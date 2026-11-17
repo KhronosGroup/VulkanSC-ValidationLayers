@@ -197,6 +197,8 @@ class BestPractices : public vvl::DeviceProxy {
                                  const RecordObject& record_obj) override;
     bool ValidateMultisampledBlendingArm(const vvl::Pipeline& pipeline, const Location& create_info_loc) const;
 
+    bool ValidateSampleShadingFragmentShadingRate(const VkGraphicsPipelineCreateInfo& create_info, const vvl::Pipeline& pipeline,
+                                                  const Location& create_info_loc) const;
     bool ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo& create_info, const vvl::Pipeline& pipeline,
                                         const Location create_info_loc) const;
     bool PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
@@ -245,7 +247,7 @@ class BestPractices : public vvl::DeviceProxy {
     bool PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
                                        const VkDependencyInfo* pDependencyInfos, const ErrorObject& error_obj) const override;
     bool ValidateAccessLayoutCombination(const Location& loc, VkImage image, VkAccessFlags2 access, VkImageLayout layout,
-                                         VkImageAspectFlags aspect) const;
+                                         VkImageAspectFlags aspect, bool is_src) const;
     bool ValidateImageMemoryBarrier(const Location& loc, VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout,
                                     VkImageLayout newLayout, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask,
                                     VkImageAspectFlags aspectMask, uint32_t srcQueueFamilyIndex,
@@ -401,9 +403,6 @@ class BestPractices : public vvl::DeviceProxy {
                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
                                              const ErrorObject& error_obj) const override;
-    bool PreCallValidateBindAccelerationStructureMemoryNV(VkDevice device, uint32_t bindInfoCount,
-                                                          const VkBindAccelerationStructureMemoryInfoNV* pBindInfos,
-                                                          const ErrorObject& error_obj) const override;
     bool PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence,
                                         const ErrorObject& error_obj) const override;
     void ManualPostCallRecordQueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo,
@@ -435,17 +434,6 @@ class BestPractices : public vvl::DeviceProxy {
                               IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
     void ValidateImageInQueueArmImg(const Location& loc, vvl::Image& image_state, IMAGE_SUBRESOURCE_USAGE_BP last_usage,
                                     IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
-
-    template <typename RegionType>
-    bool ValidateCmdBlitImage(VkCommandBuffer command_buffer, uint32_t region_count, const RegionType* regions,
-                              const Location& loc) const;
-    bool PreCallValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                     VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                     const VkImageBlit* pRegions, VkFilter filter, const ErrorObject& error_obj) const override;
-    bool PreCallValidateCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR* pBlitImageInfo,
-                                         const ErrorObject& error_obj) const override;
-    bool PreCallValidateCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo,
-                                      const ErrorObject& error_obj) const override;
 
     bool PreCallValidateCreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo,
                                       const VkAllocationCallbacks* pAllocator, VkSampler* pSampler,
@@ -556,11 +544,6 @@ class BestPractices : public vvl::DeviceProxy {
     bool PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
                                            const VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const override;
 
-    bool PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuffer commandBuffer, const VkAccelerationStructureInfoNV* pInfo,
-                                                        VkBuffer instanceData, VkDeviceSize instanceOffset, VkBool32 update,
-                                                        VkAccelerationStructureNV dst, VkAccelerationStructureNV src,
-                                                        VkBuffer scratch, VkDeviceSize scratchOffset,
-                                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateCmdBuildAccelerationStructuresIndirectKHR(VkCommandBuffer commandBuffer, uint32_t infoCount,
                                                                   const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
                                                                   const VkDeviceAddress* pIndirectDeviceAddresses,
@@ -583,10 +566,6 @@ class BestPractices : public vvl::DeviceProxy {
     void RecordClearColor(VkFormat format, const VkClearColorValue& clear_value);
     bool ClearAttachmentsIsFullClear(const bp_state::CommandBufferSubState& cb_state, uint32_t rectCount,
                                      const VkClearRect* pRects) const;
-    void PipelineUsedInFrame(VkPipeline pipeline) {
-        WriteLockGuard guard(pipeline_lock_);
-        pipelines_used_in_frame_.insert(pipeline);
-    }
 
 // Include code-generated functions
 #include "generated/best_practices_device_methods.h"
@@ -627,16 +606,6 @@ class BestPractices : public vvl::DeviceProxy {
     bool ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat format, const VkClearColorValue& clear_value,
                             const Location& loc) const;
 
-    void ClearPipelinesUsedInFrame() {
-        WriteLockGuard guard(pipeline_lock_);
-        pipelines_used_in_frame_.clear();
-    }
-
-    bool IsPipelineUsedInFrame(VkPipeline pipeline) const {
-        ReadLockGuard guard(pipeline_lock_);
-        return pipelines_used_in_frame_.count(pipeline) != 0;
-    }
-
     // AMD tracked
     std::atomic<uint32_t> num_barriers_objects_{0};
     std::atomic<uint32_t> num_pso_{0};
@@ -656,9 +625,6 @@ class BestPractices : public vvl::DeviceProxy {
     // Can't get vvl::unordered_set to work with std::array
     std::set<std::array<uint32_t, 4>> clear_colors_;
     mutable std::shared_mutex clear_colors_lock_;
-
-    vvl::unordered_set<VkPipeline> pipelines_used_in_frame_;
-    mutable std::shared_mutex pipeline_lock_;
 };
 
 static inline bool RenderPassUsesAttachmentOnTile(const vku::safe_VkRenderPassCreateInfo2& create_info, uint32_t attachment) {

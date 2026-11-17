@@ -29,7 +29,7 @@
 #ifdef _WIN32
 /* Windows-specific common code: */
 // WinBase.h defines CreateSemaphore and synchapi.h defines CreateEvent
-//  undefine them to avoid conflicts with VkLayerDispatchTable struct members.
+//  undefine them to avoid conflicts with the vk:: function pointers below.
 #ifdef CreateSemaphore
 #undef CreateSemaphore
 #endif
@@ -702,6 +702,13 @@ extern PFN_vkCmdCudaLaunchKernelNV CmdCudaLaunchKernelNV;
 extern PFN_vkCmdDispatchTileQCOM CmdDispatchTileQCOM;
 extern PFN_vkCmdBeginPerTileExecutionQCOM CmdBeginPerTileExecutionQCOM;
 extern PFN_vkCmdEndPerTileExecutionQCOM CmdEndPerTileExecutionQCOM;
+extern PFN_vkSetLatencySleepModeLegacyNV SetLatencySleepModeLegacyNV;
+extern PFN_vkLatencySleepLegacyNV LatencySleepLegacyNV;
+extern PFN_vkSetLatencyMarkerLegacyNV SetLatencyMarkerLegacyNV;
+extern PFN_vkGetLatencyTimingsLegacyNV GetLatencyTimingsLegacyNV;
+extern PFN_vkQueueNotifyOutOfBandLegacyNV QueueNotifyOutOfBandLegacyNV;
+extern PFN_vkGetSleepStatusLegacyNV GetSleepStatusLegacyNV;
+extern PFN_vkShutdownLatencyDeviceLegacyNV ShutdownLatencyDeviceLegacyNV;
 #ifdef VK_USE_PLATFORM_METAL_EXT
 extern PFN_vkExportMetalObjectsEXT ExportMetalObjectsEXT;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -906,10 +913,15 @@ extern PFN_vkCmdEndRendering2EXT CmdEndRendering2EXT;
 extern PFN_vkCmdBeginCustomResolveEXT CmdBeginCustomResolveEXT;
 extern PFN_vkGetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM GetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM;
 extern PFN_vkCmdSetComputeOccupancyPriorityNV CmdSetComputeOccupancyPriorityNV;
+extern PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT GetPhysicalDeviceCooperativeMatrixProperties2EXT;
 #ifdef VK_USE_PLATFORM_UBM_SEC
 extern PFN_vkCreateUbmSurfaceSEC CreateUbmSurfaceSEC;
 extern PFN_vkGetPhysicalDeviceUbmPresentationSupportSEC GetPhysicalDeviceUbmPresentationSupportSEC;
 #endif  // VK_USE_PLATFORM_UBM_SEC
+extern PFN_vkGetPhysicalDeviceInternalHandleNV GetPhysicalDeviceInternalHandleNV;
+extern PFN_vkGetDeviceInternalHandleNV GetDeviceInternalHandleNV;
+extern PFN_vkGetQueueInternalHandleNV GetQueueInternalHandleNV;
+extern PFN_vkGetCommandBufferInternalHandleNV GetCommandBufferInternalHandleNV;
 extern PFN_vkCmdSetPrimitiveRestartIndexEXT CmdSetPrimitiveRestartIndexEXT;
 extern PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR;
 extern PFN_vkDestroyAccelerationStructureKHR DestroyAccelerationStructureKHR;

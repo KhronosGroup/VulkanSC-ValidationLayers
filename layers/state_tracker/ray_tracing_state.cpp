@@ -25,6 +25,7 @@ AccelerationStructureKHR::AccelerationStructureKHR(vvl::DeviceState& device_stat
                                                    const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                    VkAccelerationStructureKHR handle)
     : StateObject(handle, kVulkanObjectTypeAccelerationStructureKHR),
+      device_state(device_state),
       create_info(std::in_place_type<CreateInfo1>, pCreateInfo, device_state.Get<vvl::Buffer>(pCreateInfo->buffer)) {
     auto& ci_1 = std::get<CreateInfo1>(create_info);
     if (ci_1.buffer_state) {
@@ -34,7 +35,9 @@ AccelerationStructureKHR::AccelerationStructureKHR(vvl::DeviceState& device_stat
         } else if (ci_1.buffer_state->Binding()) {
             buffer_address = device_state.GetBufferDeviceAddressHelper(ci_1.buffer_state->VkHandle());
         }
-        device_address_range = {buffer_address + pCreateInfo->offset, pCreateInfo->size};
+        if (buffer_address != 0) {
+            device_address_range = {buffer_address + pCreateInfo->offset, pCreateInfo->size};
+        }
     }
 }
 
@@ -42,6 +45,7 @@ AccelerationStructureKHR::AccelerationStructureKHR(vvl::DeviceState& device_stat
                                                    const VkAccelerationStructureCreateInfo2KHR* pCreateInfo,
                                                    VkAccelerationStructureKHR handle)
     : StateObject(handle, kVulkanObjectTypeAccelerationStructureKHR),
+      device_state(device_state),
       create_info(std::in_place_type<vku::safe_VkAccelerationStructureCreateInfo2KHR>, pCreateInfo),
       device_address_range(pCreateInfo->addressRange) {}
 
@@ -77,28 +81,6 @@ void AccelerationStructureKHR::NotifyInvalidate(const StateObject::NodeList& inv
         item.second->NotifyInvalidate(invalid_nodes, unlink);
     }
     StateObject::NotifyInvalidate(invalid_nodes, unlink);
-}
-
-void AccelerationStructureKHR::Build(const VkAccelerationStructureBuildGeometryInfoKHR* pInfo, const bool is_host,
-                                     const VkAccelerationStructureBuildRangeInfoKHR* build_range_info) {
-    if (!GetBuildInfo().has_value()) {
-        build_geometry_info = vku::safe_VkAccelerationStructureBuildGeometryInfoKHR();
-    }
-    build_geometry_info->initialize(pInfo, is_host, build_range_info);
-};
-
-void AccelerationStructureKHR::UpdateBuildRangeInfos(const VkAccelerationStructureBuildRangeInfoKHR* p_build_range_infos,
-                                                     uint32_t geometry_count) {
-    // range info is null for indirect builds (vkCmdBuildAccelerationStructuresIndirectKHR) or VK_GEOMETRY_TYPE_MICROMAP_KHR
-    if (!p_build_range_infos) {
-        build_range_infos.clear();
-        return;
-    }
-
-    build_range_infos.resize(geometry_count);
-    for (const auto [i, build_range] : vvl::enumerate(p_build_range_infos, geometry_count)) {
-        build_range_infos[i] = build_range;
-    }
 }
 
 bool AccelerationStructureKHR::UsesCreateInfo1() const { return std::get_if<CreateInfo1>(&create_info) != nullptr; }
@@ -145,7 +127,24 @@ VkAccelerationStructureTypeKHR AccelerationStructureKHR::GetType() const {
     return std::get<vku::safe_VkAccelerationStructureCreateInfo2KHR>(create_info).type;
 }
 
-VkDeviceAddressRangeKHR AccelerationStructureKHR::GetEffectiveDeviceAddressRange() const { return device_address_range; }
+VkDeviceAddressRangeKHR AccelerationStructureKHR::GetEffectiveDeviceAddressRange() const {
+    if (device_address_range.address == 0) {
+        if (const auto* ci_1 = std::get_if<CreateInfo1>(&create_info)) {
+            if (ci_1->buffer_state) {
+                VkDeviceAddress buffer_address = 0;
+                if (ci_1->buffer_state->deviceAddress != 0) {
+                    buffer_address = ci_1->buffer_state->deviceAddress;
+                } else if (ci_1->buffer_state->Binding()) {
+                    buffer_address = device_state.GetBufferDeviceAddressHelper(ci_1->buffer_state->VkHandle());
+                }
+                if (buffer_address != 0) {
+                    device_address_range = {buffer_address + ci_1->ci.offset, ci_1->ci.size};
+                }
+            }
+        }
+    }
+    return device_address_range;
+}
 
 vvl::range<VkDeviceAddress> AccelerationStructureKHR::GetVvlEffectiveDeviceAddressRange() const {
     const VkDeviceAddressRangeKHR khr_device_address_range = GetEffectiveDeviceAddressRange();
@@ -157,17 +156,30 @@ std::string AccelerationStructureKHR::Describe(const Logger& dev_data) const {
 
     ss << dev_data.FormatHandle(Handle());
     if (UsesCreateInfo1()) {
-        const auto* ci_1 = std::get_if<CreateInfo1>(&create_info);
-        ss << ", createFlags: " << string_VkAccelerationStructureCreateFlagsKHR(ci_1->ci.createFlags)
-           << ", buffer: " << dev_data.FormatHandle(*ci_1->buffer_state) << ", offset: " << ci_1->ci.offset
-           << ", size: " << ci_1->ci.size << ", type: " << string_VkAccelerationStructureTypeKHR(ci_1->ci.type)
-           << ", deviceAddress: 0x" << std::hex << ci_1->ci.deviceAddress;
+        if (const auto* ci_1 = std::get_if<CreateInfo1>(&create_info)) {
+            ss << ", createFlags: " << string_VkAccelerationStructureCreateFlagsKHR(ci_1->ci.createFlags)
+               << ", buffer: " << dev_data.FormatHandle(*ci_1->buffer_state) << ", offset: " << ci_1->ci.offset
+               << ", size: " << ci_1->ci.size << ", type: " << string_VkAccelerationStructureTypeKHR(ci_1->ci.type)
+               << ", deviceAddress: 0x" << std::hex << ci_1->ci.deviceAddress;
+            const VkDeviceAddress address = GetAccelerationStructureAddress();
+            if (address != 0) {
+                ss << ", vkGetAccelerationStructureDeviceAddressKHR: 0x" << std::hex << address << std::dec;
+            } else {
+                ss << ", vkGetAccelerationStructureDeviceAddressKHR: <unknown>";
+            }
+        }
     } else if (UsesCreateInfo2()) {
         const auto& ci_2 = std::get<vku::safe_VkAccelerationStructureCreateInfo2KHR>(create_info);
         ss << ", createFlags: " << string_VkAccelerationStructureCreateFlagsKHR(ci_2.createFlags) << ", addressRange.address: 0x"
            << std::hex << ci_2.addressRange.address << ", addressRange.size: " << std::dec << ci_2.addressRange.size
            << ", addressFlags: " << string_VkAddressCommandFlagsKHR(ci_2.addressFlags)
            << ", type: " << string_VkAccelerationStructureTypeKHR(ci_2.type);
+        const VkDeviceAddress address = GetAccelerationStructureAddress();
+        if (address != 0) {
+            ss << ", vkGetAccelerationStructureDeviceAddressKHR: 0x" << std::hex << address << std::dec;
+        } else {
+            ss << ", vkGetAccelerationStructureDeviceAddressKHR: <unknown>";
+        }
     }
 
     return ss.str();

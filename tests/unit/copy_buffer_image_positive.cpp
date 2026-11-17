@@ -125,7 +125,7 @@ TEST_F(PositiveCopyBufferImage, ImageLayerCount) {
     m_command_buffer.End();
 }
 
-TEST_F(PositiveCopyBufferImage, BufferToRemaingImageLayers) {
+TEST_F(PositiveCopyBufferImage, BufferToRemainingImageLayers) {
     TEST_DESCRIPTION("Test vkCmdCopyBufferToImage2 with VK_REMAINING_ARRAY_LAYERS");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1674,8 +1674,7 @@ TEST_F(PositiveCopyBufferImage, Transition3dImage) {
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 4};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &region);
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -1715,15 +1714,13 @@ TEST_F(PositiveCopyBufferImage, Transition3dImageSlices) {
     image_memory_barrier.image = image;
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 4};
 
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     image_memory_barrier.subresourceRange.baseArrayLayer = 2u;
     image_memory_barrier.subresourceRange.layerCount = 2u;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1u, &region);
 
@@ -1835,6 +1832,51 @@ TEST_F(PositiveCopyBufferImage, MemoryToImageIndirect) {
     copy_info.pImageSubresources = res_layers;
 
     vk::CmdCopyImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
+    vk::CmdCopyMemoryToImageIndirectKHR(m_command_buffer, &copy_info);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveCopyBufferImage, MemoryToImageIndirect3D) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11332");
+    AddRequiredExtensions(VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::indirectMemoryToImageCopy);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init());
+
+    const size_t copy_size = sizeof(VkCopyMemoryToImageIndirectCommandKHR);
+    vkt::Buffer indirect_buffer(*m_device, copy_size * 3, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
+
+    // depth is 4 at mip 0 and 2 at mip 1
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {32, 32, 4};
+    image_ci.mipLevels = 2;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    vkt::Image dst_image(*m_device, image_ci);
+
+    // layerCount is greater than arrayLayers (1), which is fine for a 3D image
+    VkImageSubresourceLayers res_layers[3] = {{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 4},
+                                              {VK_IMAGE_ASPECT_COLOR_BIT, 1, 1, 1},
+                                              {VK_IMAGE_ASPECT_COLOR_BIT, 1, 0, VK_REMAINING_ARRAY_LAYERS}};
+
+    VkStridedDeviceAddressRangeKHR address_range = {};
+    address_range.address = indirect_buffer.Address();
+    address_range.size = copy_size * 3;
+    address_range.stride = copy_size;
+
+    VkCopyMemoryToImageIndirectInfoKHR copy_info = vku::InitStructHelper();
+    copy_info.copyCount = 3;
+    copy_info.copyAddressRange = address_range;
+    copy_info.srcCopyFlags = VK_ADDRESS_COPY_DEVICE_LOCAL_BIT_KHR;
+    copy_info.dstImage = dst_image;
+    copy_info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    copy_info.pImageSubresources = res_layers;
+
+    m_command_buffer.Begin();
     vk::CmdCopyMemoryToImageIndirectKHR(m_command_buffer, &copy_info);
     m_command_buffer.End();
 }

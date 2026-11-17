@@ -16,6 +16,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <chrono>
 #include <thread>
 #include "utils/cast_utils.h"
 #include "external_memory_sync.h"
@@ -64,8 +65,7 @@ TEST_F(NegativeSyncObject, ImageBarrierSubpassConflicts) {
     mem_barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     mem_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 1,
-                           &mem_barrier, 0, nullptr, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, mem_barrier);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
 
@@ -82,22 +82,21 @@ TEST_F(NegativeSyncObject, ImageBarrierSubpassConflicts) {
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     // Mis-match src stage mask
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // // Now mis-match dst stage mask
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Set srcQueueFamilyIndex to a different value than dstQueueFamilyIndex
     img_barrier.srcQueueFamilyIndex = 0;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-01182");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -106,42 +105,38 @@ TEST_F(NegativeSyncObject, ImageBarrierSubpassConflicts) {
     mem_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     mem_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &mem_barrier, 0, nullptr,
-                           0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             mem_barrier, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Mis-match mem barrier dst access mask. Also set srcAccessMask to 0 which should not cause an error
     mem_barrier.srcAccessMask = 0;
     mem_barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &mem_barrier, 0, nullptr,
-                           0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             mem_barrier, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Mis-match image barrier src access mask
     img_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Mis-match image barrier dst access mask
     img_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     img_barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Mis-match dependencyFlags
     img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0 /* wrong */, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0 /* wrong */);
     m_errorMonitor->VerifyFound();
 
     // Send non-zero bufferMemoryBarrierCount
@@ -158,18 +153,16 @@ TEST_F(NegativeSyncObject, ImageBarrierSubpassConflicts) {
     bmb.offset = 0;
     bmb.size = VK_WHOLE_SIZE;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-bufferMemoryBarrierCount-01178");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 1, &bmb, 0,
-                           nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, bmb,
+                             VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Add image barrier w/ image handle that's not in framebuffer
     vkt::Image lone_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     img_barrier.image = lone_image;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-04073");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Have image barrier with layout that does not match layout specified in attachment reference
@@ -177,9 +170,8 @@ TEST_F(NegativeSyncObject, ImageBarrierSubpassConflicts) {
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-oldLayout-10758");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
 }
@@ -199,8 +191,7 @@ TEST_F(NegativeSyncObject, BufferMemoryBarrierNoBuffer) {
     buf_barrier.buffer = VK_NULL_HANDLE;
     buf_barrier.offset = 0;
     buf_barrier.size = VK_WHOLE_SIZE;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1,
-                           &buf_barrier, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, buf_barrier);
 
     m_errorMonitor->VerifyFound();
 }
@@ -335,16 +326,14 @@ TEST_F(NegativeSyncObject, Barriers) {
         img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
         img_barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
         img_barrier.dstAccessMask = 0;
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &img_barrier);
+        m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
         img_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
         img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
         img_barrier.dstQueueFamilyIndex = submit_family;
         img_barrier.srcAccessMask = 0;
         img_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &img_barrier);
+        m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     }
 
     // Exceed the buffer size
@@ -402,6 +391,7 @@ TEST_F(NegativeSyncObject, Barriers) {
 
         // DEPTH bit must be set
         conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_METADATA_BIT;
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-image-10749");
         conc_test("VUID-VkImageMemoryBarrier-subresourceRange-09601");
 
         // No bits other than DEPTH may be set
@@ -421,6 +411,7 @@ TEST_F(NegativeSyncObject, Barriers) {
         // Use of COLOR aspect on depth image is error
         conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         // must have the VK_IMAGE_ASPECT_STENCIL_BIT set
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-image-10750");
         conc_test("VUID-VkImageMemoryBarrier-subresourceRange-09601");
     }
 
@@ -710,8 +701,8 @@ TEST_F(NegativeSyncObject, Barriers) {
     // Set two bits that should both be supported as a bonus positive check
     buf_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     buf_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-    vk::CmdPipelineBarrier(bad_command_buffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 1, &buf_barrier, 0, nullptr);
+    bad_command_buffer.Barrier(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, buf_barrier,
+                               VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
 
     // Check for error for trying to wait on pipeline stage not supported by this queue. Specifically since our queue is not a
@@ -915,6 +906,7 @@ TEST_F(NegativeSyncObject, Sync2Barriers) {
 
         // DEPTH bit must be set
         conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_METADATA_BIT;
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-image-10749");
         conc_test("depth-only image formats must have the VK_IMAGE_ASPECT_DEPTH_BIT set.");
 
         // No bits other than DEPTH may be set
@@ -933,6 +925,7 @@ TEST_F(NegativeSyncObject, Sync2Barriers) {
 
         // Use of COLOR aspect on depth image is error
         conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-image-10750");
         conc_test("stencil-only image formats must have the VK_IMAGE_ASPECT_STENCIL_BIT set.");
     }
 
@@ -1194,6 +1187,64 @@ TEST_F(NegativeSyncObject, DepthStencilImageNonSeparateSync2) {
     conc_test("VUID-VkImageMemoryBarrier2-image-03320");
 }
 
+TEST_F(NegativeSyncObject, DepthOnlyStencilOnlyImageAspect) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    m_command_buffer.Begin();
+
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    VkImageMemoryBarrier2 barrier2 = vku::InitStructHelper();
+    barrier2.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier2.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier2.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    const VkFormat depth_format = FindSupportedDepthOnlyFormat(Gpu());
+    vkt::Image depth_image(*m_device, 32, 32, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    barrier.image = depth_image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+    m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-subresourceRange-09601");
+    m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-image-10749");
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    m_errorMonitor->VerifyFound();
+
+    barrier2.image = depth_image;
+    barrier2.subresourceRange = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+    m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-subresourceRange-09601");
+    m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-image-10749");
+    m_command_buffer.Barrier(barrier2);
+    m_errorMonitor->VerifyFound();
+
+    const VkFormat stencil_format = FindSupportedStencilOnlyFormat(Gpu());
+    if (stencil_format != VK_FORMAT_UNDEFINED) {
+        vkt::Image stencil_image(*m_device, 32, 32, stencil_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+        barrier.image = stencil_image;
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-subresourceRange-09601");
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-image-10750");
+        m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+        m_errorMonitor->VerifyFound();
+
+        barrier2.image = stencil_image;
+        barrier2.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-subresourceRange-09601");
+        m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-image-10750");
+        m_command_buffer.Barrier(barrier2);
+        m_errorMonitor->VerifyFound();
+    }
+
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeSyncObject, BarrierQueueFamily) {
     TEST_DESCRIPTION("Create and submit barriers with invalid queue families");
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -1359,8 +1410,7 @@ TEST_F(NegativeSyncObject, BufferOwnershipTransferQueueMismatch) {
     release_barrier.size = 256;
     release_cb.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-10388");
-    vk::CmdPipelineBarrier(release_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 1,
-                           &release_barrier, 0, nullptr);
+    release_cb.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, release_barrier);
     m_errorMonitor->VerifyFound();
     release_cb.End();
 
@@ -1374,8 +1424,7 @@ TEST_F(NegativeSyncObject, BufferOwnershipTransferQueueMismatch) {
     acquire_barrier.size = 256;
     acquire_cb.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-10388");
-    vk::CmdPipelineBarrier(acquire_cb, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 1,
-                           &acquire_barrier, 0, nullptr);
+    acquire_cb.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, acquire_barrier);
     m_errorMonitor->VerifyFound();
     acquire_cb.End();
 }
@@ -1407,8 +1456,7 @@ TEST_F(NegativeSyncObject, ConcurrentBufferBarrierNeedsIgnoredQueue) {
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkBufferMemoryBarrier-None-09049");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
-                           1, &barrier, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, barrier);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1444,8 +1492,7 @@ TEST_F(NegativeSyncObject, ConcurrentImageBarrierNeedsIgnoredQueue) {
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-None-09052");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1461,7 +1508,7 @@ TEST_F(NegativeSyncObject, BufferBarrierWithHostStage) {
     barrier.buffer = buffer;
     barrier.size = VK_WHOLE_SIZE;
     // source and destination families should be equal if HOST stage is used
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
     barrier.dstQueueFamilyIndex = 0;
 
     // HOST stage as source
@@ -1500,7 +1547,7 @@ TEST_F(NegativeSyncObject, ImageBarrierWithHostStage) {
     barrier.image = image;
     barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     // source and destination families should be equal if HOST stage is used
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
     barrier.dstQueueFamilyIndex = 0;
 
     // HOST stage as source
@@ -1546,8 +1593,7 @@ TEST_F(NegativeSyncObject, BufferBarrierWithHostStageSync1) {
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09634");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 1,
-                           &barrier, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, barrier);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 
@@ -1556,8 +1602,7 @@ TEST_F(NegativeSyncObject, BufferBarrierWithHostStageSync1) {
     barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09634");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, nullptr, 1,
-                           &barrier, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_HOST_BIT, barrier);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1584,8 +1629,7 @@ TEST_F(NegativeSyncObject, ImageBarrierWithHostStageSync1) {
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09633");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 
@@ -1594,8 +1638,7 @@ TEST_F(NegativeSyncObject, ImageBarrierWithHostStageSync1) {
     barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09633");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_HOST_BIT);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -1900,8 +1943,7 @@ TEST_F(NegativeSyncObject, BufferBarrierQueuesExternalAndForeign) {
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-10388");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 1, &bmb, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, bmb, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -2126,15 +2168,13 @@ TEST_F(NegativeSyncObject, BarrierAccessSync1) {
     VkMemoryBarrier mem_barrier = vku::InitStructHelper();
     mem_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcAccessMask-02815");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
-                           &mem_barrier, 0, nullptr, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, mem_barrier);
     m_errorMonitor->VerifyFound();
 
     mem_barrier = vku::InitStructHelper();
     mem_barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstAccessMask-02816");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
-                           &mem_barrier, 0, nullptr, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, mem_barrier);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -2164,8 +2204,7 @@ TEST_F(NegativeSyncObject, BarrierAccessSync1AllCommands) {
     transfer_cb.Begin();
     // ALL_COMMANDS on transfer queue does not include operations on stages that allow SHADER_READ access
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-pImageMemoryBarriers-02820");
-    vk::CmdPipelineBarrier(transfer_cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier);
+    transfer_cb.Barrier(barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_errorMonitor->VerifyFound();
     transfer_cb.End();
 }
@@ -3589,8 +3628,7 @@ TEST_F(NegativeSyncObject, PipelineStageConditionalRenderingWithWrongQueue) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-06461");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-06462");
-    vk::CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT, 0,
-                           0, nullptr, 0, nullptr, 1, &imb);
+    commandBuffer.Barrier(imb, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT);
     m_errorMonitor->VerifyFound();
 
     commandBuffer.End();
@@ -3615,8 +3653,7 @@ TEST_F(NegativeSyncObject, RenderPassPipelineBarrierGraphicsStage) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07889");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-07892");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                           nullptr, 0, nullptr, 0, nullptr);
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_errorMonitor->VerifyFound();
 }
 
@@ -3778,9 +3815,8 @@ TEST_F(NegativeSyncObject, BarrierOwnershipTransferUseAllStages) {
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-maintenance8-10206");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, 0, nullptr, 1, &barrier, 0,
-                           nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier,
+                             VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -3867,6 +3903,47 @@ TEST_F(NegativeSyncObject, TimelineHostSignalAndInUseTracking) {
 
     m_default_queue->Wait();
     vk::DestroySemaphore(*m_device, handle, nullptr);
+}
+
+TEST_F(NegativeSyncObject, TimelineRepeatedHostSignalsAndInUseTracking) {
+    TEST_DESCRIPTION("Test semaphore in-use tracking with multiple host signals");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    vkt::Semaphore blocking_semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+
+    VkSemaphoreSubmitInfo wait_infos[2];
+    wait_infos[0] = vku::InitStructHelper();
+    wait_infos[0].semaphore = semaphore;
+    wait_infos[0].value = 1;
+    wait_infos[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+    wait_infos[1] = vku::InitStructHelper();
+    wait_infos[1].semaphore = blocking_semaphore;
+    wait_infos[1].value = 1;
+    wait_infos[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+    VkSubmitInfo2 submit_info = vku::InitStructHelper();
+    submit_info.waitSemaphoreInfoCount = 2;
+    submit_info.pWaitSemaphoreInfos = wait_infos;
+    vk::QueueSubmit2(*m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+
+    // Check for a regression when signal handing incorrectly removes a timepoint.
+    // The second signal can then discard information about the waiting queue
+    semaphore.Signal(1);
+    semaphore.Signal(2);
+
+    // Check the presense of the queue in the message. If we lost semaphore timepoint information
+    // due to incorrect cleanup we can get error message without queue information
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkDestroySemaphore-semaphore-05149", "in use by VkQueue");
+    vk::DestroySemaphore(*m_device, semaphore, nullptr);
+    m_errorMonitor->VerifyFound();
+
+    blocking_semaphore.Signal(1);
+    m_default_queue->Wait();
 }
 
 TEST_F(NegativeSyncObject, TimelineSubmitSignalAndInUseTracking) {
@@ -4181,15 +4258,7 @@ TEST_F(NegativeSyncObject, Sync2FeatureDisabled) {
     RETURN_IF_SKIP(Init());
 
     const bool vulkan_13 = (DeviceValidationVersion() >= VK_API_VERSION_1_3);
-    bool timestamp = false;
-
-    uint32_t queue_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_count, NULL);
-    std::vector<VkQueueFamilyProperties> queue_props(queue_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_count, queue_props.data());
-    if (queue_props[m_device->graphics_queue_node_index_].timestampValidBits > 0) {
-        timestamp = true;
-    }
+    const bool timestamp = (m_device->Physical().queue_properties_[m_device->graphics_queue_node_index_].timestampValidBits > 0);
 
     m_command_buffer.Begin();
 
@@ -4257,8 +4326,7 @@ TEST_F(NegativeSyncObject, BufferMemoryBarrierUnbound) {
     bmb.offset = 0;
     bmb.size = VK_WHOLE_SIZE;
     m_errorMonitor->SetDesiredError("VUID-VkBufferMemoryBarrier-buffer-01931");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, nullptr,
-                           1u, &bmb, 0u, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, bmb);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -4293,15 +4361,13 @@ TEST_F(NegativeSyncObject, DISABLED_BufferMemoryBarrierQueueFamilyExternal) {
     bmb.offset = 0;
     bmb.size = VK_WHOLE_SIZE;
     m_errorMonitor->SetDesiredError("VUID-VkBufferMemoryBarrier-None-09097");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, nullptr,
-                           1u, &bmb, 0u, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, bmb);
     m_errorMonitor->VerifyFound();
 
     bmb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     bmb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
     m_errorMonitor->SetDesiredError("VUID-VkBufferMemoryBarrier-None-09098");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, nullptr,
-                           1u, &bmb, 0u, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, bmb);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -4371,15 +4437,13 @@ TEST_F(NegativeSyncObject, BufferMemoryBarrierQueueFamilyForeign) {
     bmb.size = VK_WHOLE_SIZE;
 
     m_errorMonitor->SetDesiredError("VUID-VkBufferMemoryBarrier-srcQueueFamilyIndex-09099");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, nullptr,
-                           1u, &bmb, 0u, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, bmb);
     m_errorMonitor->VerifyFound();
 
     bmb.srcQueueFamilyIndex = m_default_queue->family_index;
     bmb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT;
     m_errorMonitor->SetDesiredError("VUID-VkBufferMemoryBarrier-dstQueueFamilyIndex-09100");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, nullptr,
-                           1u, &bmb, 0u, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, bmb);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -4524,40 +4588,35 @@ TEST_F(NegativeSyncObject, UnsupportedPipelineBarrierStages) {
     m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-04091");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT,
-                           0u, 0u, nullptr, 0u, nullptr, 0u, nullptr);
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT);
     m_errorMonitor->VerifyFound();
 
     if (IsExtensionsEnabled(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME)) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-04092");
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT,
-                               0u, 0u, nullptr, 0u, nullptr, 0u, nullptr);
+        m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT);
         m_errorMonitor->VerifyFound();
     }
 
     if (IsExtensionsEnabled(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME)) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-04093");
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT, 0u, 0u, nullptr, 0u, nullptr, 0u, nullptr);
+        m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT);
         m_errorMonitor->VerifyFound();
     }
 
     if (IsExtensionsEnabled(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME)) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-04094");
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT,
-                               0u, 0u, nullptr, 0u, nullptr, 0u, nullptr);
+        m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT);
         m_errorMonitor->VerifyFound();
     }
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-03937");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0u, 0u, 0u, nullptr, 0u, nullptr, 0u, nullptr);
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0u);
     m_errorMonitor->VerifyFound();
 
     if (IsExtensionsEnabled(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME)) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-07318");
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR, 0u, 0u, nullptr, 0u, nullptr, 0u,
-                               nullptr);
+        m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                          VK_PIPELINE_STAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR);
         m_errorMonitor->VerifyFound();
     }
 
@@ -4672,8 +4731,7 @@ TEST_F(NegativeSyncObject, AcquireWithoutRelease) {
     buffer_memory_barrier.size = VK_WHOLE_SIZE;
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 1u,
-                           &buffer_memory_barrier, 0u, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, buffer_memory_barrier);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredError("VUID-vkQueueSubmit-pSubmits-02207");
@@ -4830,12 +4888,11 @@ TEST_F(NegativeSyncObject, RayTracingStageFlagWithoutFeature) {
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-07949");
-    vk::CmdPipelineBarrier(m_command_buffer, stage, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr, 0u, nullptr, 0u,
-                           nullptr);
+    m_command_buffer.ExecutionBarrier(stage, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-07949");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, stage, 0u, 0u, nullptr, 0u, nullptr, 0u, nullptr);
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, stage);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -4926,15 +4983,13 @@ TEST_F(NegativeSyncObject, Transition3dImageSlice) {
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-maintenance9-10798");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_errorMonitor->VerifyFound();
 
     image_memory_barrier.subresourceRange.baseArrayLayer = 0u;
     image_memory_barrier.subresourceRange.layerCount = 5u;
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-maintenance9-10800");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -4970,9 +5025,99 @@ TEST_F(NegativeSyncObject, Transition3dImageWithMipLevels) {
 
     m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier-maintenance9-10799");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_errorMonitor->VerifyFound();
 
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSyncObject, RenderPassBarrier) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    rp.AddSubpassSelfDependency(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0);
+    rp.CreateRenderPass();
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView view = image.CreateView();
+    vkt::Framebuffer fb(*m_device, rp, 1, &view.handle());
+
+    VkImageMemoryBarrier2 image_barrier = vku::InitStructHelper();
+    image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    image_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_barrier.image = image;
+    image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp, fb);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-None-07892");
+    m_command_buffer.Barrier(image_barrier, VK_DEPENDENCY_BY_REGION_BIT);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSyncObject, TimelineSemaphoreNullValueArrays) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+
+    VkTimelineSemaphoreSubmitInfo timeline_info = vku::InitStructHelper();
+    timeline_info.signalSemaphoreValueCount = 1;
+    timeline_info.pSignalSemaphoreValues = nullptr;
+    VkSubmitInfo submit_info = vku::InitStructHelper(&timeline_info);
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &semaphore.handle();
+    m_errorMonitor->SetDesiredError("VUID-VkTimelineSemaphoreSubmitInfo-pSignalSemaphoreValues-parameter");
+    vk::QueueSubmit(*m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    m_errorMonitor->VerifyFound();
+
+    timeline_info.signalSemaphoreValueCount = 0;
+    timeline_info.waitSemaphoreValueCount = 1;
+    timeline_info.pWaitSemaphoreValues = nullptr;
+    const VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    submit_info.signalSemaphoreCount = 0;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &semaphore.handle();
+    submit_info.pWaitDstStageMask = &wait_stage;
+    m_errorMonitor->SetDesiredError("VUID-VkTimelineSemaphoreSubmitInfo-pWaitSemaphoreValues-parameter");
+    vk::QueueSubmit(*m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeSyncObject, BarrierStencilAspectUsesStencilUsage) {
+    TEST_DESCRIPTION("A stencil-only barrier is checked against VkImageStencilUsageCreateInfo::stencilUsage");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::separateDepthStencilLayouts);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+    VkImageStencilUsageCreateInfo stencil_usage = vku::InitStructHelper();
+    stencil_usage.stencilUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, ds_format,
+                                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_ci.pNext = &stencil_usage;
+    vkt::Image image(*m_device, image_ci);
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkImageMemoryBarrier2-oldLayout-01211");
+    m_command_buffer.Barrier(barrier);
+    m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }

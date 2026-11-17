@@ -37,7 +37,7 @@ void RegisterBufferDeviceAddressValidation(Validator& gpuav, CommandBufferSubSta
     }
 
     cb.on_instrumentation_error_logger_register_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb,
-                                                                          const LastBound& last_bound) {
+                                                                          const LastBound&) {
         CommandBufferSubState::InstrumentationErrorLogger inst_error_logger =
             [](Validator& gpuav, const Location&, const uint32_t* error_record, const InstrumentedShader* instrumented_shader,
                std::string& out_error_msg, std::string& out_vuid_msg) {
@@ -58,16 +58,18 @@ void RegisterBufferDeviceAddressValidation(Validator& gpuav, CommandBufferSubSta
                 const uint32_t error_sub_code = GetSubError(error_record);
                 switch (error_sub_code) {
                     case kErrorSubCode_BufferDeviceAddress_UnallocRef: {
-                        const char* access_type = is_write ? "written" : "read";
+                        const char* access_type = is_write ? "write" : "read";
                         const uint32_t byte_size = payload & kInst_BuffAddrAccess_PayloadMaskAccessInfo;
-                        ss << "Out of bounds access: " << byte_size << " bytes " << access_type << " at buffer device address 0x"
-                           << std::hex << address << '.';
+                        ss << "Out of bounds: trying to " << access_type << " " << byte_size << " bytes at [0x" << std::hex
+                           << address << ", 0x" << (address + byte_size) - 1 << ") but this range does not belong to any buffer.";
                         if (is_struct) {
-                            // Added because glslang currently has no way to seperate out the struct (Slang does as of 2025.6.2)
+                            // Added because glslang currently has no way to separate out the struct (Slang does as of 2025.6.2)
                             ss << " This " << (is_write ? "write" : "read") << " corresponds to a full OpTypeStruct load";
-                            const uint32_t instruction_position_offset =
-                                error_record[kHeader_StageInstructionIdOffset] & kInstructionId_Mask;
-                            ::spirv::FindOpStructFromBDA(ss, instrumented_shader->original_spirv, instruction_position_offset);
+                            if (instrumented_shader) {
+                                const uint32_t instruction_position_offset =
+                                    error_record[kHeader_StageInstructionIdOffset] & kInstructionId_Mask;
+                                ::spirv::FindOpStructFromBDA(ss, instrumented_shader->original_spirv, instruction_position_offset);
+                            }
                             ss << ". While not all members of the struct might be accessed, "
                                   "it is up "
                                   "to the source language or tooling to detect that and reflect it in the SPIR-V.";
@@ -76,19 +78,15 @@ void RegisterBufferDeviceAddressValidation(Validator& gpuav, CommandBufferSubSta
                         const NearestBufferResult nearest = gpuav.GetNearestBuffersByAddress(address);
                         auto plural = [&](uint64_t counter) -> const char* { return counter > 1 ? "s" : ""; };
                         if (!nearest.above_buffers.empty()) {
-                            const VkDeviceAddress offset = nearest.above_range.begin - address;
-                            ss << "\nNearest above committed device address range " << vvl::string_range_hex(nearest.above_range)
-                               << " is above address by " << std::dec << offset << " byte" << plural(offset) << " and has buffer"
-                               << plural(nearest.above_buffers.size()) << ":";
+                            ss << "\nNearest above committed device address range is " << vvl::string_range_hex(nearest.above_range)
+                               << " and has buffer" << plural(nearest.above_buffers.size()) << ":";
                             for (const auto buffer : nearest.above_buffers) {
                                 ss << "\n  " << buffer->Describe(gpuav);
                             }
                         }
                         if (!nearest.below_buffers.empty()) {
-                            const VkDeviceAddress offset = address - nearest.below_range.end + 1;
-                            ss << "\nNearest below committed device address range " << vvl::string_range_hex(nearest.below_range)
-                               << " is below address by " << std::dec << offset << " byte" << plural(offset) << " and has buffer"
-                               << plural(nearest.below_buffers.size()) << ":";
+                            ss << "\nNearest below committed device address range is " << vvl::string_range_hex(nearest.below_range)
+                               << " and has buffer" << plural(nearest.below_buffers.size()) << ":";
                             for (const auto buffer : nearest.below_buffers) {
                                 ss << "\n  " << buffer->Describe(gpuav);
                             }
@@ -133,32 +131,33 @@ void RegisterBufferDeviceAddressValidation(Validator& gpuav, CommandBufferSubSta
             out_update.binding = glsl::kBindingInstBufferDeviceAddress;
         });
 
-    cb.on_pre_cb_submission_functions.emplace_back(
-        [](Validator& gpuav, CommandBufferSubState& cb, VkCommandBuffer per_submission_cb) {
-            BufferDeviceAddressCbState* bda_cb_state = cb.shared_resources_cache.TryGet<BufferDeviceAddressCbState>();
-            // Can happen if command buffer did not record any action command
-            if (!bda_cb_state) {
-                return;
-            }
+    cb.on_pre_cb_submission_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb,
+                                                      VkCommandBuffer per_submission_cb, gpuav::QueueSubmission& queue_submission,
+                                                      gpuav::CommandBufferSubmitInfo& cb_submit_info) {
+        BufferDeviceAddressCbState* bda_cb_state = cb.shared_resources_cache.TryGet<BufferDeviceAddressCbState>();
+        // Can happen if command buffer did not record any action command
+        if (!bda_cb_state) {
+            return;
+        }
 
-            // Update buffer device address (BDA) table
-            // One snapshot update per CB submission, to prevent concurrent submissions of the same CB to write and read
-            // to the same snapshot.
-            const size_t bda_ranges_count = gpuav.device_state->GetBufferAddressRangesCount();
-            const VkDeviceSize bda_table_byte_size = 2 * sizeof(uint32_t) + 2 * sizeof(VkDeviceAddress) * bda_ranges_count;
-            vko::BufferRange bda_table = cb.gpu_resources_manager.GetHostCachedBufferRange(bda_table_byte_size);
+        // Update buffer device address (BDA) table
+        // One snapshot update per CB submission, to prevent concurrent submissions of the same CB to write and read
+        // to the same snapshot.
+        const size_t bda_ranges_count = gpuav.device_state->GetBufferAddressRangesCount();
+        const VkDeviceSize bda_table_byte_size = 2 * sizeof(uint32_t) + 2 * sizeof(VkDeviceAddress) * bda_ranges_count;
+        vko::BufferRange bda_table = queue_submission.resources_manager->GetHostCachedBufferRange(bda_table_byte_size);
 
-            auto bda_table_ranges_u32_ptr = (uint32_t*)bda_table.offset_mapped_ptr;
-            *bda_table_ranges_u32_ptr = (uint32_t)bda_ranges_count;
-            gpuav.device_state->GetBufferAddressRanges((vvl::DeviceState::BufferAddressRange*)(bda_table_ranges_u32_ptr + 2));
-            cb.gpu_resources_manager.FlushAllocation(bda_table);
+        auto bda_table_ranges_u32_ptr = (uint32_t*)bda_table.offset_mapped_ptr;
+        *bda_table_ranges_u32_ptr = (uint32_t)bda_ranges_count;
+        gpuav.device_state->GetBufferAddressRanges((vvl::DeviceState::BufferAddressRange*)(bda_table_ranges_u32_ptr + 2));
+        queue_submission.resources_manager->FlushAllocation(bda_table);
 
-            // Fill a GPU buffer with a pointer to the BDA table
-            vko::BufferRange bda_table_ptr = cb.gpu_resources_manager.GetHostCoherentBufferRange(sizeof(VkDeviceAddress));
-            *(VkDeviceAddress*)bda_table_ptr.offset_mapped_ptr = bda_table.offset_address;
+        // Fill a GPU buffer with a pointer to the BDA table
+        vko::BufferRange bda_table_ptr = queue_submission.resources_manager->GetHostCoherentBufferRange(sizeof(VkDeviceAddress));
+        *(VkDeviceAddress*)bda_table_ptr.offset_mapped_ptr = bda_table.offset_address;
 
-            vko::CmdSynchronizedCopyBufferRange(per_submission_cb, bda_cb_state->bda_ranges_snapshot_ptr, bda_table_ptr);
-        });
+        vko::CmdSynchronizedCopyBufferRange(per_submission_cb, bda_cb_state->bda_ranges_snapshot_ptr, bda_table_ptr);
+    });
 }
 
 }  // namespace gpuav

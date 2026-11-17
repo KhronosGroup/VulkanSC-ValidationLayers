@@ -23,6 +23,48 @@
 
 struct PositiveSyncValRenderPass : public VkSyncValTest {};
 
+TEST_F(PositiveSyncValRenderPass, ExternalDependencySyncSubmitTime) {
+    TEST_DESCRIPTION("An external subpass dependency synchronizes an attachment write with a previous copy read");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Image attachment(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image copy_dst(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::ImageView attachment_view = attachment.CreateView();
+    attachment.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    copy_dst.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+                                         VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+    render_pass.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    render_pass.AddSubpassDependency(dependency);
+    render_pass.CreateRenderPass();
+
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &attachment_view.handle(), 32, 32);
+
+    VkImageCopy region{};
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.extent = {32, 32, 1};
+    const VkClearValue clear_value{};
+
+    m_command_buffer.Begin();
+    vk::CmdCopyImage(m_command_buffer, attachment, VK_IMAGE_LAYOUT_GENERAL, copy_dst, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    m_command_buffer.BeginRenderPass(render_pass, framebuffer, 32, 32, 1, &clear_value);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
 TEST_F(PositiveSyncValRenderPass, SyncStoreOpWriteWithPreviousRead) {
     TEST_DESCRIPTION("Synchronize StoreOp writes with previous copy reads");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -1291,4 +1333,56 @@ TEST_F(PositiveSyncValRenderPass, MultiviewStoreOpSubpassSelection) {
     m_command_buffer.NextSubpass();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncValRenderPass, UnusedAttachmentFinalLayoutTransitionSubmit) {
+    TEST_DESCRIPTION("Unused attachment layout transition as the first access of a submitted command buffer");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer(*m_device, 32 * 32 * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::ImageView image_view = image.CreateView();
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+    rp.CreateRenderPass();
+    vkt::Framebuffer framebuffer(*m_device, rp, 1, &image_view.handle());
+
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {32, 32, 1};
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
+    cb0.Begin();
+    vk::CmdCopyBufferToImage(cb0, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    // Guard the unused attachment's layout transition in the next command buffer
+    cb0.Barrier(barrier);
+    cb0.End();
+
+    // The unused attachment's final layout transition is the FIRST access to the image
+    // in this command buffer, so submit-time validation replays it as a first access.
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
+    cb1.Begin();
+    cb1.BeginRenderPass(rp, framebuffer, 32, 32);
+    cb1.EndRenderPass();
+    cb1.End();
+
+    m_default_queue->Submit({cb0, cb1});
+    m_default_queue->Wait();
 }

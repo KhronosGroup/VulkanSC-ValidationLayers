@@ -37,6 +37,7 @@ class PipelineLayout;
 
 namespace spirv {
 struct EntryPoint;
+struct Module;
 }  // namespace spirv
 
 struct ShaderStageState;
@@ -55,6 +56,9 @@ struct LastBound {
     std::shared_ptr<vvl::ShaderObject> shader_object_states[kShaderObjectStageCount]{nullptr};
     // The compatible layout used binding descriptor sets (track location to provide better error message)
     std::shared_ptr<const vvl::PipelineLayout> desc_set_pipeline_layout;
+    // Because you can have a shader with push constants and no descriptors, we need to track both pipeline layout
+    // We normally will use |desc_set_pipeline_layout| as these layouts must be compatible at draw/dispatch time
+    std::shared_ptr<const vvl::PipelineLayout> push_constant_pipeline_layout;
     vvl::Func desc_set_bound_command = vvl::Func::Empty;  // will be something like vkCmdBindDescriptorSets
     std::shared_ptr<vvl::DescriptorSet> push_descriptor_set;
 
@@ -81,10 +85,14 @@ struct LastBound {
         uint64_t validated_set_change_count{~0ULL};
         uint64_t validated_set_image_layout_change_count{~0ULL};
 
+        // For better error messages to know if the layout was disturbed
+        VkPipelineLayout disturbed_pipeline_layout{VK_NULL_HANDLE};
+
         void Reset() {
             ds_state.reset();
             descriptor_buffer_binding.reset();
             dynamic_offsets.clear();
+            disturbed_pipeline_layout = VK_NULL_HANDLE;
         }
     };
 
@@ -136,6 +144,8 @@ struct LastBound {
     bool IsAlphaToOneEnable() const;
     VkCoverageModulationModeNV GetCoverageModulationMode() const;
     uint32_t GetViewportSwizzleCount() const;
+    uint32_t GetViewportWScalingCount() const;
+    uint32_t GetShadingRatePaletteCount() const;
     VkPolygonMode GetPolygonMode() const;
 
     VkPrimitiveTopology GetVertexInputAssemblerTopology() const;
@@ -165,7 +175,8 @@ struct LastBound {
     std::string DescribeNonCompatibleSet(uint32_t set, const vvl::ShaderObject &shader_object_state) const;
 
     const spirv::EntryPoint *GetVertexEntryPoint() const;
-    const spirv::EntryPoint *GetFragmentEntryPoint() const;
+    const spirv::EntryPoint* GetFragmentEntryPoint() const;
+    const spirv::Module* GetFragmentSpirvModule() const;
 
     // Since GPU-AV uses this to access an array, force a getter to ensure people use this correctly.
     vvl::DescriptorMode GetActionDescriptorMode() const;

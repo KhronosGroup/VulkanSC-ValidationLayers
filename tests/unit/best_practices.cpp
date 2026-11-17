@@ -12,6 +12,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <algorithm>
 #include <thread>
 #include "layer_validation_tests.h"
 #include "pipeline_helper.h"
@@ -208,32 +209,6 @@ TEST_F(NegativeBestPractices, CmdClearAttachmentTestSecondary) {
     m_command_buffer.EndRenderPass();
 }
 
-TEST_F(NegativeBestPractices, ZeroSizeBlitRegion) {
-    TEST_DESCRIPTION("vkCmdBlitImage with a zero area region");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    vkt::Image image_src(*m_device, 128, 128, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    vkt::Image image_dst(*m_device, 128, 128, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-
-    VkImageBlit blit_region = {};
-    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    blit_region.srcOffsets[0] = {128, 0, 0};
-    blit_region.srcOffsets[1] = {128, 128, 1};
-    blit_region.dstOffsets[0] = {0, 128, 0};
-    blit_region.dstOffsets[1] = {128, 128, 1};
-
-    m_command_buffer.Begin();
-    m_errorMonitor->SetDesiredWarning("BestPractices-DrawState-InvalidExtents-src");
-    m_errorMonitor->SetDesiredWarning("BestPractices-DrawState-InvalidExtents-dst");
-    vk::CmdBlitImage(m_command_buffer, image_src, VK_IMAGE_LAYOUT_GENERAL, image_dst, VK_IMAGE_LAYOUT_GENERAL, 1, &blit_region,
-                     VK_FILTER_LINEAR);
-    m_errorMonitor->VerifyFound();
-    m_command_buffer.End();
-}
-
 TEST_F(NegativeBestPractices, SecondaryCommandBuffer) {
     TEST_DESCRIPTION("Test for validating usage of vkCreateCommandPool with VK_COMMAND_BUFFER_LEVEL_SECONDARY");
 
@@ -340,14 +315,9 @@ TEST_F(NegativeBestPractices, AttachmentShouldNotBeTransient) {
     attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkSubpassDescription sd{};
-
-    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
-    rp_info.attachmentCount = 1;
-    rp_info.pAttachments = &attachment;
-    rp_info.subpassCount = 1;
-    rp_info.pSubpasses = &sd;
-    vkt::RenderPass rp(*m_device, rp_info);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(attachment);
+    rp.CreateRenderPass();
 
     VkImageCreateInfo image_info = vkt::Image::ImageCreateInfo2D(
         1920, 1080, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
@@ -651,6 +621,9 @@ TEST_F(NegativeBestPractices, SwapchainCreationTest) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     RETURN_IF_SKIP(InitSurface());
+    if (vvl::SurfaceType::Wayland == m_surface.GetType()) {
+        GTEST_SKIP() << "No MAILBOX warning for Wayland";
+    }
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
     m_surface_composite_alpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
@@ -940,7 +913,7 @@ TEST_F(NegativeBestPractices, TransitionFromUndefinedToReadOnly) {
 
     VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.srcAccessMask = 0;
-    img_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    img_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     img_barrier.image = image;
@@ -952,8 +925,7 @@ TEST_F(NegativeBestPractices, TransitionFromUndefinedToReadOnly) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdPipelineBarrier-pImageMemoryBarriers-02820");  // skip core checks
     m_errorMonitor->SetDesiredWarning("BestPractices-ImageMemoryBarrier-TransitionUndefinedToReadOnly");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -1044,22 +1016,10 @@ TEST_F(NegativeBestPractices, RenderPassClearWithoutLoadOpClear) {
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
     attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
 
-    VkAttachmentReference ar{};
-    ar.attachment = 0;
-    ar.layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription spd{};
-    spd.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    spd.colorAttachmentCount = 1;
-    spd.pColorAttachments = &ar;
-
-    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
-    rp_info.attachmentCount = 1;
-    rp_info.pAttachments = &attachment;
-    rp_info.subpassCount = 1;
-    rp_info.pSubpasses = &spd;
-
-    vkt::RenderPass rp(*m_device, rp_info);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(attachment);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    rp.CreateRenderPass();
     vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), w, h);
 
     m_command_buffer.Begin();
@@ -1269,22 +1229,10 @@ TEST_F(NegativeBestPractices, ExclusiveImageMultiQueueUsage) {
     attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
     attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
 
-    VkAttachmentReference ar{};
-    ar.attachment = 0;
-    ar.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription spd{};
-    spd.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    spd.colorAttachmentCount = 1;
-    spd.pColorAttachments = &ar;
-
-    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
-    rp_info.attachmentCount = 1;
-    rp_info.pAttachments = &attachment;
-    rp_info.subpassCount = 1;
-    rp_info.pSubpasses = &spd;
-
-    vkt::RenderPass rp(*m_device, rp_info);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(attachment);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.CreateRenderPass();
     vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle(), w, h);
 
     vkt::CommandPool graphics_pool(*m_device, graphics_queue->family_index);
@@ -1339,8 +1287,7 @@ TEST_F(NegativeBestPractices, ExclusiveImageMultiQueueUsage) {
 
     graphics_buffer.End();
 
-    graphics_queue->Submit(graphics_buffer);
-    graphics_queue->Wait();
+    graphics_queue->SubmitAndWait(graphics_buffer);
 
     // Record compute command buffer
     compute_buffer.Begin();
@@ -1356,8 +1303,7 @@ TEST_F(NegativeBestPractices, ExclusiveImageMultiQueueUsage) {
 
     // Warning should trigger as we are potentially accessing undefined resources
     m_errorMonitor->SetDesiredWarning("BestPractices-ConcurrentUsageOfExclusiveImage");
-    compute_queue->Submit(compute_buffer);
-    compute_queue->Wait();
+    compute_queue->SubmitAndWait(compute_buffer);
     m_errorMonitor->VerifyFound();
 
     vk::ResetCommandPool(device(), graphics_pool, 0);
@@ -1385,18 +1331,17 @@ TEST_F(NegativeBestPractices, ExclusiveImageMultiQueueUsage) {
 
     graphics_buffer.EndRenderPass();
 
-    vk::CmdPipelineBarrier(graphics_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+    graphics_buffer.Barrier(barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                            VK_DEPENDENCY_BY_REGION_BIT);
 
     graphics_buffer.End();
-    graphics_queue->Submit(graphics_buffer);
-    graphics_queue->Wait();
+    graphics_queue->SubmitAndWait(graphics_buffer);
 
     // Record compute command buffer
     compute_buffer.Begin();
 
-    vk::CmdPipelineBarrier(compute_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
+    compute_buffer.Barrier(barrier, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT);
 
     vk::CmdBindPipeline(compute_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
 
@@ -1409,8 +1354,7 @@ TEST_F(NegativeBestPractices, ExclusiveImageMultiQueueUsage) {
 
     // Warning shouldn't trigger
     m_errorMonitor->SetDesiredWarning("BestPractices-ConcurrentUsageOfExclusiveImage");
-    compute_queue->Submit(compute_buffer);
-    compute_queue->Wait();
+    compute_queue->SubmitAndWait(compute_buffer);
     m_errorMonitor->Finish();
 }
 
@@ -1450,32 +1394,27 @@ TEST_F(NegativeBestPractices, ImageMemoryBarrierAccessLayoutCombinations) {
     // note: the table in PR 2918 originally said that 0 was not allowed, but this was incorrect. See Issue #4735
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     // Every table entry includes an implicit "can be 0"
     img_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     // PRESENT_SRC_KHR - Must be 0
     img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     img_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
     m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     m_errorMonitor->VerifyFound();
 
     img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     img_barrier.dstAccessMask = 0;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
     {
         VkImageMemoryBarrier2 img_barrier2 = vku::InitStructHelper();
@@ -1505,6 +1444,138 @@ TEST_F(NegativeBestPractices, ImageMemoryBarrierAccessLayoutCombinations) {
 
         m_command_buffer.End();
     }
+}
+
+TEST_F(NegativeBestPractices, DepthStencilReadOnlyResolveWrite) {
+    TEST_DESCRIPTION("Resolves only read from depth/stencil attachments in read-only layouts, so writes are still reported");
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::separateDepthStencilLayouts);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+    vkt::Image image(*m_device, 32u, 32u, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+    const VkImageAspectFlags depth = VK_IMAGE_ASPECT_DEPTH_BIT;
+    const VkImageAspectFlags stencil = VK_IMAGE_ASPECT_STENCIL_BIT;
+    struct TestCase {
+        VkImageLayout layout;
+        VkImageAspectFlags aspect;
+    };
+    const TestCase test_cases[] = {
+        {VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, depth | stencil},
+        {VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, depth},
+        {VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil},
+        {VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, depth},
+        {VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, stencil},
+    };
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.image = image;
+    barrier.subresourceRange = {0u, 0u, 1u, 0u, 1u};
+
+    m_command_buffer.Begin();
+    for (const auto& test_case : test_cases) {
+        barrier.oldLayout = test_case.layout;
+        barrier.newLayout = test_case.layout;
+        barrier.subresourceRange.aspectMask = test_case.aspect;
+        m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
+        m_command_buffer.Barrier(barrier);
+        m_errorMonitor->VerifyFound();
+    }
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeBestPractices, SampleShadingIgnoresShadingRate) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9762");
+    AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineFragmentShadingRate);
+    AddRequiredFeature(vkt::Feature::attachmentFragmentShadingRate);
+    AddRequiredFeature(vkt::Feature::sampleRateShading);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkPipelineFragmentShadingRateStateCreateInfoKHR fsr_ci = vku::InitStructHelper();
+    fsr_ci.fragmentSize = {2, 2};
+    fsr_ci.combinerOps[0] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+    fsr_ci.combinerOps[1] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+
+    // Sample shading enabled in the pipeline
+    {
+        CreatePipelineHelper pipe(*this, &fsr_ci);
+        pipe.ms_ci_.sampleShadingEnable = VK_TRUE;
+        pipe.ms_ci_.minSampleShading = 1.0f;
+        m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateGraphicsPipelines-SampleShadingFragmentShadingRate");
+        pipe.CreateGraphicsPipeline();
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Sample shading enabled by the fragment shader
+    {
+        const char* fs_source = R"glsl(
+            #version 450
+            layout(location = 0) out vec4 color;
+            void main() {
+                color = vec4(float(gl_SampleID));
+            }
+        )glsl";
+        VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+        CreatePipelineHelper pipe(*this, &fsr_ci);
+        pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateGraphicsPipelines-SampleShadingFragmentShadingRate");
+        pipe.CreateGraphicsPipeline();
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Attachment shading rate with sample shading
+    {
+        fsr_ci.fragmentSize = {1, 1};
+        fsr_ci.combinerOps[1] = VK_FRAGMENT_SHADING_RATE_COMBINER_OP_REPLACE_KHR;
+        CreatePipelineHelper pipe(*this, &fsr_ci);
+        pipe.ms_ci_.sampleShadingEnable = VK_TRUE;
+        pipe.ms_ci_.minSampleShading = 1.0f;
+        m_errorMonitor->SetDesiredWarning("BestPractices-vkCreateGraphicsPipelines-SampleShadingFragmentShadingRate");
+        pipe.CreateGraphicsPipeline();
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeBestPractices, ReadOnlyAndAttachmentLayoutAccess) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8521");
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
+
+    m_command_buffer.Begin();
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+    m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
+    m_command_buffer.Barrier(barrier);
+    m_errorMonitor->VerifyFound();
+
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+    m_errorMonitor->SetDesiredWarning("BestPractices-ImageBarrierAccessLayout");
+    m_command_buffer.Barrier(barrier);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeBestPractices, NonSimultaneousSecondaryMarksPrimary) {

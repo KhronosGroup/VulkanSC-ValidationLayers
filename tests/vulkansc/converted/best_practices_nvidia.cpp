@@ -338,17 +338,23 @@ TEST_F(NegativeBestPracticesNV, DISABLED_AllocateMemory_ReuseAllocations) {
     memory_ai.memoryTypeIndex = 0;
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-AllocateMemory-ReuseAllocations");
-    { vkt::DeviceMemory memory(*m_device, memory_ai); }
+    {
+        vkt::DeviceMemory memory(*m_device, memory_ai);
+    }
 
     std::this_thread::sleep_for(std::chrono::seconds{6});
 
-    { vkt::DeviceMemory memory(*m_device, memory_ai); }
+    {
+        vkt::DeviceMemory memory(*m_device, memory_ai);
+    }
 
     m_errorMonitor->Finish();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-NVIDIA-AllocateMemory-ReuseAllocations");
 
-    { vkt::DeviceMemory memory(*m_device, memory_ai); }
+    {
+        vkt::DeviceMemory memory(*m_device, memory_ai);
+    }
 
     m_errorMonitor->VerifyFound();
 }

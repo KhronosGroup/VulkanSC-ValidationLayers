@@ -190,10 +190,12 @@ typedef struct VkLayerInstanceDispatchTable_ {
     PFN_vkEnumeratePhysicalDeviceShaderInstrumentationMetricsARM EnumeratePhysicalDeviceShaderInstrumentationMetricsARM;
     PFN_vkGetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM
         GetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM;
+    PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT GetPhysicalDeviceCooperativeMatrixProperties2EXT;
 #ifdef VK_USE_PLATFORM_UBM_SEC
     PFN_vkCreateUbmSurfaceSEC CreateUbmSurfaceSEC;
     PFN_vkGetPhysicalDeviceUbmPresentationSupportSEC GetPhysicalDeviceUbmPresentationSupportSEC;
 #endif  // VK_USE_PLATFORM_UBM_SEC
+    PFN_vkGetPhysicalDeviceInternalHandleNV GetPhysicalDeviceInternalHandleNV;
 } VkLayerInstanceDispatchTable;
 
 // Device function pointer dispatch table
@@ -731,6 +733,13 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkCmdDispatchTileQCOM CmdDispatchTileQCOM;
     PFN_vkCmdBeginPerTileExecutionQCOM CmdBeginPerTileExecutionQCOM;
     PFN_vkCmdEndPerTileExecutionQCOM CmdEndPerTileExecutionQCOM;
+    PFN_vkSetLatencySleepModeLegacyNV SetLatencySleepModeLegacyNV;
+    PFN_vkLatencySleepLegacyNV LatencySleepLegacyNV;
+    PFN_vkSetLatencyMarkerLegacyNV SetLatencyMarkerLegacyNV;
+    PFN_vkGetLatencyTimingsLegacyNV GetLatencyTimingsLegacyNV;
+    PFN_vkQueueNotifyOutOfBandLegacyNV QueueNotifyOutOfBandLegacyNV;
+    PFN_vkGetSleepStatusLegacyNV GetSleepStatusLegacyNV;
+    PFN_vkShutdownLatencyDeviceLegacyNV ShutdownLatencyDeviceLegacyNV;
 #ifdef VK_USE_PLATFORM_METAL_EXT
     PFN_vkExportMetalObjectsEXT ExportMetalObjectsEXT;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -910,6 +919,9 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkCmdEndRendering2EXT CmdEndRendering2EXT;
     PFN_vkCmdBeginCustomResolveEXT CmdBeginCustomResolveEXT;
     PFN_vkCmdSetComputeOccupancyPriorityNV CmdSetComputeOccupancyPriorityNV;
+    PFN_vkGetDeviceInternalHandleNV GetDeviceInternalHandleNV;
+    PFN_vkGetQueueInternalHandleNV GetQueueInternalHandleNV;
+    PFN_vkGetCommandBufferInternalHandleNV GetCommandBufferInternalHandleNV;
     PFN_vkCmdSetPrimitiveRestartIndexEXT CmdSetPrimitiveRestartIndexEXT;
     PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR;
     PFN_vkDestroyAccelerationStructureKHR DestroyAccelerationStructureKHR;

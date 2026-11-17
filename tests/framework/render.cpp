@@ -19,16 +19,18 @@
 
 #include "render.h"
 
-#include <cassert>
-#include <cstring>
-
-#include <vulkan/utility/vk_format_utils.h>
+#include <unordered_set>
 
 #include "generated/vk_extension_helper.h"
 #include "layer_validation_tests.h"
 #include "vk_layer_config.h"
 #include "shader_helper.h"
 #include "containers/container_utils.h"
+
+// Cache to quickly skip tests.
+// If an extension is known to be unsupported we detect it on the first test and quickly skip the following tests.
+// Since most non core 1.0 features need an extension to enable, we just check the extension instead of the feature bit.
+static std::unordered_set<std::string> g_unsupported_extensions;
 
 #if defined(VK_USE_PLATFORM_METAL_EXT)
 #include "apple_wsi.h"
@@ -169,6 +171,13 @@ VkInstanceCreateInfo VkRenderFramework::GetInstanceCreateInfo() const {
 }
 
 void VkRenderFramework::InitFramework(void* instance_pnext) {
+    // If we already know this device doesn't support a requested extension, skip instantly.
+    for (const char* ext : m_required_extensions) {
+        if (g_unsupported_extensions.count(ext)) {
+            GTEST_SKIP() << "Early Skip: " << ext << " is unsupported.";
+        }
+    }
+
     ASSERT_EQ((VkInstance)0, instance_);
 
     const auto ExtensionIncludedInTargetVersion = [this](const char* extension) {
@@ -237,8 +246,9 @@ void VkRenderFramework::InitFramework(void* instance_pnext) {
         ici.pNext = instance_pnext;
     }
 
-    ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &instance_));
+    const VkResult create_instance_result = vk::CreateInstance(&ici, nullptr, &instance_);
     if (instance_pnext) reinterpret_cast<VkBaseOutStructure*>(last_pnext)->pNext = nullptr;  // reset back borrowed pNext chain
+    ASSERT_EQ(VK_SUCCESS, create_instance_result) << string_VkResult(create_instance_result);
 
     for (const char* instance_ext_name : m_instance_extension_names) {
         vk::InitInstanceExtension(instance_, instance_ext_name);
@@ -330,6 +340,12 @@ void VkRenderFramework::InitFramework(void* instance_pnext) {
 
     if (!std::all_of(m_required_extensions.begin(), m_required_extensions.end(),
                      [&](const char* ext) -> bool { return IsExtensionsEnabled(ext); })) {
+        for (const char* ext : m_required_extensions) {
+            if (!IsExtensionsEnabled(ext)) {
+                g_unsupported_extensions.insert(ext);
+            }
+        }
+
         GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
     }
 
@@ -831,12 +847,15 @@ VkResult VkRenderFramework::CreateSurface(SurfaceContext& surface_context, vkt::
         surface_context.m_surface_xcb_conn = xcb_connect(nullptr, nullptr);
         int err = xcb_connection_has_error(surface_context.m_surface_xcb_conn);
         if (surface_context.m_surface_xcb_conn && !err) {
-            xcb_window_t window = xcb_generate_id(surface_context.m_surface_xcb_conn);
+            surface_context.m_surface_xcb_window = xcb_generate_id(surface_context.m_surface_xcb_conn);
             VkXcbSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
             surface_create_info.connection = surface_context.m_surface_xcb_conn;
-            surface_create_info.window = window;
+            surface_create_info.window = surface_context.m_surface_xcb_window;
             return surface.Init(surface_instance, surface_create_info);
         }
+        // xcb_connect() never returns null, on failure it returns an error connection object
+        xcb_disconnect(surface_context.m_surface_xcb_conn);
+        surface_context.m_surface_xcb_conn = nullptr;
     }
 #endif
 
@@ -849,6 +868,48 @@ VkResult VkRenderFramework::CreateSurface(SurfaceContext& surface_context, vkt::
             surface_create_info.surface = surface_context.m_wayland_context.surface;
             return surface.Init(surface_instance, surface_create_info);
         }
+    }
+#endif
+
+    return VK_ERROR_UNKNOWN;
+}
+
+VkResult VkRenderFramework::CreateSurfaceFromSameWindow(const SurfaceContext& surface_context, vkt::Surface& surface) {
+    (void)surface_context;
+    (void)surface;
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+    if (surface_context.m_win32Window != nullptr) {
+        VkWin32SurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
+        surface_create_info.hinstance = GetModuleHandle(nullptr);
+        surface_create_info.hwnd = surface_context.m_win32Window;
+        return surface.Init(instance(), surface_create_info);
+    }
+#endif
+
+#if defined(VK_USE_PLATFORM_XLIB_KHR)
+    if (surface_context.m_surface_dpy != nullptr) {
+        VkXlibSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
+        surface_create_info.dpy = surface_context.m_surface_dpy;
+        surface_create_info.window = surface_context.m_surface_window;
+        return surface.Init(instance(), surface_create_info);
+    }
+#endif
+
+#if defined(VK_USE_PLATFORM_XCB_KHR)
+    if (surface_context.m_surface_xcb_conn != nullptr) {
+        VkXcbSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
+        surface_create_info.connection = surface_context.m_surface_xcb_conn;
+        surface_create_info.window = surface_context.m_surface_xcb_window;
+        return surface.Init(instance(), surface_create_info);
+    }
+#endif
+
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+    if (surface_context.m_wayland_context.surface != nullptr) {
+        VkWaylandSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
+        surface_create_info.display = surface_context.m_wayland_context.display;
+        surface_create_info.surface = surface_context.m_wayland_context.surface;
+        return surface.Init(instance(), surface_create_info);
     }
 #endif
 
@@ -883,6 +944,7 @@ void SurfaceContext::Destroy() {
     if (m_surface_xcb_conn != nullptr) {
         xcb_disconnect(m_surface_xcb_conn);
         m_surface_xcb_conn = nullptr;
+        m_surface_xcb_window = 0;
     }
 #endif
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
@@ -913,14 +975,14 @@ SurfaceInformation VkRenderFramework::GetSwapchainInfo(const VkSurfaceKHR surfac
 
     vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &info.surface_capabilities);
 
-    uint32_t format_count;
+    uint32_t format_count = 0;
     vk::GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &format_count, nullptr);
     if (format_count != 0) {
         info.surface_formats.resize(format_count);
         vk::GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &format_count, info.surface_formats.data());
     }
 
-    uint32_t present_mode_count;
+    uint32_t present_mode_count = 0;
     vk::GetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &present_mode_count, nullptr);
     if (present_mode_count != 0) {
         info.surface_present_modes.resize(present_mode_count);
@@ -1015,6 +1077,14 @@ void VkRenderFramework::DestroySwapchain() {
 void VkRenderFramework::SupportMultiSwapchain() {
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
     GTEST_SKIP() << "Android currently doesn't support multiple swapchain on all devices";
+#endif  // VK_USE_PLATFORM_ANDROID_KHR
+}
+
+void VkRenderFramework::SupportDeferredSwapchainAllocation() {
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+    // The Android loader accepts VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_KHR and returns a valid swapchain,
+    // but vkAcquireNextImageKHR then calls a null driver entry point and crashes inside libvulkan.so
+    GTEST_SKIP() << "Android currently doesn't support deferred swapchain memory allocation";
 #endif  // VK_USE_PLATFORM_ANDROID_KHR
 }
 
@@ -1197,8 +1267,8 @@ void VkRenderFramework::DestroyRenderTarget() {
     m_framebuffer = nullptr;
 }
 
-void VkRenderFramework::SetDefaultDynamicStatesExclude(const std::vector<VkDynamicState>& exclude, bool tessellation,
-                                                       VkCommandBuffer commandBuffer) {
+void VkRenderFramework::SetDefaultDynamicStatesExcludeEXT(const std::vector<VkDynamicState>& exclude, bool tessellation,
+                                                          VkCommandBuffer commandBuffer) {
     const auto excluded = [&exclude](VkDynamicState state) {
         for (const auto& check_state : exclude) {
             if (check_state == state) {
@@ -1272,7 +1342,7 @@ void VkRenderFramework::SetDefaultDynamicStatesExclude(const std::vector<VkDynam
     if (!excluded(VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT)) vk::CmdSetColorWriteMaskEXT(cmdBuffer, 0u, 1u, &colorWriteMask);
 }
 
-void VkRenderFramework::SetDefaultDynamicStatesAll(VkCommandBuffer cmdBuffer) {
+void VkRenderFramework::SetDefaultDynamicStatesAllEXT(VkCommandBuffer cmdBuffer) {
     uint32_t width = 32;
     uint32_t height = 32;
     VkViewport viewport = {0, 0, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};

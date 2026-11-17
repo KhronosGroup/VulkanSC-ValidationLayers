@@ -32,7 +32,7 @@ class Swapchain;
 class VideoProfileDesc;
 }  // namespace vvl
 
-struct DeviceExtensions;
+struct DeviceFeatures;
 
 // Transfer VkImageSubresourceRange into VkImageSubresourceLayers struct
 static inline VkImageSubresourceLayers LayersFromRange(const VkImageSubresourceRange &subresource_range) {
@@ -118,7 +118,7 @@ class Image : public Bindable, public SubStateManager<ImageSubState> {
     const bool metal_io_surface_export;
 #endif  // VK_USE_PLATFORM_METAL
 
-    const subresource_adapter::RangeEncoder subresource_encoder;  // Subresource resolution encoder
+    const SubresourceEncoder subresource_encoder;                 // Subresource resolution encoder
     const VkDevice store_device_as_workaround;                    // TODO REMOVE WHEN encoder can be const
 
     // Tracks current layouts of image subresources. Can be used by multiple threads, so should be locked when in use.
@@ -154,6 +154,7 @@ class Image : public Bindable, public SubStateManager<ImageSubState> {
     VkImageLayout GetInitialLayout() const { return create_info.initialLayout; }
 
     VkPhysicalDeviceImageFormatInfo2 GetImageFormatInfo2(void* pNext = nullptr) const;
+    VkImageUsageFlags2KHR GetInheritedUsage(const VkImageViewCreateInfo& ci) const;
 
     bool HasAHBFormat() const { return ahb_format != 0; }
     bool IsCompatibleAliasing(const Image *other_image_state) const;
@@ -275,7 +276,9 @@ class Image : public Bindable, public SubStateManager<ImageSubState> {
     // layouts map can address each slice.
     VkImageSubresourceRange GetSubresourceEncoderRange(const DeviceState &device_state, const VkImageSubresourceRange &full_range);
 
-    std::variant<std::monostate, BindableNoMemoryTracker, BindableLinearMemoryTracker, BindableSparseMemoryTracker,
+    // The sparse tracker is 128 bytes vs the linear 40 bytes
+    // Assume sparse images are more rare and trade 88 bytes for a small indirection if using sparse
+    std::variant<std::monostate, BindableNoMemoryTracker, BindableLinearMemoryTracker, std::unique_ptr<BindableSparseMemoryTracker>,
                  BindableMultiplanarMemoryTracker>
         tracker_;
 };
@@ -310,12 +313,20 @@ class ImageView : public StateObject, public SubStateManager<ImageViewSubState> 
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
     const bool is_depth_sliced;
+    const bool filter_cubic;
+    const bool filter_cubic_minmax;
     const VkImageSubresourceRange normalized_subresource_range;
-    const subresource_adapter::RangeGenerator range_generator;
+
+    // The range that defines indexing space of all possible image layouts for this image view.
+    // It is used by the SubresourceRangeGenerator and the image layout maps.
+    // In the general case, it is different than the number of subresources (described by
+    // normalized_subresource_range), so when dealing with image layouts this range should
+    // always be used instead
+    const VkImageSubresourceRange image_layout_range;
+
     const VkSampleCountFlagBits samples;
     // VK_NULL_HANDLE if it doesn't have one chained in the pNext at creation time
     const VkSamplerYcbcrConversion sampler_conversion;
-    const VkFilterCubicImageViewImageFormatPropertiesEXT filter_cubic_props;
     const float min_lod;
     const VkFormatFeatureFlags2 format_features;
     const VkImageUsageFlags2KHR inherited_usage;  // from spec #resources-image-inherited-usage
@@ -349,14 +360,14 @@ class ImageView : public StateObject, public SubStateManager<ImageViewSubState> 
     static VkImageSubresourceRange NormalizeImageViewSubresourceRange(const Image &image_state,
                                                                       const VkImageViewCreateInfo &image_view_ci);
 
-    // The range that defines indexing space of all possible image layouts for this image view.
-    // It is used by the RangeGenerator and the image layout maps.
-    // In the general case, it is different than the number of subresources (described by
-    // normalized_subresource_range), so when dealing with image layouts this function should
-    // always be used instead
-    VkImageSubresourceRange GetRangeGeneratorRange(const DeviceExtensions &extensions) const;
+    SubresourceRangeGenerator MakeImageLayoutRangeGenerator() const {
+        return SubresourceRangeGenerator(image_state->subresource_encoder, image_layout_range);
+    }
 
     std::string DescribeImageUsage(const Logger& logger) const;
+
+  private:
+    VkImageSubresourceRange GetImageLayoutRange(const DeviceFeatures& features) const;
 };
 
 class ImageViewSubState {

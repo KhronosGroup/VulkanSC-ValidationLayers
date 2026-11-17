@@ -14,6 +14,7 @@
 #include <thread>
 #include <algorithm>
 #include "sync_val_tests.h"
+#include "buffer_helper.h"
 #include "pipeline_helper.h"
 #include "descriptor_helper.h"
 #include "render_pass_helper.h"
@@ -36,22 +37,26 @@ void VkSyncValTest::InitSyncValFramework(const SyncValSettings* p_sync_settings)
         // The main layer configuration can have some options turned off by default,
         // but we might still want that functionality to be available for testing.
         SyncValSettings settings;
-        settings.submit_time_validation = true;
+        settings.full_validation = true;
         settings.shader_accesses_heuristic = true;
         settings.load_op_after_store_op_validation = true;
         return settings;
     }();
     const SyncValSettings& sync_settings = p_sync_settings ? *p_sync_settings : test_default_sync_settings;
 
-    const auto submit_time_validation = static_cast<VkBool32>(sync_settings.submit_time_validation);
-    settings.emplace_back(VkLayerSettingEXT{OBJECT_LAYER_NAME, "syncval_submit_time_validation", VK_LAYER_SETTING_TYPE_BOOL32_EXT,
-                                            1, &submit_time_validation});
+    const VkBool32 full_validation = static_cast<VkBool32>(sync_settings.full_validation);
+    settings.emplace_back(
+        VkLayerSettingEXT{OBJECT_LAYER_NAME, "syncval_full_validation", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &full_validation});
 
-    const auto shader_accesses_heuristic = static_cast<VkBool32>(sync_settings.shader_accesses_heuristic);
+    const VkBool32 record_time_validation = static_cast<VkBool32>(sync_settings.record_time_validation);
+    settings.emplace_back(VkLayerSettingEXT{OBJECT_LAYER_NAME, "syncval_record_time_validation", VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+                                            1, &record_time_validation});
+
+    const VkBool32 shader_accesses_heuristic = static_cast<VkBool32>(sync_settings.shader_accesses_heuristic);
     settings.emplace_back(VkLayerSettingEXT{OBJECT_LAYER_NAME, "syncval_shader_accesses_heuristic",
                                             VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &shader_accesses_heuristic});
 
-    const auto load_op_after_store_op_validation = static_cast<VkBool32>(sync_settings.load_op_after_store_op_validation);
+    const VkBool32 load_op_after_store_op_validation = static_cast<VkBool32>(sync_settings.load_op_after_store_op_validation);
     settings.emplace_back(VkLayerSettingEXT{OBJECT_LAYER_NAME, "syncval_load_op_after_store_op_validation",
                                             VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &load_op_after_store_op_validation});
 
@@ -141,8 +146,7 @@ TEST_F(PositiveSyncVal, BufferCopySecondary) {
     // Execution dependency
     vkt::CommandBuffer secondary_cb2(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     secondary_cb2.Begin();
-    vk::CmdPipelineBarrier(secondary_cb2, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    secondary_cb2.ExecutionBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     secondary_cb2.End();
 
     // buffer_c WRITE
@@ -195,19 +199,11 @@ TEST_F(PositiveSyncVal, CmdClearAttachmentLayer) {
         return attachment;
     };
     const VkAttachmentDescription attachment = attachment_without_load_store(rt_format);
-    const VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_GENERAL};
 
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_ref;
-
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &attachment;
-    vkt::RenderPass render_pass(*m_device, rpci);
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.AddAttachmentDescription(attachment);
+    render_pass.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    render_pass.CreateRenderPass();
 
     vkt::ImageView rt_view = rt.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, layers);
     VkFramebufferCreateInfo fbci = vku::InitStructHelper();
@@ -820,10 +816,41 @@ TEST_F(PositiveSyncVal, LayoutTransition) {
 }
 
 TEST_F(PositiveSyncVal, LayoutTransitionAfterLayoutTransition) {
-    // TODO: check results of this dicussion https://gitlab.khronos.org/vulkan/vulkan/-/issues/4302
-    // NOTE: artem can't believe this does not cause race conditions
     TEST_DESCRIPTION("There should be no hazard for ILT after ILT");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
 
+    vkt::Image image(*m_device, 64, 64, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+
+    // The layout transitions are implicitly ordered, so we have execution dependency.
+    // The memory accesses also do not cause race conditions even though we don't specify
+    // a memory barrier below (no src/dst access masks).
+    //
+    // Before a layout transition, available accesses are automatically made visible, and
+    // after the transition, its accesses are automatically made available. So transition1
+    // makes its accesses available, and transition2 makes them visible before it starts.
+
+    VkImageMemoryBarrier2 transition1 = vku::InitStructHelper();
+    transition1.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transition1.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transition1.image = image;
+    transition1.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 transition2 = vku::InitStructHelper();
+    transition2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transition2.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    transition2.image = image;
+    transition2.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(transition1);
+    m_command_buffer.Barrier(transition2);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncVal, QSLayoutTransitionAfterLayoutTransition) {
+    TEST_DESCRIPTION("Sequential layout transitions in separate command buffers");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(InitSyncVal());
@@ -842,10 +869,19 @@ TEST_F(PositiveSyncVal, LayoutTransitionAfterLayoutTransition) {
     transition2.image = image;
     transition2.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    m_command_buffer.Begin();
-    m_command_buffer.Barrier(transition1);
-    m_command_buffer.Barrier(transition2);
-    m_command_buffer.End();
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
+    cb1.Begin();
+    cb1.Barrier(transition1);
+    cb1.End();
+
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+    cb2.Begin();
+    cb2.Barrier(transition2);
+    cb2.End();
+
+    m_default_queue->Submit2(cb1);
+    m_default_queue->Submit2(cb2);
+    m_default_queue->Wait();
 }
 
 // Image transition ensures that image data is made visible and available when necessary.
@@ -878,8 +914,7 @@ TEST_F(PositiveSyncVal, WriteToImageAfterTransition) {
     region.imageExtent = {width, height, 1};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
-                           1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     m_command_buffer.End();
 }
@@ -984,8 +1019,12 @@ TEST_F(PositiveSyncVal, GetSemaphoreCounterFromMultipleThreads) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
 
-    constexpr uint64_t max_signal_value = 5'000;  // 15'000 in the original version for stress testing
-    constexpr int waiter_count = 8;               // 24 in the original version for stress testing
+    // 15'000 in the original version for stress testing, then 5K, now it's 1K
+    // Don't make it smaller, threading tests need iterations.
+    constexpr uint64_t max_signal_value = 1'000;
+
+    // 24 in the original version for stress testing, then 8, now it's 5
+    constexpr int waiter_count = 5;
 
     vkt::Semaphore semaphore(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
     ThreadTimeoutHelper timeout_helper(waiter_count + 1 /* signaling thread*/);
@@ -1087,8 +1126,7 @@ TEST_F(PositiveSyncVal, SeparateAvailabilityAndVisibilityForBuffer) {
     barrier_a.dstAccessMask = 0;
     barrier_a.buffer = buffer;
     barrier_a.size = VK_WHOLE_SIZE;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1,
-                           &barrier_a, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier_a);
 
     // Make writes visible
     VkBufferMemoryBarrier barrier_b = vku::InitStructHelper();
@@ -1096,8 +1134,7 @@ TEST_F(PositiveSyncVal, SeparateAvailabilityAndVisibilityForBuffer) {
     barrier_b.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier_b.buffer = buffer;
     barrier_b.size = VK_WHOLE_SIZE;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1,
-                           &barrier_b, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier_b);
 
     // Perform one more copy. Should not generate WAW.
     vk::CmdCopyBuffer(m_command_buffer, staging_buffer, buffer, 1, &region);
@@ -1133,8 +1170,7 @@ TEST_F(PositiveSyncVal, LayoutTransitionWithAlreadyAvailableImage) {
     barrier_a.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier_a.image = image;
     barrier_a.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier_a);
+    m_command_buffer.Barrier(barrier_a, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     // Transition to new layout. Available memory should automatically be made visible to the layout transition.
     VkImageMemoryBarrier barrier_b = vku::InitStructHelper();
@@ -1144,8 +1180,7 @@ TEST_F(PositiveSyncVal, LayoutTransitionWithAlreadyAvailableImage) {
     barrier_b.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     barrier_b.image = image;
     barrier_b.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &barrier_b);
+    m_command_buffer.Barrier(barrier_b, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     m_command_buffer.End();
 }
 
@@ -1359,7 +1394,7 @@ TEST_F(PositiveSyncVal, TexelBufferArrayConstantIndexing) {
 TEST_F(PositiveSyncVal, QSBufferCopyHazardsDisabled) {
     TEST_DESCRIPTION("This test checks that disabling syncval's submit time validation actually disables it");
     SyncValSettings settings;
-    settings.submit_time_validation = false;
+    settings.full_validation = false;
     RETURN_IF_SKIP(InitSyncValFramework(&settings));
     RETURN_IF_SKIP(InitState());
 
@@ -1430,7 +1465,7 @@ TEST_F(PositiveSyncVal, QSTransitionWithSrcNoneStage) {
     // Wait on ALL_COMMANDS semaphore should protect this submission from previous accesses.
     layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
     layout_transition.srcAccessMask = 0;
-    layout_transition.dstAccessMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
     layout_transition.dstAccessMask = 0;
     layout_transition.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     layout_transition.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1503,7 +1538,7 @@ TEST_F(PositiveSyncVal, QSTransitionAndRead) {
     VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
     layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
     layout_transition.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-    layout_transition.dstAccessMask = VK_PIPELINE_STAGE_2_NONE;
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
     layout_transition.dstAccessMask = 0;
     layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     layout_transition.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -2019,8 +2054,7 @@ TEST_F(PositiveSyncVal, CopyBufferToCompressedImageASTC3) {
 
     m_command_buffer.Begin();
     vk::CmdCopyBufferToImage(m_command_buffer, src_buffer, dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_copy[0]);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     vk::CmdCopyBufferToImage(m_command_buffer, src_buffer, dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &buffer_copy[1]);
     m_command_buffer.End();
 }
@@ -2415,8 +2449,7 @@ TEST_F(PositiveSyncVal, AtomicAccessFromTwoSubmits) {
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 // Does not work correctly similar to AtomicAccessFromTwoDispatches. The initial idea that using
@@ -2604,7 +2637,7 @@ TEST_F(PositiveSyncVal, IndirectDrawAndSuballocatedVertexBuffer) {
     VkDrawIndirectCommand indirect_command = {};
     indirect_command.vertexCount = 3;
     indirect_command.instanceCount = 1;
-    vkt::Buffer indirect_buffer(*m_device, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, &indirect_command, sizeof(VkDrawIndirectCommand));
+    vkt::Buffer indirect_buffer = vkt::IndirectBuffer<VkDrawIndirectCommand>(*m_device, {indirect_command});
 
     const size_t vertices_size = 3 * 3 * sizeof(float);  // 3 VK_FORMAT_R32G32B32_SFLOAT vertices
     const size_t fill_region_size = 32;
@@ -2615,10 +2648,7 @@ TEST_F(PositiveSyncVal, IndirectDrawAndSuballocatedVertexBuffer) {
     const VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
 
     CreatePipelineHelper pipe(*this);
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -2646,8 +2676,7 @@ TEST_F(PositiveSyncVal, IndirectDrawAndSuballocatedIndexBuffer) {
     indirect_command.indexCount = 3;
     indirect_command.instanceCount = 1;
 
-    vkt::Buffer indirect_buffer(*m_device, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, &indirect_command,
-                                sizeof(VkDrawIndexedIndirectCommand));
+    vkt::Buffer indirect_buffer = vkt::IndirectBuffer<VkDrawIndexedIndirectCommand>(*m_device, {indirect_command});
 
     const size_t vertices_size = 3 * 3 * sizeof(float);  // 3 VK_FORMAT_R32G32B32_SFLOAT vertices
     vkt::Buffer vertex_buffer(*m_device, vertices_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -2656,16 +2685,15 @@ TEST_F(PositiveSyncVal, IndirectDrawAndSuballocatedIndexBuffer) {
     constexpr size_t fill_region_size = 12;
     constexpr VkDeviceSize buffer_size = indices_size + fill_region_size;
     uint32_t buffer_data[buffer_size / sizeof(uint32_t)] = {0, 1, 2};  // initialize index region
-    vkt::Buffer buffer(*m_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, buffer_data, buffer_size);
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                       kHostVisibleMemProps);
+    std::memcpy(buffer.Memory().Map(), buffer_data, buffer_size);
 
     const VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     const VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
 
     CreatePipelineHelper pipe(*this);
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -2831,8 +2859,7 @@ TEST_F(PositiveSyncVal, AmdBufferMarkerDuplicated2) {
     m_command_buffer.End();
     // Submit two times
     m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveSyncVal, AmdBufferMarkerDuplicated3) {
@@ -2860,8 +2887,7 @@ TEST_F(PositiveSyncVal, AmdBufferMarkerDuplicated4) {
     m_command_buffer.End();
     // Submit two times
     m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveSyncVal, VertexBufferWithEventSync) {
@@ -3278,8 +3304,7 @@ TEST_F(PositiveSyncVal, BufferBarrierExecutionDependencySync1) {
 
     m_command_buffer.Begin();
     m_command_buffer.Copy(buffer_a, buffer_b);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1,
-                           &buffer_barrier, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, buffer_barrier);
     m_command_buffer.Copy(buffer_b, buffer_a);
     m_command_buffer.End();
 }
@@ -3333,8 +3358,7 @@ TEST_F(PositiveSyncVal, ImageBarrierExecutionDependencySync1) {
 
     m_command_buffer.Begin();
     vk::CmdCopyImage(m_command_buffer, image_a, VK_IMAGE_LAYOUT_GENERAL, image_b, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &image_barrier);
+    m_command_buffer.Barrier(image_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     vk::CmdCopyImage(m_command_buffer, image_b, VK_IMAGE_LAYOUT_GENERAL, image_a, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
     m_command_buffer.End();
 }
@@ -3675,10 +3699,7 @@ TEST_F(PositiveSyncVal, VertexStride) {
     VkVertexInputAttributeDescription vertex_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
 
     CreatePipelineHelper pipe(*this);
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexBindingDescriptions = &vertex_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &vertex_attrib;
+    pipe.SetVertexInput(vertex_binding, vertex_attrib);
     pipe.CreateGraphicsPipeline();
 
     VkMemoryBarrier2 barrier = vku::InitStructHelper();
@@ -4250,11 +4271,8 @@ TEST_F(PositiveSyncVal, StencilNotWritable) {
     depth_stencil_ci.front = stencil;
     depth_stencil_ci.back = stencil;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.stencilAttachmentFormat = depth_stencil_format;
-    pipeline_rendering_info.depthAttachmentFormat = depth_stencil_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({}, depth_stencil_format, depth_stencil_format);
     pipe.gp_ci_.pDepthStencilState = &depth_stencil_ci;
     pipe.CreateGraphicsPipeline();
 
@@ -4317,11 +4335,8 @@ TEST_F(PositiveSyncVal, StencilNotWritable2) {
     depth_stencil_ci.front = stencil;
     depth_stencil_ci.back = stencil;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.stencilAttachmentFormat = depth_stencil_format;
-    pipeline_rendering_info.depthAttachmentFormat = depth_stencil_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({}, depth_stencil_format, depth_stencil_format);
     pipe.gp_ci_.pDepthStencilState = &depth_stencil_ci;
     pipe.CreateGraphicsPipeline();
 
@@ -4380,10 +4395,8 @@ TEST_F(PositiveSyncVal, StencilNotWritable3) {
     depth_stencil_ci.front = stencil;
     depth_stencil_ci.back = stencil;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.stencilAttachmentFormat = stencil_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({}, VK_FORMAT_UNDEFINED, stencil_format);
     pipe.gp_ci_.pDepthStencilState = &depth_stencil_ci;
     pipe.CreateGraphicsPipeline();
 
@@ -4442,10 +4455,8 @@ TEST_F(PositiveSyncVal, StencilNotWritable4) {
     depth_stencil_ci.front = stencil;
     depth_stencil_ci.back = stencil;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.stencilAttachmentFormat = stencil_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({}, VK_FORMAT_UNDEFINED, stencil_format);
     pipe.gp_ci_.pDepthStencilState = &depth_stencil_ci;
     pipe.CreateGraphicsPipeline();
 
@@ -4793,11 +4804,8 @@ TEST_F(PositiveSyncVal, DrawMeshTasksIndirectTestIndirectAccess) {
                                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({format});
     pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
@@ -4846,11 +4854,8 @@ TEST_F(PositiveSyncVal, DrawMeshTasksIndirectTestIndirectUpdate) {
                                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({format});
     pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
@@ -4900,11 +4905,8 @@ TEST_F(PositiveSyncVal, DrawMeshTasksIndirectCountTestCountAccess) {
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({format});
     pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
@@ -4955,11 +4957,8 @@ TEST_F(PositiveSyncVal, DrawMeshTasksIndirectCountTestCountUpdate) {
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({format});
     pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
@@ -5038,11 +5037,8 @@ TEST_F(PositiveSyncVal, MeshShaderWithPreRasterizationBarrier) {
     )glsl";
     VkShaderObj mesh_shader(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({format});
     pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
@@ -5066,6 +5062,571 @@ TEST_F(PositiveSyncVal, MeshShaderWithPreRasterizationBarrier) {
     m_command_buffer.BeginRendering(rendering_info);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdDrawMeshTasksIndirectEXT(m_command_buffer, indirect_buffer, 0, 1, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncVal, WaitEventImageLayoutTransition) {
+    TEST_DESCRIPTION("Use an event to synchronize an image layout transition in a separate command buffer");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::CommandBuffer write_cb(*m_device, m_command_pool);
+    vkt::CommandBuffer wait_cb(*m_device, m_command_pool);
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::Event event(*m_device);
+
+    const VkImageSubresourceRange subresource_range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    const VkClearColorValue clear_color{};
+
+    write_cb.Begin();
+    vk::CmdClearColorImage(write_cb, image, VK_IMAGE_LAYOUT_GENERAL, &clear_color, 1, &subresource_range);
+    write_cb.SetEvent(event, VK_PIPELINE_STAGE_TRANSFER_BIT);
+    write_cb.End();
+
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
+    // Make clear accesses available for layout transition
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    // NOTE: We don't need dst access mask because we don't have accesses after transition
+    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.image = image;
+    barrier.subresourceRange = subresource_range;
+
+    wait_cb.Begin();
+    wait_cb.WaitEvent(event, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier);
+    wait_cb.End();
+
+    m_default_queue->Submit({write_cb, wait_cb});
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncVal, EventScopeFromPriorSubmission) {
+    TEST_DESCRIPTION("SetEvent captures accesses from a preceding submission");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Buffer dst(*m_device, 64, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Event event(*m_device);
+    vkt::CommandBuffer write_cb(*m_device, m_command_pool);
+    vkt::CommandBuffer set_cb(*m_device, m_command_pool);
+    vkt::CommandBuffer wait_cb(*m_device, m_command_pool);
+
+    write_cb.Begin();
+    vk::CmdFillBuffer(write_cb, buffer, 0, 64, 0x42);
+    write_cb.End();
+
+    set_cb.Begin();
+    set_cb.SetEvent(event, VK_PIPELINE_STAGE_TRANSFER_BIT);
+    set_cb.End();
+
+    VkBufferMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.buffer = buffer;
+    barrier.size = VK_WHOLE_SIZE;
+
+    wait_cb.Begin();
+    wait_cb.WaitEvent(event, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier);
+    wait_cb.Copy(buffer, dst);
+    wait_cb.End();
+
+    m_default_queue->Submit(write_cb);
+    m_default_queue->Submit(set_cb);
+    m_default_queue->SubmitAndWait(wait_cb);
+}
+
+TEST_F(PositiveSyncVal, WaitEvents2SeparateBufferBarriers) {
+    TEST_DESCRIPTION("Each event uses its own buffer barrier in WaitEvents2");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    vkt::Buffer buffer_a(*m_device, 64, usage);
+    vkt::Buffer buffer_b(*m_device, 64, usage);
+    vkt::Buffer output_a(*m_device, 64, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Buffer output_b(*m_device, 64, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Event event_a(*m_device);
+    vkt::Event event_b(*m_device);
+
+    VkBufferMemoryBarrier2 barrier_a = vku::InitStructHelper();
+    barrier_a.srcStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier_a.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier_a.dstStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    barrier_a.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    barrier_a.buffer = buffer_a;
+    barrier_a.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 barrier_b = barrier_a;
+    barrier_b.buffer = buffer_b;
+
+    VkDependencyInfo dependencies[2] = {vku::InitStructHelper(), vku::InitStructHelper()};
+    dependencies[0].bufferMemoryBarrierCount = 1;
+    dependencies[0].pBufferMemoryBarriers = &barrier_a;
+    dependencies[1].bufferMemoryBarrierCount = 1;
+    dependencies[1].pBufferMemoryBarriers = &barrier_b;
+    const VkEvent events[2] = {event_a, event_b};
+
+    m_command_buffer.Begin();
+    vk::CmdFillBuffer(m_command_buffer, buffer_a, 0, 64, 0);
+    vk::CmdSetEvent2(m_command_buffer, event_a, &dependencies[0]);
+
+    vk::CmdFillBuffer(m_command_buffer, buffer_b, 0, 64, 0);
+    vk::CmdSetEvent2(m_command_buffer, event_b, &dependencies[1]);
+
+    vk::CmdWaitEvents2(m_command_buffer, 2, events, dependencies);
+    m_command_buffer.Copy(buffer_a, output_a);
+    m_command_buffer.Copy(buffer_b, output_b);
+
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveSyncVal, QSCopyImage) {
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    vkt::Image image_a(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, usage);
+    vkt::Image image_b(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, usage);
+    vkt::Image image_c(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, usage);
+    image_a.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    image_b.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    image_c.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    VkImageCopy region{};
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.extent = {32, 32, 1};
+
+    m_command_buffer.Begin();
+    vk::CmdCopyImage(m_command_buffer, image_a, VK_IMAGE_LAYOUT_GENERAL, image_b, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+
+    // The execution dependency protects the read from image A before the following write to image A.
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+    vk::CmdCopyImage(m_command_buffer, image_c, VK_IMAGE_LAYOUT_GENERAL, image_a, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveSyncVal, DrawIndirectStridedGaps) {
+    TEST_DESCRIPTION("Strided indirect accesses do not include the gap between entries");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::multiDrawIndirect);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({});
+    pipe.CreateGraphicsPipeline();
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea.extent = {32, 32};
+    rendering_info.layerCount = 1;
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, kHostVisibleMemProps);
+    auto* draws = static_cast<VkDrawIndirectCommand*>(buffer.Memory().Map());
+    draws[0] = {};  // first struct
+    draws[2] = {};  // second struct (use index 2 to skip the gap)
+    buffer.Memory().Unmap();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdDrawIndirect(m_command_buffer, buffer, 0, 2, 32 /* 16 bytes struct + 16 bytes gap*/);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    VkMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    vkt::CommandBuffer fill_cb(*m_device, m_command_pool);
+    fill_cb.Begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+    vk::CmdFillBuffer(fill_cb, buffer, 16, 16, 0);  // fill the gap
+    fill_cb.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier);
+    fill_cb.End();
+
+    m_default_queue->Submit(fill_cb);
+    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->SubmitAndWait(fill_cb);
+}
+
+TEST_F(PositiveSyncVal, PartialRenderAreaLoadRead) {
+    TEST_DESCRIPTION("LOAD reads only the render area on the selected layer");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    const VkImageCreateInfo image_info = vkt::Image::ImageCreateInfo2D(32, 32, 1, 2, VK_FORMAT_R8G8B8A8_UNORM, image_usage);
+    vkt::Image image(*m_device, image_info);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    const vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 1, 1);
+    vkt::Buffer buffer(*m_device, 16 * 32 * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy copy{};
+    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1};
+    copy.imageOffset = {16, 0, 0};
+    copy.imageExtent = {16, 32, 1};
+
+    VkMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderingAttachmentInfo attachment = vku::InitStructHelper();
+    attachment.imageView = view;
+    attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    VkRenderingInfo rendering = vku::InitStructHelper();
+    rendering.renderArea.extent = {16, 32};
+    rendering.layerCount = 1;
+    rendering.colorAttachmentCount = 1;
+    rendering.pColorAttachments = &attachment;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy);
+    m_command_buffer.Barrier(barrier);
+
+    // Write layer 0 after the barrier so an attachment access to the wrong layer reports a hazard
+    copy.imageSubresource.baseArrayLayer = 0;
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy);
+    m_command_buffer.BeginRendering(rendering);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveSyncVal, PartialRenderAreaFeedback) {
+    TEST_DESCRIPTION("Feedback keeps writing load/store operations within the render area");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::unifiedImageLayouts);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                         VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    const vkt::ImageView view = image.CreateView();
+    vkt::Buffer buffer(*m_device, 16 * 32 * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    VkBufferImageCopy copy{};
+    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy.imageOffset = {16, 0, 0};
+    copy.imageExtent = {16, 32, 1};
+
+    VkAttachmentFeedbackLoopInfoEXT feedback = vku::InitStructHelper();
+    feedback.feedbackLoopEnable = VK_TRUE;
+    VkRenderingAttachmentInfo attachment = vku::InitStructHelper(&feedback);
+    attachment.imageView = view;
+    attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+    VkRenderingInfo rendering = vku::InitStructHelper();
+    rendering.renderArea.extent = {16, 32};
+    rendering.layerCount = 1;
+    rendering.colorAttachmentCount = 1;
+    rendering.pColorAttachments = &attachment;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy);
+    m_command_buffer.BeginRendering(rendering);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveSyncVal, DynamicRenderingNullAttachmentLoad) {
+    TEST_DESCRIPTION("Ignore LOAD for a null dynamic rendering attachment");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    VkRenderingAttachmentInfo attachment = vku::InitStructHelper();
+    attachment.imageView = VK_NULL_HANDLE;
+    attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo rendering = vku::InitStructHelper();
+    rendering.renderArea.extent = {1, 1};
+    rendering.layerCount = 1;
+    rendering.colorAttachmentCount = 1;
+    rendering.pColorAttachments = &attachment;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveSyncVal, RenderPassLayoutTransitionAndSecondaryCmdBuffer) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7743
+    TEST_DESCRIPTION("Subpass dependency synchronizes render pass layout transition with secondary command buffer accesses");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_LOAD_STORE_OP_NONE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const VkImageLayout input_attachment_layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+
+    // Replace implicit EXTERNAL<->subpass dependency (which uses dstStageMask = ALL_COMMANDS)
+    // with more narrow dependency. It is enough to synchronize only with the fragment shader accesses.
+    // The LoadOp is NONE, that's why layout transition synchronizes with subpass accesses and not
+    // with load op as usual.
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_NONE;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dependency.srcAccessMask = VK_ACCESS_NONE;
+    dependency.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+    dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, input_attachment_layout,
+                                VK_ATTACHMENT_LOAD_OP_NONE_KHR, VK_ATTACHMENT_STORE_OP_DONT_CARE);
+    rp.AddInputAttachment(0, input_attachment_layout);
+    rp.AddSubpassDependency(dependency);
+    rp.CreateRenderPass();
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle());
+
+    // Fragment shader READs input attachment.
+    CreatePipelineHelper pipe(*this);
+    pipe.ResetShaderInfo(kVertexMinimalGlsl, kFragmentSubpassLoadGlsl);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT};
+    pipe.gp_ci_.renderPass = rp;
+    pipe.CreateGraphicsPipeline();
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                                                   input_attachment_layout);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    // Record subpass into a secondary command buffer.
+    VkCommandBufferInheritanceInfo inherited_state = vku::InitStructHelper();
+    inherited_state.renderPass = rp;
+    inherited_state.subpass = 0;
+    inherited_state.framebuffer = fb;
+    VkCommandBufferBeginInfo subpass_cb_info = vku::InitStructHelper();
+    subpass_cb_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    subpass_cb_info.pInheritanceInfo = &inherited_state;
+
+    vkt::CommandBuffer subpass_cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    subpass_cb.Begin(&subpass_cb_info);
+    vk::CmdBindPipeline(subpass_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(subpass_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 0, 1, &pipe.descriptor_set_->set_,
+                              0, nullptr);
+    vk::CmdDraw(subpass_cb, 1, 0, 0, 0);
+    subpass_cb.End();
+
+    // Render pass transitions input attachment.
+    // Subpass dependency synchronizes this transition with subsequent input attachment read in the fragment shader.
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp, fb, 32, 32, 0, nullptr, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    m_command_buffer.ExecuteCommands(subpass_cb);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncVal, RenderPassLayoutTransitionAndSecondaryCmdBuffer2) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7743
+    TEST_DESCRIPTION("Subpass dependency synchronizes render pass layout transition with secondary command buffer accesses");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const VkImageLayout input_attachment_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    // Render pass with two subpasses.
+    // Subpass 0: loadOp attachment write
+    // Subpass 1: input attachment read
+    // Attachment layout transition between subpasses: COLOR_ATTACHMENT -> SHADER_READ_ONLY
+    // Subpass dependency is needed so layout transition is synchronized with subpass 0 writes
+    // and subpass 1 reads
+    VkAttachmentDescription attachment = {};
+    attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = input_attachment_layout;
+
+    VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference input_ref = {0, input_attachment_layout};
+
+    VkSubpassDescription subpasses[2] = {};
+    subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpasses[0].colorAttachmentCount = 1;
+    subpasses[0].pColorAttachments = &color_ref;
+    subpasses[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpasses[1].inputAttachmentCount = 1;
+    subpasses[1].pInputAttachments = &input_ref;
+
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = 0;
+    dependency.dstSubpass = 1;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;  // subpass 0 loadOp stage
+    dependency.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;  // subpass 0 loadOp DONT_CARE write access
+    dependency.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+    dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
+    rpci.subpassCount = 2;
+    rpci.pSubpasses = subpasses;
+    rpci.attachmentCount = 1;
+    rpci.pAttachments = &attachment;
+    rpci.dependencyCount = 1;
+    rpci.pDependencies = &dependency;
+    vkt::RenderPass render_pass(*m_device, rpci);
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Framebuffer fb(*m_device, render_pass, 1, &image_view.handle());
+
+    // Fragment shader READs input attachment.
+    CreatePipelineHelper pipe(*this);
+    pipe.ResetShaderInfo(kVertexMinimalGlsl, kFragmentSubpassLoadGlsl);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT};
+    pipe.gp_ci_.renderPass = render_pass;
+    pipe.gp_ci_.subpass = 1;
+    pipe.CreateGraphicsPipeline();
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                                                   input_attachment_layout);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    // Record subpass into a secondary command buffer.
+    VkCommandBufferInheritanceInfo inherited_state = vku::InitStructHelper();
+    inherited_state.renderPass = render_pass;
+    inherited_state.subpass = 1;
+    inherited_state.framebuffer = fb;
+    VkCommandBufferBeginInfo subpass_cb_info = vku::InitStructHelper();
+    subpass_cb_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    subpass_cb_info.pInheritanceInfo = &inherited_state;
+
+    vkt::CommandBuffer subpass_cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    subpass_cb.Begin(&subpass_cb_info);
+    vk::CmdBindPipeline(subpass_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(subpass_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 0, 1, &pipe.descriptor_set_->set_,
+                              0, nullptr);
+    vk::CmdDraw(subpass_cb, 1, 0, 0, 0);
+    subpass_cb.End();
+
+    // Between subpass 0 and 1 there is a layout transition of color attachment into input attachment layout.
+    // Subpass dependency synchronizes this transition with subsequent input attachment read in the fragment shader.
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(render_pass, fb, 32, 32);
+    m_command_buffer.NextSubpass(VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    m_command_buffer.ExecuteCommands(subpass_cb);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncVal, PartialBlockWriteToSeparateMip) {
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13446
+    TEST_DESCRIPTION("Test writing to a partially used block in a non-power-of-two sized mip doesn't affect other mips");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    const VkFormat format = VK_FORMAT_BC2_UNORM_BLOCK;
+    const VkFormatFeatureFlags format_flags = VK_FORMAT_FEATURE_TRANSFER_DST_BIT | VK_FORMAT_FEATURE_TRANSFER_SRC_BIT;
+    VkFormatProperties format_properties;
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), format, &format_properties);
+    if ((format_properties.optimalTilingFeatures & format_flags) != format_flags) {
+        GTEST_SKIP() << "Device does not support transfers for VK_FORMAT_BC2_UNORM_BLOCK, skipping test.\n";
+    }
+
+    const uint32_t mip_sizes[3] = {12, 6, 3};
+    const uint32_t buffer_row_lengths[3] = {12, 8, 4};
+    const uint32_t mip_data_sizes[3] = {144, 64, 16};  // 1 byte per compressed texel
+    const uint32_t buffer_size = mip_data_sizes[0] + mip_data_sizes[2];
+
+    const auto image_ci = vkt::Image::ImageCreateInfo2D(mip_sizes[0], mip_sizes[0], 3, 1, format,
+                                                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    vkt::Image image(*m_device, image_ci);
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkImageMemoryBarrier2 mip2_transition_to_src = vku::InitStructHelper();
+    mip2_transition_to_src.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    mip2_transition_to_src.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    mip2_transition_to_src.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    mip2_transition_to_src.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    mip2_transition_to_src.image = image;
+    mip2_transition_to_src.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 2, 1, 0, 1};
+
+    VkBufferImageCopy mip1_copy_dst{};
+    mip1_copy_dst.bufferRowLength = buffer_row_lengths[1];
+    mip1_copy_dst.bufferImageHeight = buffer_row_lengths[1];
+    mip1_copy_dst.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 1, 0, 1};
+    mip1_copy_dst.imageOffset = {4, 4, 0};
+    mip1_copy_dst.imageExtent = {2, 2, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(mip2_transition_to_src);
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &mip1_copy_dst);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSyncVal, BlockTexelViewRenderAreaLoad) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_BC2_UNORM_BLOCK,
+                                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    image_ci.flags =
+        VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT | VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
+
+    VkImageFormatProperties properties{};
+    if (GetImageFormatProps(Gpu(), image_ci, properties) != VK_SUCCESS) {
+        GTEST_SKIP() << "BC2 image with block-compatible attachment views is not supported";
+    }
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R32G32B32A32_UINT, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) {
+        GTEST_SKIP() << "Uncompressed attachment view format unsupported";
+    }
+
+    vkt::Image image(*m_device, image_ci);
+    VkImageViewCreateInfo view_ci = vku::InitStructHelper();
+    view_ci.image = image;
+    view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_ci.format = VK_FORMAT_R32G32B32A32_UINT;
+    view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vkt::ImageView view(*m_device, view_ci);
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy copy{};
+    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    // Copy the first compressed block [0, 0] - (4, 4)
+    copy.imageExtent = {4, 4, 1};
+
+    VkRenderingAttachmentInfo attachment = vku::InitStructHelper();
+    attachment.imageView = view;
+    attachment.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+
+    VkRenderingInfo rendering = vku::InitStructHelper();
+    // Each view texel is one compressed block. Load the block to the right of the copied block
+    rendering.renderArea = {{1, 0}, {1, 1}};
+    rendering.layerCount = 1;
+    rendering.colorAttachmentCount = 1;
+    rendering.pColorAttachments = &attachment;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1, &copy);
+    m_command_buffer.BeginRendering(rendering);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
 }

@@ -90,6 +90,7 @@ void LastBound::Reset() {
         shader_object_states[i] = nullptr;
     }
     desc_set_pipeline_layout.reset();
+    push_constant_pipeline_layout.reset();
     if (push_descriptor_set) {
         cb_state.RemoveChild(push_descriptor_set);
         push_descriptor_set->Destroy();
@@ -278,14 +279,18 @@ bool LastBound::IsColorWriteEnabled(uint32_t i) const {
             return cb_state.dynamic_state_value.color_write_enabled[i];
         }
     } else {
-        if (const auto& color_blend = pipeline_state->ColorBlendState()) {
-            auto color_write = vku::FindStructInPNextChain<VkPipelineColorWriteCreateInfoEXT>(color_blend->pNext);
-            if (color_write && i < color_write->attachmentCount) {
-                return color_write->pColorWriteEnables[i];
-            }
+        const auto& color_blend = pipeline_state->ColorBlendState();
+        const auto* color_write =
+            color_blend ? vku::FindStructInPNextChain<VkPipelineColorWriteCreateInfoEXT>(color_blend->pNext) : nullptr;
+        if (!color_write) {
+            return true;  // Without VkPipelineColorWriteCreateInfoEXT, color writes are enabled for every attachment
+        }
+        if (i < color_write->attachmentCount) {
+            return color_write->pColorWriteEnables[i];
         }
     }
-    return true;
+    // With dynamicRenderingUnusedAttachments we might have extra attachments and want to ignore them
+    return false;
 }
 
 bool LastBound::IsColorBlendEnabled(uint32_t i) const {
@@ -300,7 +305,8 @@ bool LastBound::IsColorBlendEnabled(uint32_t i) const {
             }
         }
     }
-    return true;
+    // With dynamicRenderingUnusedAttachments we might have extra attachments and want to ignore them
+    return false;
 }
 
 std::string LastBound::DescribeColorBlendEnabled(uint32_t i) const {
@@ -620,6 +626,38 @@ uint32_t LastBound::GetViewportSwizzleCount() const {
             if (const auto* viewport_swizzle_state =
                     vku::FindStructInPNextChain<VkPipelineViewportSwizzleStateCreateInfoNV>(viewport_state->pNext)) {
                 return viewport_swizzle_state->viewportCount;
+            }
+        }
+    }
+    return 0;
+}
+
+uint32_t LastBound::GetViewportWScalingCount() const {
+    if (IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV)) {
+            return cb_state.dynamic_state_value.viewport_w_scaling_count;
+        }
+    } else {
+        if (auto viewport_state = pipeline_state->ViewportState()) {
+            if (const auto* viewport_w_scaling_state =
+                    vku::FindStructInPNextChain<VkPipelineViewportWScalingStateCreateInfoNV>(viewport_state->pNext)) {
+                return viewport_w_scaling_state->viewportCount;
+            }
+        }
+    }
+    return 0;
+}
+
+uint32_t LastBound::GetShadingRatePaletteCount() const {
+    if (IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV)) {
+        if (cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV)) {
+            return cb_state.dynamic_state_value.shading_rate_palette_count;
+        }
+    } else {
+        if (auto viewport_state = pipeline_state->ViewportState()) {
+            if (const auto* shading_rate_image_state =
+                    vku::FindStructInPNextChain<VkPipelineViewportShadingRateImageStateCreateInfoNV>(viewport_state->pNext)) {
+                return shading_rate_image_state->viewportCount;
             }
         }
     }
@@ -1033,11 +1071,18 @@ const spirv::EntryPoint* LastBound::GetFragmentEntryPoint() const {
     return nullptr;
 }
 
-vvl::DescriptorMode LastBound::GetActionDescriptorMode() const {
-    if (descriptor_mode != vvl::DescriptorModeUnknown) {
-        return descriptor_mode;  // Most common case
+const spirv::Module* LastBound::GetFragmentSpirvModule() const {
+    if (pipeline_state && pipeline_state->fragment_shader_state) {
+        if (const auto& fragment_shader = pipeline_state->fragment_shader_state->fragment_shader) {
+            return fragment_shader->spirv.get();
+        }
+    } else if (const auto* shader_object = GetShaderObjectState(ShaderObjectStage::FRAGMENT)) {
+        return shader_object->stage.spirv_state.get();
     }
+    return nullptr;
+}
 
+vvl::DescriptorMode LastBound::GetActionDescriptorMode() const {
     // This is only needed at draw/dispatch time when there is a chance there is not bound descriptor, but can still find from a
     // pipeline/layout
     if (pipeline_state) {
@@ -1059,8 +1104,19 @@ vvl::DescriptorMode LastBound::GetActionDescriptorMode() const {
             } else {
                 return vvl::DescriptorModeClassic;
             }
+        } else if (push_constant_pipeline_layout) {
+            if (push_constant_pipeline_layout->has_descriptor_buffer) {
+                return vvl::DescriptorModeBuffer;
+            } else {
+                return vvl::DescriptorModeClassic;
+            }
         }
     }
+
+    if (descriptor_mode != vvl::DescriptorModeUnknown) {
+        return descriptor_mode;  // Most common case
+    }
+
     // Not sure how to find it if in this situation, so resort to a safe choice
     return vvl::DescriptorModeClassic;
 }

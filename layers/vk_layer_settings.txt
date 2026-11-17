@@ -25,6 +25,11 @@ khronos_validation.debug_action = VK_DBG_LAYER_ACTION_LOG_MSG,VK_DBG_LAYER_ACTIO
 # When enabled and using VK_EXT_descriptor_heap/VK_EXT_descriptor_buffer, this will attempt to track all descriptors seen such that GPU-AV and GPU Dump can detect more errors. This will increase the memory footprint.
 khronos_validation.descriptor_hashing = false
 
+# Total expected descriptors used
+# =====================
+# We create a static allocation to hold all potential descriptor hashes we see. The larger it is the more memory and time it may take. The true capacity is always this value rounded up to the next power of two.
+khronos_validation.descriptor_hashing_total_descriptors = 65536
+
 # Max Duplicated Messages
 # =====================
 # Maximum number of times any single validation message should be reported.
@@ -44,11 +49,6 @@ khronos_validation.gpu_dump_copy_memory_indirect = false
 # =====================
 # Dump all the information at every draw/dispatch when recording VK_EXT_descriptor_heap or VK_EXT_descriptor_buffer
 khronos_validation.gpu_dump_descriptors = false
-
-# Force Device Copy
-# =====================
-# [Very experimental] For non-host visible memory, try and do a device copy during command recording to view the data inside a buffer.
-khronos_validation.gpu_dump_device_copy = false
 
 # Dump VK_EXT_device_generated_commands
 # =====================
@@ -79,6 +79,11 @@ khronos_validation.gpuav_buffer_copies = true
 # =====================
 # Validate buffers containing parameters used in indirect Vulkan commands, or used in copy commands
 khronos_validation.gpuav_buffers_validation = true
+
+# CDL dump file
+# =====================
+# Path to a Crash Diagnostic Layer (CDL) dump file. Pipeline names found in this file will be selected for instrumentation.
+khronos_validation.gpuav_cdl_dump_path =
 
 # VK_KHR_copy_memory_indirect
 # =====================
@@ -145,9 +150,12 @@ khronos_validation.gpuav_ray_tracing_buffers_consistency = false
 # Will have GPU-AV try and prevent crashes, but will be much slower to validate. If using Safe Mode, consider using selective shader instrumentation, to only instrument the shaders/pipelines causing issues.
 khronos_validation.gpuav_safe_mode = false
 
-# Enable instrumenting shaders selectively
+# Scoped GPU-AV
 # =====================
-# Select which shaders to instrument by passing a VkValidationFeaturesEXT struct with GPU-AV enabled in the VkShaderModuleCreateInfo pNext or using a regex matching a shader/pipeline debug name. Because this only validates the selected shaders/pipelines, it will allow GPU-AV to run much faster.
+# When turned on, only selected shaders will be instrumented. Shader selection can be done by:
+- passing a VkValidationFeaturesEXT struct in the pNext of VkShaderModuleCreateInfo/VkPipelineShaderStageCreateInfo/vkCreateShadersEXT pNext
+- using a pattern matching a shader/pipeline debug name.
+- Providing a CDL dump file to parse the debug names from it.
 khronos_validation.gpuav_select_instrumented_shaders = false
 
 # Shader instrumentation
@@ -160,9 +168,9 @@ khronos_validation.gpuav_shader_instrumentation = true
 # Things invalid to do in SPIR-V but don't have a dedicated check (example: dividing an int by zero, reaching OpUnreachable, invalid casting, overflow/undeflow). When in safe mode, will modify the invalid usage.
 khronos_validation.gpuav_shader_sanitizer = true
 
-# Shader/pipeline name regexes
+# Shader/pipeline name patterns
 # =====================
-# Any shader or pipeline library debug name (set with vkSetDebugUtilsObjectNameEXT) fully matching any listed regular expression will be instrumented when creating pipelines with those shaders or libraries. Regex grammar: Modified ECMAScript. No support for shader objects yet. Warning: instrumentation being performed at final pipeline creation time, if shaders modules have already been destroyed at this step (possible when using pipeline libraries), they won't be found by this regex selection system. In this case, consider naming pipeline libraries instead.
+# Any shader or pipeline library debug name (set with vkSetDebugUtilsObjectNameEXT) fully matching any listed pattern will be instrumented when creating pipelines with those shaders or libraries. In a pattern, '*' matches any sequence of characters (including none), every other character is matched literally. For instance `foo` will only match for `foo`, `foo*` with every name starting with `foo`, `*foo*` every name containing `foo`. Warning: instrumentation being performed at final pipeline creation time, if shaders modules have already been destroyed at this step (possible when using pipeline libraries), they won't be found by this name selection system. In this case, consider naming pipeline libraries instead.
 khronos_validation.gpuav_shaders_to_instrument =
 
 # Shared Memory Data Race Detection
@@ -185,6 +193,11 @@ khronos_validation.gpuav_vertex_attribute_fetch_oob = true
 # Give warnings when using legacy parts of the API.
 khronos_validation.legacy_detection = false
 
+# When to give warning
+# =====================
+# Control when legacy detection warnings are emitted
+khronos_validation.legacy_detection_mode = ALWAYS
+
 # Log Filename
 # =====================
 # Specifies the output filename
@@ -202,7 +215,7 @@ khronos_validation.message_format_json = false
 
 # Mute Message VUIDs
 # =====================
-# List of VUIDs which are to be IGNORED by the validation layer. The list is comma seperated and can be either the entire VUID string, the hashed value, or the last 5 digit number of a VUID
+# List of VUIDs which are to be IGNORED by the validation layer. The list is comma separated and can be either the entire VUID string, the hashed value, or the last 5 digit number of a VUID
 khronos_validation.message_id_filter =
 
 # Object Lifetime
@@ -250,15 +263,15 @@ khronos_validation.stateless_param = true
 # Append a section of key-value properties to the error message. Useful for filtering errors.
 khronos_validation.syncval_message_extra_properties = false
 
+# Record-time reporting
+# =====================
+# Report errors during command buffer recording, at the command that caused them. This runs a subset of full validation and adds CPU overhead. Disabling it does not reduce validation coverage. Full validation reports errors during queue submission.
+khronos_validation.syncval_record_time_validation = true
+
 # Shader accesses heuristic
 # =====================
 # Take into account memory accesses performed by the shader based on SPIR-V static analysis. Warning: can produce false-positives, can ignore certain types of accesses, does not support VK_EXT_descriptor_buffer.
 khronos_validation.syncval_shader_accesses_heuristic = false
-
-# Submit time validation
-# =====================
-# Enable synchronization validation on the boundary between submitted command buffers. This also validates accesses from presentation operations. This option can incur a significant performance cost.
-khronos_validation.syncval_submit_time_validation = true
 
 # Thread Safety
 # =====================

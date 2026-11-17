@@ -55,7 +55,10 @@ std::string string_VkDependencyInfo(const Logger& logger, VkDependencyInfo set_d
         set << "imageMemoryBarrierCount " << set_dependency_info.imageMemoryBarrierCount;
         wait << "imageMemoryBarrierCount " << dependency_info.imageMemoryBarrierCount;
     } else {
-        for (uint32_t i = 0; i < dependency_info.memoryBarrierCount; ++i) {
+        // Only report the first difference found, otherwise the 3 loops below concatenate into an unreadable message
+        bool found_any = false;
+
+        for (uint32_t i = 0; !found_any && i < dependency_info.memoryBarrierCount; ++i) {
             bool found = true;
             if (dependency_info.pMemoryBarriers[i].srcStageMask != set_dependency_info.pMemoryBarriers[i].srcStageMask) {
                 set << "pMemoryBarriers[" << i << "].srcStageMask "
@@ -81,10 +84,11 @@ std::string string_VkDependencyInfo(const Logger& logger, VkDependencyInfo set_d
                 found = false;
             }
             if (found) {
+                found_any = true;
                 break;
             }
         }
-        for (uint32_t i = 0; i < dependency_info.bufferMemoryBarrierCount; ++i) {
+        for (uint32_t i = 0; !found_any && i < dependency_info.bufferMemoryBarrierCount; ++i) {
             bool found = true;
             if (dependency_info.pBufferMemoryBarriers[i].srcStageMask !=
                 set_dependency_info.pBufferMemoryBarriers[i].srcStageMask) {
@@ -137,10 +141,11 @@ std::string string_VkDependencyInfo(const Logger& logger, VkDependencyInfo set_d
                 found = false;
             }
             if (found) {
+                found_any = true;
                 break;
             }
         }
-        for (uint32_t i = 0; i < dependency_info.imageMemoryBarrierCount; ++i) {
+        for (uint32_t i = 0; !found_any && i < dependency_info.imageMemoryBarrierCount; ++i) {
             bool found = true;
             if (dependency_info.pImageMemoryBarriers[i].srcStageMask != set_dependency_info.pImageMemoryBarriers[i].srcStageMask) {
                 set << "pImageMemoryBarriers[" << i << "].srcStageMask "
@@ -167,14 +172,14 @@ std::string string_VkDependencyInfo(const Logger& logger, VkDependencyInfo set_d
                      << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].dstAccessMask);
             } else if (dependency_info.pImageMemoryBarriers[i].oldLayout != set_dependency_info.pImageMemoryBarriers[i].oldLayout) {
                 set << "pImageMemoryBarriers[" << i << "].oldLayout "
-                    << string_VkAccessFlags2(set_dependency_info.pImageMemoryBarriers[i].oldLayout);
+                    << string_VkImageLayout(set_dependency_info.pImageMemoryBarriers[i].oldLayout);
                 wait << "pImageMemoryBarriers[" << i << "].oldLayout "
-                     << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].oldLayout);
+                     << string_VkImageLayout(dependency_info.pImageMemoryBarriers[i].oldLayout);
             } else if (dependency_info.pImageMemoryBarriers[i].newLayout != set_dependency_info.pImageMemoryBarriers[i].newLayout) {
                 set << "pImageMemoryBarriers[" << i << "].newLayout "
-                    << string_VkAccessFlags2(set_dependency_info.pImageMemoryBarriers[i].newLayout);
+                    << string_VkImageLayout(set_dependency_info.pImageMemoryBarriers[i].newLayout);
                 wait << "pImageMemoryBarriers[" << i << "].newLayout "
-                     << string_VkAccessFlags2(dependency_info.pImageMemoryBarriers[i].newLayout);
+                     << string_VkImageLayout(dependency_info.pImageMemoryBarriers[i].newLayout);
             } else if (dependency_info.pImageMemoryBarriers[i].srcQueueFamilyIndex !=
                        set_dependency_info.pImageMemoryBarriers[i].srcQueueFamilyIndex) {
                 set << "pImageMemoryBarriers[" << i << "].srcQueueFamilyIndex "
@@ -226,11 +231,17 @@ std::string string_VkDependencyInfo(const Logger& logger, VkDependencyInfo set_d
                 found = false;
             }
             if (found) {
+                found_any = true;
                 break;
             }
         }
     }
-    return "event was set with " + set.str() + " and is being waited on with " + wait.str();
+
+    const std::string set_str = set.str();
+    if (set_str.empty()) {
+        return "unable to find which field of the VkDependencyInfo differs (this is a Validation bug, please report!)";
+    }
+    return "event was set with " + set_str + " and is being waited on with " + wait.str();
 }
 
 std::string string_BuffersFromAddress(const vvl::DeviceState& device, VkDeviceAddress address) {
@@ -283,7 +294,7 @@ std::string string_VkAccelerationStructureGeometryTrianglesDataKHR(
     ss << indent << "vertexStride: " << std::dec << triangles.vertexStride << '\n';
     ss << indent << "maxVertex: " << triangles.maxVertex << '\n';
     ss << indent << "indexType: " << string_VkIndexType(triangles.indexType) << '\n';
-    ss << indent << "indexData: " << std::hex << triangles.indexData.deviceAddress << '\n';
+    ss << indent << "indexData: 0x" << std::hex << triangles.indexData.deviceAddress << '\n';
     if (triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
         std::string index_buffers_list_str = string_BuffersFromAddress(device_state, triangles.indexData.deviceAddress);
         if (!index_buffers_list_str.empty()) {
@@ -292,7 +303,7 @@ std::string string_VkAccelerationStructureGeometryTrianglesDataKHR(
             ss << index_buffers_str << '\n';
         }
     }
-    ss << indent << "transformData: " << triangles.transformData.deviceAddress << '\n';
+    ss << indent << "transformData: 0x" << std::hex << triangles.transformData.deviceAddress << '\n';
     if (triangles.transformData.deviceAddress != 0) {
         std::string transform_buffers_list_str = string_BuffersFromAddress(device_state, triangles.transformData.deviceAddress);
         if (!transform_buffers_list_str.empty()) {

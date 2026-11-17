@@ -55,7 +55,7 @@ TEST_F(NegativeSparseImage, DISABLED_BindingImageBufferCreate) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     if (m_device->Physical().Features().sparseResidencyImage2D) {
@@ -89,7 +89,7 @@ TEST_F(NegativeSparseImage, DISABLED_ResidencyImageCreateUnsupportedTypes) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
 
@@ -123,7 +123,7 @@ TEST_F(NegativeSparseImage, DISABLED_ResidencyImageCreateUnsupportedSamples) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_LINEAR;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
 
@@ -166,7 +166,7 @@ TEST_F(NegativeSparseImage, DISABLED_ResidencyFlag) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
@@ -204,7 +204,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageUsageBits) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-None-01925");
 }
@@ -240,7 +240,7 @@ TEST_F(NegativeSparseImage, DISABLED_MemoryBindOffset) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     if (m_device->Physical().Features().sparseResidencyImage2D) {
@@ -377,7 +377,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     /// Create image whose memory has an incompatible type
@@ -526,7 +526,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType2) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
@@ -659,7 +659,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType3) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
@@ -878,7 +878,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
@@ -1389,4 +1389,48 @@ TEST_F(NegativeSparseImage, DISABLED_UnalignedBindOffsets) {
 
     // Wait for operations to finish before destroying anything
     m_default_queue->Wait();
+}
+
+// Not supported in Vulkan SC: sparse resources
+TEST_F(NegativeSparseImage, DISABLED_GetFormatPropertiesSamples) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_EXTENDED_FLAGS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedFlags);
+    RETURN_IF_SKIP(InitFramework());
+
+    const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    const VkImageType type = VK_IMAGE_TYPE_2D;
+    const VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+    const VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    // best guess to not be supported
+    const VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_64_BIT;
+
+    VkImageFormatProperties image_format_props;
+    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), format, type, tiling, usage, 0, &image_format_props) != VK_SUCCESS) {
+        GTEST_SKIP() << "GetPhysicalDeviceImageFormatProperties failed";
+    }
+    if ((image_format_props.sampleCounts & samples) != 0) {
+        GTEST_SKIP() << "VK_SAMPLE_COUNT_64_BIT is supported";
+    }
+
+    uint32_t property_count = 0u;
+    {
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceSparseImageFormatProperties-samples-01094");
+        vk::GetPhysicalDeviceSparseImageFormatProperties(Gpu(), format, type, samples, usage, tiling, &property_count, nullptr);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        VkImageUsageFlags2CreateInfoKHR usage_flags_2 = vku::InitStructHelper();
+        usage_flags_2.usage = VK_IMAGE_USAGE_2_COLOR_ATTACHMENT_BIT_KHR;
+        VkPhysicalDeviceSparseImageFormatInfo2 format_info = vku::InitStructHelper(&usage_flags_2);
+        format_info.format = format;
+        format_info.type = type;
+        format_info.usage = usage;
+        format_info.tiling = tiling;
+        format_info.samples = samples;
+        m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceSparseImageFormatInfo2-samples-01095");
+        vk::GetPhysicalDeviceSparseImageFormatProperties2(Gpu(), &format_info, &property_count, nullptr);
+        m_errorMonitor->VerifyFound();
+    }
 }

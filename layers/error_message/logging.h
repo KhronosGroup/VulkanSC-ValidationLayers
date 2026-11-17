@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstdarg>
 #include <mutex>
 #include <string>
@@ -93,7 +94,7 @@ struct LogObjectList {
     [[nodiscard]] auto begin() const -> decltype(object_list.begin()) { return object_list.begin(); }
     [[nodiscard]] auto end() const -> decltype(object_list.end()) { return object_list.end(); }
 
-    LogObjectList(){};
+    LogObjectList() {}
 };
 
 typedef struct VkLayerDbgFunctionState {
@@ -138,7 +139,7 @@ struct LoggingLabel {
         out.pLabelName = name.c_str();
         std::copy(color.cbegin(), color.cend(), out.color);
         return out;
-    };
+    }
 
     LoggingLabel() : name(), color({{0.f, 0.f, 0.f, 0.f}}) {}
     LoggingLabel(const VkDebugUtilsLabelEXT* label_info);
@@ -242,6 +243,8 @@ class DebugReport {
     bool LogMessage(VkFlags msg_flags, std::string_view vuid_text, const LogObjectList &objects, const Location &loc,
                     const std::string &main_message);
 
+    void EraseObjectName(uint64_t object_handle);
+
     void BeginQueueDebugUtilsLabel(VkQueue queue, const VkDebugUtilsLabelEXT *label_info);
     void EndQueueDebugUtilsLabel(VkQueue queue);
     void InsertQueueDebugUtilsLabel(VkQueue queue, const VkDebugUtilsLabelEXT *label_info);
@@ -251,6 +254,8 @@ class DebugReport {
     void InsertCmdDebugUtilsLabel(VkCommandBuffer command_buffer, const VkDebugUtilsLabelEXT *label_info);
     void ResetCmdDebugUtilsLabel(VkCommandBuffer command_buffer);
     void EraseCmdDebugUtilsLabel(VkCommandBuffer command_buffer);
+
+    bool HasSeverityLevel(VkDebugUtilsMessageSeverityFlagBitsEXT level) const { return (active_msg_severities & level) != 0; }
 
   private:
     std::string CreateMessageText(const Location &loc, std::string_view vuid_text, const std::string &main_message,
@@ -267,6 +272,9 @@ class DebugReport {
     vvl::unordered_map<VkCommandBuffer, std::unique_ptr<LoggingLabelState>> debug_utils_cmd_buffer_labels;
     vvl::unordered_map<uint64_t, std::string> debug_object_name_map;
     vvl::unordered_map<uint64_t, std::string> debug_utils_object_name_map;
+    // Destroying an object is a very common thing and not all app will even name anything.
+    // This lets EraseObjectName() return without taking |debug_output_mutex| when there is nothing to erase
+    std::atomic<bool> has_object_names{false};
 };
 
 class Logger {
@@ -283,6 +291,16 @@ class Logger {
         va_list argptr;
         va_start(argptr, format);
         const bool result = debug_report->LogMessageVaList(kErrorBit, vuid_text, objlist, loc, format, argptr);
+        va_end(argptr);
+        return result;
+    }
+
+    // Currently works like LogError, but allows developer to better categorize the error
+    bool DECORATE_PRINTF(5, 6) LogInternalError(std::string_view vuid_text, const LogObjectList& objlist, const Location& loc,
+                                                const char* format, ...) const {
+        va_list argptr;
+        va_start(argptr, format);
+        const bool result = debug_report->LogMessageVaList(kWarningBit, vuid_text, objlist, loc, format, argptr);
         va_end(argptr);
         return result;
     }
@@ -331,15 +349,6 @@ class Logger {
         const bool result = debug_report->LogMessageVaList(kVerboseBit, vuid_text, objlist, loc, format, argptr);
         va_end(argptr);
         return result;
-    }
-
-    void LogInternalError(std::string_view failure_location, const LogObjectList &obj_list, const Location &loc,
-                          std::string_view entrypoint, VkResult err) const {
-        const std::string_view err_string = string_VkResult(err);
-        std::string vuid = "INTERNAL-ERROR-";
-        vuid += entrypoint;
-        LogError(vuid, obj_list, loc, "at %s: %s() was called in the Validation Layer state tracking and failed with result = %s.",
-                 failure_location.data(), entrypoint.data(), err_string.data());
     }
 
     DebugReport *debug_report{nullptr};

@@ -17,7 +17,7 @@
 import sys
 import os
 import json
-from vulkan_object import SpirvEnables
+from vulkan_object import EnableState
 from base_generator import BaseGenerator
 from generators.generator_utils import IsNonVulkanSprivCapability
 
@@ -42,6 +42,12 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
                     if 'provisional' in enum:
                         self.provisionalList.append(enum['enumerant'])
                 break
+
+        # Must match the identical_but_different_features renames in device_features_generator.py
+        self.featureNameSuffix = {
+            'VK_NV_cooperative_matrix2' : 'NV',
+            'VK_EXT_buffer_device_address' : 'EXT',
+        }
 
         # Promoted features structure in state_tracker.cpp are put in the VkPhysicalDeviceVulkan*Features structs
         # but the XML can still list them. This list all promoted structs to ignore since they are aliased.
@@ -69,7 +75,13 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
             "VkPhysicalDeviceVulkanMemoryModelFeatures",
             # 1.3
             "VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures",
+            "VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT",
             "VkPhysicalDeviceShaderIntegerDotProductFeatures",
+            "VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR",
+            # 1.4
+            "VkPhysicalDeviceShaderSubgroupRotateFeatures",
+            "VkPhysicalDeviceShaderExpectAssumeFeatures",
+            "VkPhysicalDeviceShaderFloatControls2Features",
         ]
 
         # Properties are harder to handle genearted without generating a template for every property struct type
@@ -84,7 +96,7 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
 
     #
     # Creates the value of the struct declared in RequiredSpirvInfo
-    def createMapValue(self, name: str, enable: SpirvEnables, isExtension: bool) -> str:
+    def createMapValue(self, name: str, enable: EnableState, isExtension: bool) -> str:
         out = []
         if enable.version is not None:
             # Version should be VK_VERSION_x_x as defined in header but need to get as VK_API_VERSION_x_x
@@ -93,7 +105,8 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
                 version = 'VK_API_VERSION_1_0'
             out.append(f'{{{version}, nullptr, nullptr, ""}}')
         elif enable.feature is not None:
-            out.append(f'{{0, &DeviceFeatures::{enable.feature}, nullptr, ""}}')
+            suffix = '' if enable.requires not in self.featureNameSuffix else self.featureNameSuffix[enable.requires]
+            out.append(f'{{0, &DeviceFeatures::{enable.feature}{suffix}, nullptr, ""}}')
         elif enable.extension is not None:
             # All fields in DeviceExtensions should just be the extension name lowercase
             out.append(f'{{0, nullptr, &DeviceExtensions::{enable.extension.lower()}, ""}}')
@@ -201,7 +214,7 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
             ''')
 
         out.append('''
-            // Each instance of the struct will only have a singel field non-null
+            // Each instance of the struct will only have a single field non-null
             struct RequiredSpirvInfo {
                 uint32_t version;
                 FeaturePointer feature;
@@ -252,19 +265,6 @@ class SpirvValidationHelperOutputGenerator(BaseGenerator):
         out.append('}\n')
         out.append('\n')
 
-        #
-        # Creates the Enum string helpers for better error messages. Same idea of vk_enum_string_helper.h but for SPIR-V
-        out.append('static inline const char* string_SpvCapability(uint32_t input_value) {\n')
-        out.append('    switch ((spv::Capability)input_value) {\n')
-        for name in self.capabilityList:
-            out.append('#ifdef VK_ENABLE_BETA_EXTENSIONS\n') if name in self.provisionalList else None
-            out.append(f'         case spv::Capability{name}:\n')
-            out.append(f'            return "{name}";\n')
-            out.append('#endif\n') if name in self.provisionalList else None
-        out.append('        default:\n')
-        out.append('            return \"Unhandled OpCapability\";\n')
-        out.append('    };\n')
-        out.append('}\n')
         #
         # Creates SPIR-V image format helper
         out.append('''
@@ -377,7 +377,7 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
                     if (GetSpirvCapabilites().count(insn_capability) == 0) {
                         const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08739" : "VUID-VkShaderCreateInfoEXT-pCode-08739";
                         skip |= LogError(vuid, module_state.handle(), loc,
-                            "SPIR-V has Capability (%s) declared, but this is not supported by Vulkan.", string_SpvCapability(insn_capability));
+                            "SPIR-V has Capability (%s) declared, but this is not supported by Vulkan.", spv::CapabilityToString(static_cast<spv::Capability>(insn_capability)));
                         return skip; // no known capability to validate
                     }
 
@@ -441,7 +441,7 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
                 if (has_support == false) {
                     const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08740" : "VUID-VkShaderCreateInfoEXT-pCode-08740";
                     skip |= LogError(vuid, module_state.handle(), loc,
-                        "SPIR-V Capability %s was declared, but one of the following requirements is required (%s).", string_SpvCapability(insn_capability), SpvCapabilityRequirements(insn_capability));
+                        "SPIR-V Capability %s was declared, but one of the following requirements must be met (%s).", spv::CapabilityToString(static_cast<spv::Capability>(insn_capability)), SpvCapabilityRequirements(insn_capability));
                 }
 
                 // Portability checks
@@ -449,8 +449,8 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
                     if ((VK_FALSE == enabled_features.shaderSampleRateInterpolationFunctions) &&
                         (spv::CapabilityInterpolationFunction == insn_capability)) {
                         skip |= LogError("VUID-RuntimeSpirv-shaderSampleRateInterpolationFunctions-06325", module_state.handle(), loc,
-                                            "SPIR-V (portability error) InterpolationFunction Capability are not supported "
-                                            "by this platform");
+                                            "SPIR-V (portability error) InterpolationFunction Capability is not supported "
+                                            "by this platform.");
                     }
                 }
             } else if (insn.Opcode() == spv::OpExtension) {
@@ -497,7 +497,7 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
                 if (has_support == false) {
                     const char *vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08742" : "VUID-VkShaderCreateInfoEXT-pCode-08742";
                     skip |= LogError(vuid, module_state.handle(), loc,
-                        "SPIR-V Extension %s was declared, but one of the following requirements is required (%s).", extension_name.c_str(), SpvExtensionRequirements(extension_name).c_str());
+                        "SPIR-V Extension %s was declared, but one of the following requirements must be met (%s).", extension_name.c_str(), SpvExtensionRequirements(extension_name).c_str());
                 }
             } //spv::OpExtension
             return skip;

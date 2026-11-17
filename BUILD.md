@@ -41,6 +41,10 @@ This repository contains generated source code in the `layers/vulkan/generated` 
 
 Please see the [Generated Code documentation](./docs/generated_code.md) for more information
 
+The GPU-AV shaders in `layers/gpuav/shaders` are recompiled into `layers/vulkan/generated/gpuav_offline_spirv*` whenever they change, using the shader compilers fetched by `UPDATE_DEPS`.
+Since those compilers are built for the target, this is disabled by default when cross compiling: the checked in SPIR-V is used as is, and CMake fails if the shaders were edited.
+Use `-D VVL_COMPILE_GPUAV_SHADERS=OFF` (or `ON`) to override this.
+
 ## Dependencies
 
 Currently this repo has a custom process for grabbing C/C++ dependencies.
@@ -57,6 +61,11 @@ Misc Useful Information:
 
 - By default `UPDATE_DEPS` is `ON` and simply use `-D UPDATE_DEPS=OFF` if you don't want to use it
 - You can run `update_deps.py` manually but it isn't recommended for most users.
+- For multi-config generators (Visual Studio, Xcode, Ninja Multi-Config), dependencies are always
+  prebuilt for both `Debug` and `Release` (regardless of `CMAKE_CONFIGURATION_TYPES`), so switching
+  between those configs in the IDE works without having to reconfigure. `RelWithDebInfo` and
+  `MinSizeRel` builds transparently use the `Release` dependency binaries (matching what `vcpkg` does
+  for the same reason), so those configs work out of the box too, without a separate prebuild step.
 
 ### How to test new dependency versions
 

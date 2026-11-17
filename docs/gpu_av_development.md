@@ -2,7 +2,7 @@
 
 For those brave souls, here are some overall basic tips/advice that should not get outdated as things actively change
 
-## You need to Validate with "Self Valiation"
+## You need to Validate with "Self Validation"
 
 Since GPU-AV itself utilizes the Vulkan API to perform its tasks,
 Vulkan function calls have to valid. To ensure that, those calls have to
@@ -13,7 +13,7 @@ How to setup self validation:
 - Build the self validation layer:
     - Make sure to use a Release build
         - Otherwise might be really slow with double validation
-    - Use the the `-DBUILD_SELF_VVL=ON` cmake option when generating the CMake project
+    - Use the `-DBUILD_SELF_VVL=ON` cmake option when generating the CMake project
         - The build will produce a manifest file used by the Vulkan loader, `VkLayer_dev_self_validation.json`.
         The `name` field in this file is `VK_LAYER_DEV_self_validation` to differentiate the self validation layer from the one you work on.
             - If the name were the same, the loader/os would mark both layers as duplicates and not load the second instance

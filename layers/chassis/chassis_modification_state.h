@@ -22,7 +22,7 @@
 #include <vector>
 #include "gpuav/spirv/instrumentation_status.h"
 #include "state_tracker/shader_module.h"
-#include "utils/vk_api_utils.h"
+#include "utils/shader_utils.h"
 
 namespace vvl {
 class Pipeline;
@@ -68,6 +68,7 @@ struct ShaderObject {
 
     // When using GPU-AV the pCreateInfo is modified on the user
     bool is_modified = false;
+    bool force_shader_instrumentation = false;
     std::vector<vku::safe_VkShaderCreateInfoEXT> modified_create_infos;
     const VkShaderCreateInfoEXT* pCreateInfos = nullptr;
 
@@ -91,6 +92,10 @@ struct ShaderInstrumentationMetadata {
 
     // Used to know if VkShaderModuleCreateInfo is passed down VkPipelineShaderStageCreateInfo
     bool passed_in_shader_stage_ci = false;
+    // Need to hold this in memory between the PreCallRecord and the Dispatch
+    // when passed_in_shader_stage_ci the modified VkShaderModuleCreateInfo::pCode points at
+    // it instead of holding a copy
+    std::vector<uint32_t> instrumented_spirv;
 };
 
 struct CreateGraphicsPipelines {
@@ -98,7 +103,7 @@ struct CreateGraphicsPipelines {
     bool is_modified = false;
     std::vector<vku::safe_VkGraphicsPipelineCreateInfo> modified_create_infos;
     const VkGraphicsPipelineCreateInfo* pCreateInfos = nullptr;
-    spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages];
+    std::vector<std::vector<spirv::StatelessData>> stateless_data;
     // 2D array for [pipelineCount][stageCount]
     std::vector<std::vector<ShaderInstrumentationMetadata>> shader_instrumentations_metadata;
 
@@ -110,7 +115,7 @@ struct CreateComputePipelines {
     bool is_modified = false;
     std::vector<vku::safe_VkComputePipelineCreateInfo> modified_create_infos;
     const VkComputePipelineCreateInfo* pCreateInfos = nullptr;
-    spirv::StatelessData stateless_data;
+    std::vector<spirv::StatelessData> stateless_data;
     // 2D array for [pipelineCount][stageCount]
     // While only 1 compute can be used, need interface to match with graphics/rtx structs
     std::vector<std::vector<ShaderInstrumentationMetadata>> shader_instrumentations_metadata;
@@ -122,7 +127,7 @@ struct CreateRayTracingPipelinesKHR {
     bool is_modified = false;
     std::vector<vku::safe_VkRayTracingPipelineCreateInfoKHR> modified_create_infos;
     const VkRayTracingPipelineCreateInfoKHR* pCreateInfos = nullptr;
-    std::vector<spirv::StatelessData> stateless_data;
+    std::vector<std::vector<spirv::StatelessData>> stateless_data;
     // 2D array for [pipelineCount][stageCount]
     std::vector<std::vector<ShaderInstrumentationMetadata>> shader_instrumentations_metadata;
 
@@ -164,6 +169,13 @@ struct CreateBuffer {
     // pointer of the Safe Struct
     const VkBufferCreateInfo* create_info_copy;
     vku::safe_VkBufferCreateInfo modified_create_info;
+};
+
+struct AllocateMemory {
+    // To not waste time for CoreChecks we just copy the pointer, but if GPU-AV want to modifiy it, it will update pointer to be a
+    // pointer of the Safe Struct
+    const VkMemoryAllocateInfo* allocate_info_copy;
+    vku::safe_VkMemoryAllocateInfo modified_allocate_info;
 };
 
 }  // namespace chassis

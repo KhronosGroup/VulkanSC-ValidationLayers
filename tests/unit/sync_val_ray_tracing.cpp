@@ -21,6 +21,56 @@
 
 struct NegativeSyncValRayTracing : public VkSyncValTest {};
 
+TEST_F(NegativeSyncValRayTracing, BuildAfterVertexBufferWrite) {
+    TEST_DESCRIPTION("Build reads vertex data written by an earlier submission without a barrier");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    auto geometry = vkt::as::blueprint::GeometrySimpleOnDeviceTriangleInfo(*m_device, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    auto blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geometry));
+    blas.SetupBuild(true);
+    const vkt::Buffer& vertex_buffer = blas.GetGeometries()[0].GetTriangles().device_vertex_buffer;
+
+    m_command_buffer.Begin();
+    vk::CmdFillBuffer(m_command_buffer, vertex_buffer, 0, 4, 0);
+    m_command_buffer.End();
+
+    vkt::CommandBuffer build_cb(*m_device, m_command_pool);
+    build_cb.Begin();
+    blas.VkCmdBuildAccelerationStructuresKHR(build_cb);
+    build_cb.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
+    m_default_queue->Submit(build_cb);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncValRayTracing, WriteScratchBufferAfterBuild) {
+    TEST_DESCRIPTION("Write scratch data used by an acceleration structure build in an earlier submission");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas.SetDeviceScratchAdditionalFlags(VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    blas.SetupBuild(true);
+    const vkt::Buffer& scratch_buffer = *blas.GetScratchBuffer();
+
+    m_command_buffer.Begin();
+    blas.VkCmdBuildAccelerationStructuresKHR(m_command_buffer);
+    m_command_buffer.End();
+
+    vkt::CommandBuffer write_cb(*m_device, m_command_pool);
+    write_cb.Begin();
+    vk::CmdFillBuffer(write_cb, scratch_buffer, 0, 4, 0);
+    write_cb.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_default_queue->Submit(write_cb);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
 TEST_F(NegativeSyncValRayTracing, ScratchBufferHazard) {
     TEST_DESCRIPTION("Write to scratch buffer during acceleration structure build");
     RETURN_IF_SKIP(InitRayTracing());
@@ -714,6 +764,70 @@ TEST_F(NegativeSyncValRayTracing, DeserializeASHazard) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeSyncValRayTracing, ASCopyAfterBufferWrite) {
+    TEST_DESCRIPTION("AS copy reads its source buffer written by another command buffer");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    const auto blas_src = BuildBLAS();
+    auto blas_dst = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas_dst.SetupBuild(true);
+
+    VkCopyAccelerationStructureInfoKHR copy_info = vku::InitStructHelper();
+    copy_info.src = blas_src->GetDstAS()->handle();
+    copy_info.dst = blas_dst.GetDstAS()->handle();
+    copy_info.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_CLONE_KHR;
+
+    m_command_buffer.Begin();
+    vk::CmdFillBuffer(m_command_buffer, blas_src->GetDstAS()->GetBuffer(), 0, 4, 0);
+    m_command_buffer.End();
+
+    vkt::CommandBuffer copy_cb(*m_device, m_command_pool);
+    copy_cb.Begin();
+    vk::CmdCopyAccelerationStructureKHR(copy_cb, &copy_info);
+    copy_cb.End();
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
+    m_default_queue->Submit({m_command_buffer, copy_cb});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncValRayTracing, DeserializeAfterSerialize) {
+    TEST_DESCRIPTION("Deserialization overwrites an AS read by serialization in another command buffer");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by TestICD: serialization size query";
+    }
+
+    const auto blas = BuildBLAS();
+    vkt::Buffer serialization_buffer = GetSerializationDeserializationBuffer(*blas->GetDstAS());
+
+    VkCopyAccelerationStructureToMemoryInfoKHR copy_to_memory = vku::InitStructHelper();
+    copy_to_memory.src = blas->GetDstAS()->handle();
+    copy_to_memory.dst.deviceAddress = serialization_buffer.Address();
+    copy_to_memory.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_SERIALIZE_KHR;
+
+    VkCopyMemoryToAccelerationStructureInfoKHR copy_from_memory = vku::InitStructHelper();
+    copy_from_memory.src.deviceAddress = serialization_buffer.Address();
+    copy_from_memory.dst = blas->GetDstAS()->handle();
+    copy_from_memory.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_DESERIALIZE_KHR;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyAccelerationStructureToMemoryKHR(m_command_buffer, &copy_to_memory);
+    m_command_buffer.End();
+
+    vkt::CommandBuffer deserialize_cb(*m_device, m_command_pool);
+    deserialize_cb.Begin();
+    vk::CmdCopyMemoryToAccelerationStructureKHR(deserialize_cb, &copy_from_memory);
+    deserialize_cb.End();
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
+    m_default_queue->Submit({m_command_buffer, deserialize_cb});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
 TEST_F(NegativeSyncValRayTracing, BuildAfterBuildSyncASBufferButNotScratch) {
     TEST_DESCRIPTION("Build BLAS after BLAS. Barrier BLAS buffer but not syncs scratch buffer");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -771,5 +885,195 @@ TEST_F(NegativeSyncValRayTracing, BuildAfterBuildSyncScratchButNotASBuffer) {
     m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     blas.VkCmdBuildAccelerationStructuresKHR(m_command_buffer);
     m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSyncValRayTracing, ShaderBindingTableAfterCopy) {
+    TEST_DESCRIPTION("Trace rays reads a shader binding table copied in another command buffer");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    const auto blas = BuildBLAS();
+    const auto tlas = BuildTLAS(*blas->GetDstAS());
+    const auto pipeline = GetTraceRaysPipeline(tlas->GetDstAS()->handle());
+    auto sbt = pipeline->GetTraceRaysSbt();
+    const vkt::Buffer& source_sbt = pipeline->GetTraceRaysSbtBuffer();
+    vkt::Buffer destination_sbt(*m_device, source_sbt.CreateInfo().size,
+                                VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                vkt::device_address);
+    sbt.ray_gen_sbt.deviceAddress = destination_sbt.Address();
+
+    m_command_buffer.Begin();
+    m_command_buffer.Copy(source_sbt, destination_sbt);
+    m_command_buffer.End();
+
+    vkt::CommandBuffer trace_cb(*m_device, m_command_pool);
+    trace_cb.Begin();
+    vk::CmdBindDescriptorSets(trace_cb, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->GetPipelineLayout(), 0, 1,
+                              &pipeline->GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(trace_cb, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline);
+    vk::CmdTraceRaysKHR(trace_cb, &sbt.ray_gen_sbt, &sbt.miss_sbt, &sbt.hit_sbt, &sbt.callable_sbt, 1, 1, 1);
+    trace_cb.End();
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
+    m_default_queue->Submit({m_command_buffer, trace_cb});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncValRayTracing, WriteAfterTraceIndirect2) {
+    TEST_DESCRIPTION("A fill overwrites trace rays indirect arguments read in another command buffer");
+    AddRequiredExtensions(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipelineTraceRaysIndirect2);
+    RETURN_IF_SKIP(InitRayTracing());
+
+    const auto blas = BuildBLAS();
+    const auto tlas = BuildTLAS(*blas->GetDstAS());
+    const auto pipeline = GetTraceRaysPipeline(tlas->GetDstAS()->handle());
+    vkt::Buffer indirect_buffer(*m_device, sizeof(VkTraceRaysIndirectCommand2KHR),
+                                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->GetPipelineLayout(), 0, 1,
+                              &pipeline->GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline);
+    vk::CmdTraceRaysIndirect2KHR(m_command_buffer, indirect_buffer.Address());
+    m_command_buffer.End();
+
+    vkt::CommandBuffer write_cb(*m_device, m_command_pool);
+    write_cb.Begin();
+    vk::CmdFillBuffer(write_cb, indirect_buffer, 0, 4, 0);
+    write_cb.End();
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
+    m_default_queue->Submit({m_command_buffer, write_cb});
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncValRayTracing, ShaderBindingTableTestValidate) {
+    TEST_DESCRIPTION("Copy to SBT then trace rays without synchronization with copy write");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> blas = BuildBLAS();
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> tlas = BuildTLAS(*blas->GetDstAS());
+
+    std::unique_ptr<vkt::rt::Pipeline> pipeline = GetTraceRaysPipeline(tlas->GetDstAS()->handle());
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline->GetTraceRaysSbt();
+    const vkt::Buffer& source_sbt = pipeline->GetTraceRaysSbtBuffer();
+
+    vkt::Buffer destination_sbt(*m_device, source_sbt.CreateInfo().size,
+                                VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                vkt::device_address);
+    trace_rays_sbt.ray_gen_sbt.deviceAddress = destination_sbt.Address();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->GetPipelineLayout(), 0, 1,
+                              &pipeline->GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline);
+    m_command_buffer.Copy(source_sbt, destination_sbt);
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSyncValRayTracing, ShaderBindingTableTestUpdate) {
+    TEST_DESCRIPTION("Copy to SBT after trace rays without synchronization with the SBT read");
+    RETURN_IF_SKIP(InitRayTracing());
+
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> blas = BuildBLAS();
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> tlas = BuildTLAS(*blas->GetDstAS());
+
+    std::unique_ptr<vkt::rt::Pipeline> pipeline = GetTraceRaysPipeline(tlas->GetDstAS()->handle());
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline->GetTraceRaysSbt();
+    const vkt::Buffer& source_sbt = pipeline->GetTraceRaysSbtBuffer();
+
+    vkt::Buffer destination_sbt(*m_device, source_sbt.CreateInfo().size,
+                                VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                vkt::device_address);
+    trace_rays_sbt.ray_gen_sbt.deviceAddress = destination_sbt.Address();
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->GetPipelineLayout(), 0, 1,
+                              &pipeline->GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline);
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                        &trace_rays_sbt.callable_sbt, 1, 1, 1);
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
+    m_command_buffer.Copy(source_sbt, destination_sbt);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSyncValRayTracing, ShaderBindingTableTestValidateIndirect) {
+    TEST_DESCRIPTION("Copy to SBT then trace rays indirectly without synchronization with the copy write");
+    AddRequiredFeature(vkt::Feature::rayTracingPipelineTraceRaysIndirect);
+    RETURN_IF_SKIP(InitRayTracing());
+
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> blas = BuildBLAS();
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> tlas = BuildTLAS(*blas->GetDstAS());
+
+    std::unique_ptr<vkt::rt::Pipeline> pipeline = GetTraceRaysPipeline(tlas->GetDstAS()->handle());
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline->GetTraceRaysSbt();
+    const vkt::Buffer& source_sbt = pipeline->GetTraceRaysSbtBuffer();
+
+    vkt::Buffer destination_sbt(*m_device, source_sbt.CreateInfo().size,
+                                VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                vkt::device_address);
+    trace_rays_sbt.ray_gen_sbt.deviceAddress = destination_sbt.Address();
+
+    vkt::Buffer indirect_buffer(*m_device, sizeof(VkTraceRaysIndirectCommandKHR), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                vkt::device_address);
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->GetPipelineLayout(), 0, 1,
+                              &pipeline->GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline);
+
+    m_command_buffer.Copy(source_sbt, destination_sbt);
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
+    vk::CmdTraceRaysIndirectKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                                &trace_rays_sbt.callable_sbt, indirect_buffer.Address());
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSyncValRayTracing, ShaderBindingTableTestUpdateIndirect) {
+    TEST_DESCRIPTION("Copy to SBT after indirect trace rays without synchronization with the SBT read");
+    AddRequiredFeature(vkt::Feature::rayTracingPipelineTraceRaysIndirect);
+    RETURN_IF_SKIP(InitRayTracing());
+
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> blas = BuildBLAS();
+    std::unique_ptr<vkt::as::BuildGeometryInfoKHR> tlas = BuildTLAS(*blas->GetDstAS());
+
+    std::unique_ptr<vkt::rt::Pipeline> pipeline = GetTraceRaysPipeline(tlas->GetDstAS()->handle());
+    vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline->GetTraceRaysSbt();
+    const vkt::Buffer& source_sbt = pipeline->GetTraceRaysSbtBuffer();
+
+    vkt::Buffer destination_sbt(*m_device, source_sbt.CreateInfo().size,
+                                VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                vkt::device_address);
+    trace_rays_sbt.ray_gen_sbt.deviceAddress = destination_sbt.Address();
+
+    vkt::Buffer indirect_buffer(*m_device, sizeof(VkTraceRaysIndirectCommandKHR), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                vkt::device_address);
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->GetPipelineLayout(), 0, 1,
+                              &pipeline->GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipeline);
+
+    vk::CmdTraceRaysIndirectKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                                &trace_rays_sbt.callable_sbt, indirect_buffer.Address());
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
+    m_command_buffer.Copy(source_sbt, destination_sbt);
+    m_errorMonitor->VerifyFound();
+
     m_command_buffer.End();
 }

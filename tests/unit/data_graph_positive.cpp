@@ -11,6 +11,7 @@
 
 #include "layer_validation_tests.h"
 #include "data_graph_objects.h"
+#include "generated/pnext_chain_extraction.h"
 
 class PositiveDataGraph : public DataGraphTest {};
 
@@ -18,6 +19,7 @@ void DataGraphTest::InitBasicDataGraph(bool optical_flow) {
     SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
     AddRequiredExtensions(VK_ARM_DATA_GRAPH_EXTENSION_NAME);
+    AddRequiredExtensions(VK_ARM_DATA_GRAPH_INSTRUCTION_SET_TOSA_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::tensors);
     AddRequiredFeature(vkt::Feature::dataGraph);
     AddRequiredFeature(vkt::Feature::dataGraphShaderModule);
@@ -31,12 +33,48 @@ void DataGraphTest::InitBasicDataGraph(bool optical_flow) {
     RETURN_IF_SKIP(Init());
 }
 
+void DataGraphTest::InitDataGraphModel() {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dataGraph);
+    AddRequiredFeature(vkt::Feature::dataGraphModel);
+    AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
+    RETURN_IF_SKIP(Init());
+
+    const auto& queue_family_properties = m_device->Physical().queue_properties_;
+    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
+        if (!(queue_family_properties[i].queueFlags & VK_QUEUE_DATA_GRAPH_BIT_ARM)) {
+            continue;
+        }
+
+        uint32_t count = 0;
+        vk::GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(Gpu(), i, &count, nullptr);
+        std::vector<VkQueueFamilyDataGraphPropertiesARM> properties(count, vku::InitStruct<VkQueueFamilyDataGraphPropertiesARM>());
+        vk::GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(Gpu(), i, &count, properties.data());
+
+        for (const auto& property : properties) {
+            if (property.engine.isForeign &&
+                (property.engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_NEURAL_QCOM ||
+                 property.engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_COMPUTE_QCOM)) {
+                if (model_properties_.empty()) {
+                    model_queue_family_index_ = i;
+                }
+                model_properties_.push_back(property);
+            }
+        }
+    }
+
+    if (model_properties_.empty()) {
+        GTEST_SKIP() << "No queue family enumerates a foreign data graph model engine, skipping test.";
+    }
+}
+
 const VkTensorDescriptionARM DataGraphTest::defaultConstantTensorDesc{DefaultConstantTensorDesc()};
 
 std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> DataGraphTest::InitSessionBindInfo(
     const vkt::DataGraphPipelineSession& session, const std::vector<vkt::DeviceMemory>& device_mem) {
     const auto& bind_point_reqs = session.BindPointReqs();
-    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos(session.MemReqs().size());
+    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos(session.NumBindObjects());
     uint32_t req_i = 0;
     for (uint32_t i = 0; i < bind_point_reqs.size(); i++) {
         if (bind_point_reqs[i].bindPointType != VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM) {
@@ -46,8 +84,8 @@ std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> DataGraphTest::InitSess
         for (uint32_t j = 0; j < bind_point_reqs[i].numObjects; j++) {
             session_bind_infos[req_i] = vku::InitStructHelper();
             session_bind_infos[req_i].session = session;
-            session_bind_infos[req_i].memory = device_mem[req_i];
-            session_bind_infos[req_i].bindPoint = bind_point_reqs[req_i].bindPoint;
+            session_bind_infos[req_i].memory = device_mem[i];
+            session_bind_infos[req_i].bindPoint = bind_point_reqs[i].bindPoint;
             session_bind_infos[req_i].objectIndex = j;
             req_i++;
         }
@@ -73,19 +111,34 @@ VkTensorDescriptionARM DataGraphTest::DefaultConstantTensorDesc() {
     VkTensorDescriptionARM desc = vku::InitStructHelper();
     static std::vector<int64_t> dimensions{1, 2, 4, 4};
     desc.tiling = VK_TENSOR_TILING_LINEAR_ARM;
-    desc.format = VK_FORMAT_R8_UINT;
+    desc.format = VK_FORMAT_R32_SINT;
     desc.dimensionCount = dimensions.size();
     desc.pDimensions = dimensions.data();
     desc.usage = VK_TENSOR_USAGE_DATA_GRAPH_BIT_ARM;
     return desc;
 }
 
+// Assumes description defines a packed tensor with linear tiling.
+inline VkDeviceSize GetLinearTensorBufferSizeBytes(const VkTensorDescriptionARM& description) {
+    assert(description.dimensionCount > 0);
+    assert(description.pDimensions);
+    // NOTE: no assert for linear tiling: used for different tilings in negative tests
+
+    VkDeviceSize size = vkuFormatTexelBlockSize(description.format);
+    for (uint32_t i = 0; i < description.dimensionCount; ++i) {
+        assert(description.pDimensions[i] > 0);
+        size *= static_cast<VkDeviceSize>(description.pDimensions[i]);
+    }
+    return size;
+}
+
 // Constant for GetSpirvModifyableDataGraph and GetSpirvMultiEntryTwoDataGraph
 VkDataGraphPipelineConstantARM DataGraphTest::GetConstant(const VkTensorDescriptionARM& desc) {
     VkDataGraphPipelineConstantARM constant = vku::InitStructHelper();
     constant.id = 0;
-    // buffer size correct for DefaultConstantTensorDesc
-    static std::array<uint8_t, 32> constant_data;
+
+    VkDeviceSize buffer_size = GetLinearTensorBufferSizeBytes(desc);
+    static std::vector<uint8_t> constant_data(buffer_size);
     constant.pConstantData = constant_data.data();
     constant.pNext = &desc;
     return constant;
@@ -136,6 +189,7 @@ TEST_F(PositiveDataGraph, DISABLED_ProtectedMemoryDataGraph) {
     AddRequiredFeature(vkt::Feature::protectedMemory);
     AddRequiredFeature(vkt::Feature::pipelineProtectedAccess);
     RETURN_IF_SKIP(InitFramework());
+    // We need to create a device with ALSO a protected queue (VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT)
     RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
 
     vkt::dg::HelperParameters params;
@@ -237,11 +291,6 @@ TEST_F(PositiveDataGraph, DataGraphMultipleEntrypoints) {
         params.spirv_source = two_entrypoint_spirv.c_str();
         params.entrypoint = "entrypoint_2";
         vkt::dg::DataGraphPipelineHelper pipeline(*this, params);
-
-        VkDataGraphPipelineConstantARM constant = GetConstant();
-        pipeline.shader_module_ci_.constantCount = 1;
-        pipeline.shader_module_ci_.pConstants = &constant;
-
         pipeline.CreateDataGraphPipeline();
     }
 }
@@ -274,7 +323,7 @@ TEST_F(PositiveDataGraph, CmdDispatchDescriptorBuffer) {
     pipeline.CreateDataGraphPipeline();
 
     VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
-    session_ci.dataGraphPipeline = pipeline.Handle();
+    session_ci.dataGraphPipeline = pipeline;
     vkt::DataGraphPipelineSession session(*m_device, session_ci);
 
     auto& bind_point_reqs = session.BindPointReqs();
@@ -288,7 +337,7 @@ TEST_F(PositiveDataGraph, CmdDispatchDescriptorBuffer) {
     pipeline.descriptor_set_->UpdateDescriptorSets();
 
     m_command_buffer.Begin();
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
 
     vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
     VkDescriptorBufferBindingInfoEXT dbbi = vku::InitStructHelper();
@@ -305,11 +354,45 @@ TEST_F(PositiveDataGraph, CmdDispatchDescriptorBuffer) {
     m_command_buffer.End();
 }
 
+TEST_F(PositiveDataGraph, ResourceInfoImageLayoutsUnifiedImageLayouts) {
+    TEST_DESCRIPTION("Execute a datagraph with image resources and no layout info, with unifiedImageLayouts feature enabled");
+    AddRequiredFeature(vkt::Feature::unifiedImageLayouts);
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    // Need to create a data graph with image resources instead of the usual tensors, so use optical flow.
+    vkt::dg::OpticalFlowHelper optical_flow(*this);
+    /* Fail to chain a VkDataGraphPipelineResourceInfoImageLayoutARM structure. Since the unifiedImageLayouts feature is enabled
+     * this is valid usage. */
+    optical_flow.dg_pipeline_.resources_[0].pNext = nullptr;
+    optical_flow.CreateDataGraphPipeline();
+    optical_flow.SetupImageDescriptors();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = optical_flow.dg_pipeline_;
+
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+    std::vector<vkt::DeviceMemory> device_mem(session.BindPointReqs().size());
+    session.AllocSessionMem(device_mem);
+    std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> session_bind_infos =
+        DataGraphTest::InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
+    VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, optical_flow.dg_pipeline_.pipeline_layout_,
+                              0, 1, &optical_flow.dg_pipeline_.descriptor_set_.get()->set_, 0, nullptr);
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
+    m_command_buffer.End();
+}
+
 TEST_F(PositiveDataGraph, OpticalFlow) {
     TEST_DESCRIPTION("Execute a datagraph with an optical flow node");
     RETURN_IF_SKIP(InitBasicDataGraph(true));
 
-    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+    vkt::dg::OpticalFlowHelper optical_flow(*this);
     optical_flow.CreateDataGraphPipeline();
     optical_flow.SetupImageDescriptors();
 
@@ -324,8 +407,6 @@ TEST_F(PositiveDataGraph, OpticalFlow) {
     vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
 
     VkDataGraphPipelineOpticalFlowDispatchInfoARM optical_flow_di = vku::InitStructHelper();
-    optical_flow_di.meanFlowL1NormHint =
-        optical_flow.optical_flow_ci_.height;  // must be less than or equal to optical_flow_ci.height/optical_flow_ci.width
     VkDataGraphPipelineDispatchInfoARM pipeline_di = vku::InitStructHelper(&optical_flow_di);
 
     m_command_buffer.Begin();
@@ -344,7 +425,7 @@ TEST_F(PositiveDataGraph, OpticalFlowConnectionsImageLayoutsUnifiedImageLayouts)
     AddRequiredFeature(vkt::Feature::unifiedImageLayouts);
     RETURN_IF_SKIP(InitBasicDataGraph(true));
 
-    vkt::dg::of::OpticalFlowHelper optical_flow(*this);
+    vkt::dg::OpticalFlowHelper optical_flow(*this);
     optical_flow.image_layouts_[0].layout = VK_IMAGE_LAYOUT_GENERAL;
     optical_flow.CreateDataGraphPipeline();
     optical_flow.SetupImageDescriptors();
@@ -368,4 +449,185 @@ TEST_F(PositiveDataGraph, OpticalFlowConnectionsImageLayoutsUnifiedImageLayouts)
                               0, 1, &optical_flow.dg_pipeline_.descriptor_set_.get()->set_, 0, nullptr);
     vk::CmdDispatchDataGraphARM(m_command_buffer, session, &pipeline_di);
     m_command_buffer.End();
+}
+
+// unit test to verify the fix for bug in descriptor copying
+TEST_F(PositiveDataGraph, CopyUpdateDescriptor) {
+    TEST_DESCRIPTION("Dispatch a datagraph where a descriptor has been copy-updated after creation");
+    RETURN_IF_SKIP(InitBasicDataGraph());
+
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+    pipeline.CreateDataGraphPipeline();
+
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = pipeline;
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+
+    auto& bind_point_reqs = session.BindPointReqs();
+    std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
+    session.AllocSessionMem(device_mem);
+    auto session_bind_infos = InitSessionBindInfo(session, device_mem);
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, session_bind_infos.size(), session_bind_infos.data());
+
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
+    pipeline.descriptor_set_->UpdateDescriptorSets();
+
+    // create a new tensor and copy it into the input tensor
+
+    VkTensorDescriptionARM desc = pipeline.tensors_[0]->Description();
+    desc.usage |= VK_TENSOR_USAGE_TRANSFER_SRC_BIT_ARM | VK_TENSOR_USAGE_TRANSFER_DST_BIT_ARM;
+    VkTensorCreateInfoARM info = vku::InitStructHelper();
+    info.pDescription = &desc;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    vkt::Tensor tensor_src(*m_device, info);
+    tensor_src.BindToMem();
+
+    VkTensorViewCreateInfoARM tensor_view_create_info_src = vku::InitStructHelper();
+    tensor_view_create_info_src.tensor = tensor_src;
+    tensor_view_create_info_src.format = tensor_src.Format();
+    vkt::TensorView view_src(*m_device, tensor_view_create_info_src);
+
+    OneOffDescriptorSet descriptor_set_src(m_device, {{0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    descriptor_set_src.WriteDescriptorTensorInfo(0, &view_src.handle());
+    descriptor_set_src.UpdateDescriptorSets();
+
+    VkCopyDescriptorSet copy_set = vku::InitStructHelper();
+    copy_set.srcSet = descriptor_set_src.set_;
+    copy_set.srcBinding = 0;
+    copy_set.dstSet = pipeline.descriptor_set_->set_;
+    copy_set.dstBinding = 0;
+    copy_set.descriptorCount = 1;
+    vk::UpdateDescriptorSets(*m_device, 0, nullptr, 1, &copy_set);
+
+    // continue as normal to dispatch
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
+                              &pipeline.descriptor_set_.get()->set_, 0, nullptr);
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, nullptr);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveDataGraph, ProcessingEnginesGetProperties) {
+    TEST_DESCRIPTION("Request the Processing Engine properties");
+    RETURN_IF_SKIP(InitBasicDataGraph(true));
+
+    // get the available properties
+    uint32_t queue_index = DefaultQueue()->family_index;
+    uint32_t n_properties = 0;
+    ASSERT_EQ(VK_SUCCESS, vk::GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(Gpu(), queue_index, &n_properties, nullptr));
+    if (n_properties == 0) {
+        GTEST_SKIP() << "The physical device does not support any datagraph properties, skip.";
+    }
+    std::vector<VkQueueFamilyDataGraphPropertiesARM> data_graph_queue_family_properties(
+        n_properties, vku::InitStruct<VkQueueFamilyDataGraphPropertiesARM>());
+    ASSERT_EQ(VK_SUCCESS, vk::GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(Gpu(), queue_index, &n_properties,
+                                                                                 data_graph_queue_family_properties.data()));
+
+    // The 2 properties that can be supported by the default engine.
+    // TODO: add more properties for other engines
+    static constexpr VkPhysicalDeviceDataGraphOperationSupportARM tosa_operation{
+        VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_SPIRV_EXTENDED_INSTRUCTION_SET_ARM, "TOSA.001000.1", 0};
+    static constexpr VkPhysicalDeviceDataGraphOperationSupportARM optical_flow_operation{
+        VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_OPTICAL_FLOW_ARM, "OpticalFlow", 1};
+
+    // get the values for the 2 properties supported in the default processing engine.
+    VkQueueFamilyDataGraphOpticalFlowPropertiesARM op_flow_properties = vku::InitStructHelper();
+    VkQueueFamilyDataGraphTOSAPropertiesARM tosa_properties = vku::InitStructHelper();
+    for (auto& prop : data_graph_queue_family_properties) {
+        VkBaseOutStructure* pProperties = nullptr;
+        if (prop.operation.operationType == optical_flow_operation.operationType &&
+            strcmp(prop.operation.name, optical_flow_operation.name) == 0) {
+            pProperties = reinterpret_cast<VkBaseOutStructure*>(&op_flow_properties);
+        } else if (prop.operation.operationType == tosa_operation.operationType &&
+                   strcmp(prop.operation.name, tosa_operation.name) == 0) {
+            pProperties = reinterpret_cast<VkBaseOutStructure*>(&tosa_properties);
+        } else {
+            // some other property that we haven't considered (other engine? Add)
+            continue;
+        }
+        ASSERT_EQ(VK_SUCCESS,
+                  vk::GetPhysicalDeviceQueueFamilyDataGraphEngineOperationPropertiesARM(Gpu(), queue_index, &prop, pProperties));
+    }
+}
+
+TEST_F(PositiveDataGraph, NeuralStatistics) {
+    TEST_DESCRIPTION("Dispatch a graph using neural statistics");
+
+    // create a pipeline with NX statistics enabled
+    AddRequiredExtensions(VK_ARM_DATA_GRAPH_NEURAL_ACCELERATOR_STATISTICS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dataGraphNeuralAcceleratorStatistics);
+    RETURN_IF_SKIP(InitBasicDataGraph());
+
+    VkDataGraphPipelineNeuralStatisticsCreateInfoARM ne_stats_info = vku::InitStructHelper();
+    ne_stats_info.allowNeuralStatistics = VK_TRUE;
+    vkt::dg::DataGraphPipelineHelper pipeline(*this);
+    vvl::PnextChainAdd(&pipeline.pipeline_ci_, &ne_stats_info);
+
+    pipeline.CreateDataGraphPipeline();
+
+    // include a SessionNeuralStatisticsCreateInfo to collect the neural stats
+    VkDataGraphPipelineSessionNeuralStatisticsCreateInfoARM session_ne_stats_info = vku::InitStructHelper();
+    session_ne_stats_info.mode = VkNeuralAcceleratorStatisticsModeARM::VK_NEURAL_ACCELERATOR_STATISTICS_MODE_STATISTICS0_ARM;
+    VkDataGraphPipelineSessionCreateInfoARM session_ci = vku::InitStructHelper();
+    session_ci.dataGraphPipeline = pipeline;
+    vvl::PnextChainAdd(&session_ci, &session_ne_stats_info);
+    vkt::DataGraphPipelineSession session(*m_device, session_ci);
+
+    auto& bind_point_reqs = session.BindPointReqs();
+    std::vector<vkt::DeviceMemory> device_mem(bind_point_reqs.size());
+    session.AllocSessionMem(device_mem);
+    auto session_bind_infos = InitSessionBindInfo(session, device_mem);
+
+    vk::BindDataGraphPipelineSessionMemoryARM(*m_device, static_cast<uint32_t>(session_bind_infos.size()),
+                                              session_bind_infos.data());
+
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(0, &pipeline.tensor_views_[0]->handle(), 0);
+    pipeline.descriptor_set_->WriteDescriptorTensorInfo(1, &pipeline.tensor_views_[1]->handle(), 0);
+    pipeline.descriptor_set_->UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline.pipeline_layout_, 0, 1,
+                              &pipeline.descriptor_set_.get()->set_, 0, nullptr);
+    VkDataGraphPipelineDispatchInfoARM disp_info = vku::InitStructHelper();
+    vk::CmdDispatchDataGraphARM(m_command_buffer, session, &disp_info);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDataGraph, BindForeignModelPipeline) {
+    TEST_DESCRIPTION("Bind a builtin model pipeline and its descriptor set for a foreign model engine.");
+    AddRequiredExtensions(VK_ARM_TENSORS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::tensors);
+    RETURN_IF_SKIP(InitDataGraphModel());
+
+    VkDataGraphProcessingEngineCreateInfoARM engine_ci = vku::InitStructHelper();
+    engine_ci.processingEngineCount = 1;
+    engine_ci.pProcessingEngines = &model_properties_[0].engine;
+
+    OneOffDescriptorSet descriptor_set{
+        m_device, {{0, VK_DESCRIPTOR_TYPE_TENSOR_ARM, 1, VK_SHADER_STAGE_ALL, nullptr}}, 0, nullptr, 0, nullptr, &engine_ci};
+    vkt::PipelineLayout layout{*m_device, {&descriptor_set.layout_}};
+
+    VkDataGraphPipelineBuiltinModelCreateInfoQCOM model_ci = vku::InitStructHelper(&engine_ci);
+    model_ci.pOperation = &model_properties_[0].operation;
+    VkDataGraphPipelineCreateInfoARM pipeline_ci = vku::InitStructHelper(&model_ci);
+    pipeline_ci.flags = VK_PIPELINE_CREATE_2_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
+    pipeline_ci.layout = layout;
+    vkt::Pipeline pipeline{*m_device, pipeline_ci};
+
+    VkCommandPoolCreateInfo command_pool_ci = vku::InitStructHelper(&engine_ci);
+    command_pool_ci.queueFamilyIndex = model_queue_family_index_;
+    vkt::CommandPool command_pool{*m_device, command_pool_ci};
+    vkt::CommandBuffer command_buffer{*m_device, command_pool};
+
+    command_buffer.Begin();
+    vk::CmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, pipeline);
+    vk::CmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM, layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    command_buffer.End();
 }

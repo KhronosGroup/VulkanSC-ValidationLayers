@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: '0'
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.10'
       - name: install python packages
@@ -87,17 +87,12 @@ jobs:
         custom_hash_map: [ "ON", "OFF" ]
     steps:
       - uses: actions/checkout@v7
-      - uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ matrix.config }}-address-${{matrix.custom_hash_map}}
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev xvfb
       - run: python scripts/tests_vksc.py --build --config ${{ matrix.config }} --cmake='-DUSE_CUSTOM_HASH_MAP=${{matrix.custom_hash_map}}'
         env:
           CFLAGS: -fsanitize=address
           CXXFLAGS: -fsanitize=address
           LDFLAGS: -fsanitize=address
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - name: Test Max Profile
         run: python scripts/tests_vksc.py --test
         env:
@@ -130,9 +125,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-      - uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ matrix.config }}-thread-${{matrix.custom_hash_map}}
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev xvfb
       - run: python scripts/tests_vksc.py --build --config ${{ matrix.config }} --cmake='-DUSE_CUSTOM_HASH_MAP=${{matrix.custom_hash_map}}'
         env:
@@ -158,9 +150,6 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
-      - uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: linux-ubsan
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
       - run: python scripts/tests_vksc.py --build --config debug --cmake='-DVVL_ENABLE_UBSAN=ON'
         env:
@@ -188,9 +177,6 @@ jobs:
         uses: lukka/get-cmake@latest
         with:
           cmakeVersion: 3.22.1
-      - uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: linux_back_compat
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
       - run: cmake -S . -B build/ -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Debug
         env:
@@ -209,10 +195,13 @@ jobs:
     strategy:
       matrix:
         arch: [ amd64 ]
-        config: [ debug, release ]
+    env:
+      # Exercises the multi-config generator path (Visual Studio, Xcode, Ninja Multi-Config),
+      # where switching Debug/Release/RelWithDebInfo must work from a single configure.
+      CMAKE_GENERATOR: Ninja Multi-Config
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.10'
       - name: install python packages
@@ -220,19 +209,6 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
-      - name: Cache known_good.json installations
-        id: cache-deps
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ github.workspace }}/external/glslang/build/install
-            ${{ github.workspace }}/external/googltest/build/install
-            ${{ github.workspace }}/external/mimalloc/build/install
-            ${{ github.workspace }}/external/SPIRV-Headers/build/install
-            ${{ github.workspace }}/external/SPIRV-Tools/build/install
-            ${{ github.workspace }}/external/Vulkan-Headers/build/install
-            ${{ github.workspace }}/external/Vulkan-Utility-Libraries/build/install
-          key: windows-dependencies-${{ matrix.arch }}-${{ hashfiles('scripts/known_good.json') }}
       - name: Build
         run: python3 scripts/tests_vksc.py --build --config ${{ matrix.config }} --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
       - name: Test Max Profile
@@ -254,11 +230,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: mingw-ccache
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.10'
       - name: install python packages

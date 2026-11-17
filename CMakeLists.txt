@@ -25,7 +25,7 @@ option(VULKANSC "Build Vulkan SC validation layers" ON)
 if(VULKANSC)
     project(VVL VERSION 1.0.22 LANGUAGES CXX) # vulkansc
 else()
-    project(VVL VERSION 1.4.356 LANGUAGES CXX) # vulkan
+    project(VVL VERSION 1.4.368 LANGUAGES CXX) # vulkan
 endif()
 
 # This variable enables downstream users to customize the target API
@@ -44,6 +44,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_VISIBILITY_INLINES_HIDDEN "YES")
+# Static libraries don't link, so they can start building
+# without waiting for the libraries they depend on
+set(CMAKE_OPTIMIZE_DEPENDENCIES ON)
 
 include(GNUInstallDirs)
 
@@ -143,6 +146,30 @@ find_package(SPIRV-Headers CONFIG QUIET)
 
 find_package(SPIRV-Tools-opt CONFIG QUIET)
 
+# Workaround AppleClang using the wrong headers when there are headers in /usr/local/include
+if (CMAKE_CXX_COMPILER_ID STREQUAL AppleClang AND TARGET Vulkan::Headers AND TARGET Vulkan::LayerSettings
+    AND TARGET SPIRV-Headers::SPIRV-Headers AND TARGET SPIRV-Tools-static AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.25)
+    get_target_property(vulkan_headers_aliased Vulkan::Headers ALIASED_TARGET)
+    if (NOT vulkan_headers_aliased)
+        set_target_properties(Vulkan::Headers PROPERTIES SYSTEM OFF)
+    endif()
+    get_target_property(vulkan_utilities_aliased Vulkan::LayerSettings ALIASED_TARGET)
+    if (NOT vulkan_utilities_aliased)
+        set_target_properties(Vulkan::LayerSettings PROPERTIES SYSTEM OFF)
+        set_target_properties(Vulkan::SafeStruct PROPERTIES SYSTEM OFF)
+        set_target_properties(Vulkan::UtilityHeaders PROPERTIES SYSTEM OFF)
+    endif()
+    get_target_property(spirv_headers_aliased SPIRV-Headers::SPIRV-Headers ALIASED_TARGET)
+    if (NOT spirv_headers_aliased)
+        set_target_properties(SPIRV-Headers::SPIRV-Headers PROPERTIES SYSTEM OFF)
+    endif()
+    get_target_property(spirv_tools_opt_aliased SPIRV-Tools-opt  ALIASED_TARGET)
+    if (NOT spirv_tools_opt_aliased)
+        set_target_properties(SPIRV-Tools-static PROPERTIES SYSTEM OFF)
+        set_target_properties(SPIRV-Tools-opt PROPERTIES SYSTEM OFF)
+    endif()
+endif()
+
 # NOTE: Our custom code generation target isn't desirable for system package managers or add_subdirectory users.
 # So this target needs to be off by default to avoid obtuse build errors or patches.
 option(VVL_CODEGEN "Enable vulkan validation layer code generation")
@@ -168,6 +195,18 @@ endif()
 option(BUILD_WERROR "Treat compiler warnings as errors")
 if (BUILD_WERROR)
     add_compile_options("$<IF:$<CXX_COMPILER_ID:MSVC>,/WX,-Werror>")
+    # MSVC only: turns link.exe warnings (e.g. LNK4098, mismatched Debug/Release runtimes) into
+    # build failures too. There's no cross-platform link.exe/ld equivalent to add here.
+    # TODO: replace with CMAKE_LINK_WARNING_AS_ERROR once the minimum CMake version is >= 4.0.
+    #
+    # LNK4099 (PDB for a prebuilt dependency .lib not found) is ignored: it's a pre-existing,
+    # benign issue independent of this fix - our dependencies' static libraries don't carry
+    # their compiler-generated PDBs (CMake's COMPILE_PDB_NAME isn't installable for STATIC_LIBRARY
+    # targets via $<TARGET_PDB_FILE:...>), so the linker always falls back to no debug info for
+    # those objects. It was already happening before /WX was added to the linker; /WX would just
+    # newly turn it into a hard failure. Fixing it for real means installing each dependency's own
+    # PDB, which requires patching that dependency's CMakeLists.txt, not something to do here.
+    add_link_options("$<$<CXX_COMPILER_ID:MSVC>:/WX;/IGNORE:4099>")
 endif()
 
 option(VVL_ENABLE_ASAN "Use address sanitization")
@@ -230,6 +269,42 @@ elseif(MSVC)
 endif()
 
 add_subdirectory(layers)
+
+if(MSVC AND UPDATE_DEPS)
+    set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
+    file(GLOB_RECURSE SCRIPTS
+        "${SCRIPTS_DIR}/*.txt"
+        "${SCRIPTS_DIR}/*.py"
+        "${SCRIPTS_DIR}/*.json"
+        "${SCRIPTS_DIR}/gn/*"
+    )
+    add_custom_target(Scripts SOURCES ${SCRIPTS} BUILD.gn)
+    source_group(TREE ${SCRIPTS_DIR} PREFIX "Scripts" FILES ${SCRIPTS})
+    source_group("Scripts/gn" FILES BUILD.gn)
+
+    set(DOCS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs")
+    file(GLOB_RECURSE DOCS "${DOCS_DIR}/*.md")
+    add_custom_target(Docs SOURCES ${DOCS})
+    source_group(TREE ${DOCS_DIR} PREFIX "Docs" FILES ${DOCS})
+
+    set(EXTERNAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external")
+    file(GLOB_RECURSE EXTERNAL_HEADER_FILES
+            "${GLSLANG_INSTALL_DIR}/*.h"
+            "${GLSLANG_INSTALL_DIR}/*.hpp"
+            "${VULKAN_HEADERS_INSTALL_DIR}/*.h"
+            "${VULKAN_HEADERS_INSTALL_DIR}/*.hpp"
+            "${VULKAN_UTILITY_LIBRARIES_INSTALL_DIR}/*.h"
+            "${VULKAN_UTILITY_LIBRARIES_INSTALL_DIR}/*.hpp"
+            "${SPIRV_HEADERS_INSTALL_DIR}/*.h"
+            "${SPIRV_HEADERS_INSTALL_DIR}/*.hpp"
+            "${SPIRV_TOOLS_INSTALL_DIR}/*.h"
+            "${SPIRV_TOOLS_INSTALL_DIR}/*.hpp"
+            "${GOOGLETEST_INSTALL_DIR}/*.h"
+            "${MIMALLOC_INSTALL_DIR}/*.h"
+    )
+    add_custom_target(External SOURCES ${EXTERNAL_HEADER_FILES})
+    source_group(TREE ${EXTERNAL_DIR} PREFIX "External" FILES ${EXTERNAL_HEADER_FILES})
+endif()
 
 option(BUILD_TESTS "Build the tests")
 if(BUILD_TESTS)

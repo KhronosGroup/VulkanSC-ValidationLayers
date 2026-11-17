@@ -118,6 +118,8 @@ ValidValue stateless::Context::IsValidEnumValue(VkAccelerationStructureTypeKHR v
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkComponentTypeKHR value) const;
 template <>
+ValidValue stateless::Context::IsValidEnumValue(VkScopeKHR value) const;
+template <>
 ValidValue stateless::Context::IsValidEnumValue(VkVideoEncodeAV1PredictionModeKHR value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkVideoEncodeAV1RateControlGroupKHR value) const;
@@ -287,6 +289,10 @@ template <>
 ValidValue stateless::Context::IsValidEnumValue(VkThrottleHintTypeSEC value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkNeuralAcceleratorStatisticsModeARM value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkImageTilingControlEXT value) const;
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkHdrSmpteSt209450PowerPreferenceGOOGLE value) const;
 template <>
 ValidValue stateless::Context::IsValidEnumValue(VkBuildAccelerationStructureModeKHR value) const;
 template <>

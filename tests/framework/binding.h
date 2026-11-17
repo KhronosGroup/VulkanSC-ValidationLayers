@@ -26,6 +26,7 @@
 #include "containers/span.h"
 #include "containers/limits.h"
 #include "generated/vk_function_pointers.h"
+#include "state_tracker/surface_type.h"
 #include "utils/cast_utils.h"
 #include "test_common.h"
 
@@ -578,11 +579,6 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
              &allocate_flag_info);
     }
 
-    explicit Buffer(const Device &dev, VkBufferUsageFlags usage, const void *data, size_t data_size,
-                    const vvl::span<uint32_t> &queue_families = {}) {
-        InitHostVisibleWithData(dev, usage, data, data_size, queue_families);
-    }
-
     Buffer(Buffer &&rhs) noexcept;
     Buffer &operator=(Buffer &&rhs) noexcept;
     ~Buffer() noexcept;
@@ -595,8 +591,6 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
               void *alloc_info_pnext = nullptr, const vvl::span<uint32_t> &queue_families = {}) {
         Init(dev, CreateInfo(size, usage, queue_families), mem_props, alloc_info_pnext);
     }
-    void InitHostVisibleWithData(const Device &dev, VkBufferUsageFlags usage, const void *data, size_t data_size,
-                                 const vvl::span<uint32_t> &queue_families = {});
     void InitNoMemory(const Device &dev, const VkBufferCreateInfo &info);
 
     void SetName(const char *name) { NonDispHandle<VkBuffer>::SetName(VK_OBJECT_TYPE_BUFFER, name); }
@@ -790,36 +784,6 @@ class ImageView : public internal::NonDispHandle<VkImageView> {
     void SetName(const char *name) { NonDispHandle<VkImageView>::SetName(VK_OBJECT_TYPE_IMAGE_VIEW, name); }
 };
 
-class AccelerationStructureNV : public internal::NonDispHandle<VkAccelerationStructureNV> {
-  public:
-    explicit AccelerationStructureNV(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true) {
-        Init(dev, info, init_memory);
-    }
-    ~AccelerationStructureNV() noexcept;
-    void Destroy() noexcept;
-
-    // vkCreateAccelerationStructureNV
-    void Init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true);
-    void SetName(const char *name) {
-        NonDispHandle<VkAccelerationStructureNV>::SetName(VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV, name);
-    }
-    // vkGetAccelerationStructureMemoryRequirementsNV()
-    VkMemoryRequirements2 MemoryRequirements() const;
-    VkMemoryRequirements2 BuildScratchMemoryRequirements() const;
-
-    uint64_t OpaqueHandle() const { return opaque_handle_; }
-
-    const VkAccelerationStructureInfoNV &Info() const { return info_; }
-
-    [[nodiscard]] Buffer CreateScratchBuffer(const Device &device, VkBufferCreateInfo *pCreateInfo = nullptr,
-                                             bool buffer_device_address = false) const;
-
-  private:
-    VkAccelerationStructureInfoNV info_;
-    DeviceMemory memory_;
-    uint64_t opaque_handle_;
-};
-
 class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
   public:
     ShaderModule() = default;
@@ -837,22 +801,22 @@ class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
     static VkShaderModuleCreateInfo CreateInfo(size_t code_size, const uint32_t *code, VkFlags flags);
 };
 
-class Shader : public internal::NonDispHandle<VkShaderEXT> {
+class ShaderEXT : public internal::NonDispHandle<VkShaderEXT> {
   public:
-    Shader() = default;
-    Shader(const Device &dev, VkShaderEXT shader) { NonDispHandle::init(dev, shader); }
-    Shader(const Device &dev, const VkShaderCreateInfoEXT &info) { Init(dev, info); }
-    Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t> &spv,
-           const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
-    Shader(const Device &dev, const VkShaderStageFlagBits stage, const char* code,
-           const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
-    Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t> &binary,
-           const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
-    ~Shader() noexcept;
+    ShaderEXT() = default;
+    ShaderEXT(const Device& dev, VkShaderEXT shader) { NonDispHandle::init(dev, shader); }
+    ShaderEXT(const Device& dev, const VkShaderCreateInfoEXT& info) { Init(dev, info); }
+    ShaderEXT(const Device& dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t>& spv,
+              const VkDescriptorSetLayout* descriptorSetLayout = nullptr, const VkPushConstantRange* pushConstRange = nullptr);
+    ShaderEXT(const Device& dev, const VkShaderStageFlagBits stage, const char* code,
+              const VkDescriptorSetLayout* descriptorSetLayout = nullptr, const VkPushConstantRange* pushConstRange = nullptr);
+    ShaderEXT(const Device& dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t>& binary,
+              const VkDescriptorSetLayout* descriptorSetLayout = nullptr, const VkPushConstantRange* pushConstRange = nullptr);
+    ~ShaderEXT() noexcept;
     void Destroy() noexcept;
 
     // vkCreateShaderModule()
-    void Init(const Device &dev, const VkShaderCreateInfoEXT &info);
+    void Init(const Device& dev, const VkShaderCreateInfoEXT& info);
     VkResult InitTry(const Device &dev, const VkShaderCreateInfoEXT &info);
     void SetName(const char *name) { NonDispHandle<VkShaderEXT>::SetName(VK_OBJECT_TYPE_SHADER_EXT, name); }
 };
@@ -878,6 +842,8 @@ class Pipeline : public internal::NonDispHandle<VkPipeline> {
     Pipeline(const Device &dev, const VkComputePipelineCreateInfo &info) { Init(dev, info); }
     Pipeline(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) { Init(dev, info); }
     Pipeline(const Device &dev, const VkDataGraphPipelineCreateInfoARM &info) { Init(dev, info); }
+    Pipeline(const Device& dev, const std::vector<VkPipeline>& libraries, VkPipelineLayout layout,
+             VkRenderPass render_pass = VK_NULL_HANDLE, VkPipelineCreateFlags flags = 0);
     ~Pipeline() noexcept;
     void Destroy() noexcept;
 
@@ -1104,26 +1070,28 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
 
     void BeginRenderPass(const VkRenderPassBeginInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
     void BeginRenderPass(VkRenderPass rp, VkFramebuffer fb, uint32_t render_area_width = 1, uint32_t render_area_height = 1,
-                         uint32_t clear_count = 0, const VkClearValue *clear_values = nullptr);
+                         uint32_t clear_count = 0, const VkClearValue *clear_values = nullptr,
+                         VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
     void NextSubpass(VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
     void EndRenderPass();
     void BeginRendering(const VkRenderingInfo &renderingInfo);
     void BeginRenderingColor(const VkImageView imageView, VkRect2D render_area);
     void EndRendering();
 
-    void PushData(uint32_t offset, size_t size, const void* address);
+    void PushDataEXT(uint32_t offset, size_t size, const void* address);
 
-    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &frag_shader);
-    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &geom_shader, const vkt::Shader &frag_shader);
-    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
-                     const vkt::Shader &frag_shader);
-    void BindShaders(const vkt::Shader &vert_shader, const vkt::Shader &tesc_shader, const vkt::Shader &tese_shader,
-                     const vkt::Shader &geom_shader, const vkt::Shader &frag_shader);
-    void BindCompShader(const vkt::Shader &comp_shader);
-    void BindMeshShaders(const vkt::Shader &mesh_shader, const vkt::Shader &frag_shader);
-    void BindMeshShaders(const vkt::Shader &task_shader, const vkt::Shader &mesh_shader, const vkt::Shader &frag_shader);
+    void BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& frag_shader);
+    void BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& geom_shader, const vkt::ShaderEXT& frag_shader);
+    void BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& tesc_shader, const vkt::ShaderEXT& tese_shader,
+                        const vkt::ShaderEXT& frag_shader);
+    void BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& tesc_shader, const vkt::ShaderEXT& tese_shader,
+                        const vkt::ShaderEXT& geom_shader, const vkt::ShaderEXT& frag_shader);
+    void BindCompShaderEXT(const vkt::ShaderEXT& comp_shader);
+    void BindMeshShadersEXT(const vkt::ShaderEXT& mesh_shader, const vkt::ShaderEXT& frag_shader);
+    void BindMeshShadersEXT(const vkt::ShaderEXT& task_shader, const vkt::ShaderEXT& mesh_shader,
+                            const vkt::ShaderEXT& frag_shader);
 
-    void BeginVideoCoding(const VkVideoBeginCodingInfoKHR &beginInfo);
+    void BeginVideoCoding(const VkVideoBeginCodingInfoKHR& beginInfo);
     void ControlVideoCoding(const VkVideoCodingControlInfoKHR &controlInfo);
     void DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo);
     void EncodeVideo(const VkVideoEncodeInfoKHR &encodeInfo);
@@ -1144,8 +1112,16 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void SetEvent2(const Event& event, const VkMemoryBarrier2& memory_barrier);
     void WaitEvent2(const Event& event, const VkMemoryBarrier2& memory_barrier);
 
-    void Copy(const Buffer &src, const Buffer &dst);
-    void ExecuteCommands(const CommandBuffer &secondary);
+    void Copy(const Buffer& src, const Buffer& dst);
+    void ExecuteCommands(const CommandBuffer& secondary);
+    void ExecuteCommands(const std::vector<VkCommandBuffer>& secondaries);
+
+    void Barrier(VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                 const VkBufferMemoryBarrier& buffer_barrier, VkDependencyFlags dependency_flags = 0);
+    void Barrier(VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask, const VkMemoryBarrier& barrier,
+                 VkDependencyFlags dependency_flags = 0);
+    void ExecutionBarrier(VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                          VkDependencyFlags dependency_flags = 0);
 
     void Barrier(const VkMemoryBarrier2 &barrier, VkDependencyFlags dependency_flags = 0);
     void Barrier(const VkBufferMemoryBarrier2 &buffer_barrier, VkDependencyFlags dependency_flags = 0);
@@ -1308,6 +1284,7 @@ class DataGraphPipelineSession : public internal::NonDispHandle<VkDataGraphPipel
     void AllocSessionMem(std::vector<vkt::DeviceMemory> &device_mem, bool is_protected = false, size_t scale_factor = 1,
                          int32_t size_modifier = 0);
     size_t BindPointsCount() const { return bind_point_reqs_.size(); }
+    uint32_t NumBindObjects() const { return num_bind_objects_; }
 
     const std::vector<VkDataGraphPipelineSessionBindPointRequirementARM> &BindPointReqs() const { return bind_point_reqs_; }
     const std::vector<VkMemoryRequirements2> &MemReqs() const { return mem_reqs_; }
@@ -1316,6 +1293,7 @@ class DataGraphPipelineSession : public internal::NonDispHandle<VkDataGraphPipel
     const Device *device_ = nullptr;
     VkDataGraphPipelineSessionCreateInfoARM create_info_;
     std::vector<VkDataGraphPipelineSessionBindPointRequirementARM> bind_point_reqs_;
+    uint32_t num_bind_objects_ = 0;
     std::vector<VkMemoryRequirements2> mem_reqs_;
 };
 
@@ -1501,10 +1479,14 @@ class Surface {
     std::vector<VkPresentModeKHR> GetPresentModes(VkPhysicalDevice physical_device) const;
     VkSurfacePresentScalingCapabilitiesKHR GetScalingCapabilities(VkPhysicalDevice physical_device,
                                                                   VkPresentModeKHR present_mode) const;
+    vvl::SurfaceType GetType() const noexcept {
+        return type_;
+    }
 
   private:
     VkInstance instance_ = VK_NULL_HANDLE;
     VkSurfaceKHR handle_ = VK_NULL_HANDLE;
+    vvl::SurfaceType type_ = vvl::SurfaceType::Unknown;
 };
 
 const VkAllocationCallbacks *DefaultAllocator();

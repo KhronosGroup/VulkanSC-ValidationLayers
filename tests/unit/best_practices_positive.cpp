@@ -185,10 +185,15 @@ TEST_F(PositiveBestPractices, PipelineLibraryNoRendering) {
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
+    VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1u;
+    pipeline_rendering_info.pColorAttachmentFormats = &format;
+
     CreatePipelineHelper pre_raster_lib(*this);
     const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
-    pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci);
+    pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci, &pipeline_rendering_info);
     pre_raster_lib.gp_ci_.renderPass = VK_NULL_HANDLE;
     pre_raster_lib.gp_ci_.flags |= VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
     pre_raster_lib.CreateGraphicsPipeline();
@@ -258,10 +263,7 @@ TEST_F(PositiveBestPractices, VertexBufferNotForAllDraws) {
     input_attrib.location = 4;
 
     CreatePipelineHelper pipe0(*this);
-    pipe0.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe0.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe0.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe0.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe0.SetVertexInput(input_binding, input_attrib);
     pipe0.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe1(*this);
@@ -328,8 +330,7 @@ TEST_F(PositiveBestPractices, ResetEventBeforeSetMultipleSubmits) {
     cb2.Begin();
     cb2.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     cb2.End();
-    m_default_queue->Submit(cb2);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(cb2);
 }
 
 TEST_F(PositiveBestPractices, ResetEventBeforeSetMultipleSubmits2) {
@@ -484,10 +485,10 @@ TEST_F(PositiveBestPractices, ShaderObjectDraw) {
     )glsl";
 
     std::vector<uint32_t> vert_spirv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexGlsl);
-    vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_spirv);
+    vkt::ShaderEXT vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vert_spirv);
 
     std::vector<uint32_t> frag_spirv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
-    vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_spirv);
+    vkt::ShaderEXT frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, frag_spirv);
 
     m_vertex_buffer = new vkt::Buffer(*m_device, sizeof(float) * 12u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -507,8 +508,8 @@ TEST_F(PositiveBestPractices, ShaderObjectDraw) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     VkDeviceSize offset = 0u;
-    m_command_buffer.BindShaders(vert_shader, frag_shader);
-    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
+    SetDefaultDynamicStatesExcludeEXT();
     vk::CmdBindVertexBuffers(m_command_buffer, 0u, 1u, &m_vertex_buffer->handle(), &offset);
     vk::CmdSetVertexInputEXT(m_command_buffer, 1u, &binding_desc, 1u, &attr_desc);
     vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
@@ -560,4 +561,250 @@ TEST_F(PositiveBestPractices, CreateDeviceWithFeatures) {
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
     vkt::Device device(phys_device_obj, device_ci);
+}
+
+TEST_F(PositiveBestPractices, PipelineLibraryRendering) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1u;
+    pipeline_rendering_info.pColorAttachmentFormats = &format;
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device);
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci, &pipeline_rendering_info);
+    pre_raster_lib.gp_ci_.renderPass = VK_NULL_HANDLE;
+    pre_raster_lib.gp_ci_.layout = pipeline_layout;
+    pre_raster_lib.CreateGraphicsPipeline();
+
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper frag_shader_lib(*this);
+    frag_shader_lib.InitFragmentLibInfo(&fs_stage.stage_ci, &pipeline_rendering_info);
+    frag_shader_lib.gp_ci_.renderPass = VK_NULL_HANDLE;
+    frag_shader_lib.gp_ci_.pDepthStencilState = &frag_shader_lib.ds_ci_;
+    frag_shader_lib.gp_ci_.layout = pipeline_layout;
+    frag_shader_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo(&pipeline_rendering_info);
+    frag_out_lib.gp_ci_.renderPass = VK_NULL_HANDLE;
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
+}
+
+TEST_F(PositiveBestPractices, TransitionImageLayoutCb) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_9_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance9);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    const VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
+
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+    barrier.srcAccessMask = VK_ACCESS_2_NONE;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_CLEAR_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange = range;
+    cb1.Begin();
+    cb1.Barrier(barrier);
+    cb1.End();
+
+    const VkClearColorValue clear_color = {};
+    cb2.Begin();
+    vk::CmdClearColorImage(cb2, image, VK_IMAGE_LAYOUT_GENERAL, &clear_color, 1u, &range);
+    cb2.End();
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    m_default_queue->Submit2({cb1, cb2});
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveBestPractices, DepthStencilResolveAccessMask) {
+    TEST_DESCRIPTION("Depth/stencil resolve attachments are accessed with the color attachment access types");
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::separateDepthStencilLayouts);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+    vkt::Image image(*m_device, 32u, 32u, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    m_command_buffer.Begin();
+
+    // After a render pass resolved into it, move the resolve attachment to a transfer source
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0u, 1u, 0u, 1u};
+    m_command_buffer.Barrier(barrier);
+
+    const VkImageAspectFlags depth = VK_IMAGE_ASPECT_DEPTH_BIT;
+    const VkImageAspectFlags stencil = VK_IMAGE_ASPECT_STENCIL_BIT;
+    const VkAccessFlags2 read = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+    const VkAccessFlags2 read_write = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    struct TestCase {
+        VkImageLayout layout;
+        VkImageAspectFlags aspect;
+        VkAccessFlags2 access;
+    };
+    // Resolve attachments are read and written, the multisample attachment is only read and can be in a read-only layout
+    const TestCase test_cases[] = {
+        {VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depth | stencil, read_write},
+        {VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth, read_write},
+        {VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL, stencil, read_write},
+        {VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, stencil, read_write},
+        {VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, depth, read_write},
+        {VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, depth | stencil, read},
+        {VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, depth, read},
+        {VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil, read},
+        {VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, depth, read},
+        {VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, stencil, read},
+    };
+    for (const auto& test_case : test_cases) {
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barrier.srcAccessMask = test_case.access;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barrier.dstAccessMask = test_case.access;
+        barrier.oldLayout = test_case.layout;
+        barrier.newLayout = test_case.layout;
+        barrier.subresourceRange.aspectMask = test_case.aspect;
+        m_command_buffer.Barrier(barrier);
+    }
+
+    // Same with a synchronization1 barrier
+    VkImageMemoryBarrier barrier1 = vku::InitStructHelper();
+    barrier1.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier1.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier1.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier1.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier1.image = image;
+    barrier1.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0u, 1u, 0u, 1u};
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier1);
+
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveBestPractices, ReadOnlyLayoutInputAttachmentAccess) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8521");
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::separateDepthStencilLayouts);
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+    vkt::Image ds_image(*m_device, 32u, 32u, ds_format,
+                        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::Image color_image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM,
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    const VkImageAspectFlags depth = VK_IMAGE_ASPECT_DEPTH_BIT;
+    const VkImageAspectFlags stencil = VK_IMAGE_ASPECT_STENCIL_BIT;
+    const VkImageAspectFlags color = VK_IMAGE_ASPECT_COLOR_BIT;
+    const VkAccessFlags2 input = VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT;
+    const VkPipelineStageFlags2 fragment = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    const VkPipelineStageFlags2 color_output = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    const VkPipelineStageFlags2 fragment_tests =
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+    struct TestCase {
+        VkImage image;
+        VkImageLayout layout;
+        VkImageAspectFlags aspect;
+        VkPipelineStageFlags2 stage;
+        VkAccessFlags2 access;
+    };
+    const TestCase test_cases[] = {
+        {ds_image, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, depth | stencil, fragment, input},
+        {ds_image, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, depth, fragment, input},
+        {ds_image, VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil, fragment, input},
+        {ds_image, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, depth, fragment, input},
+        {ds_image, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, stencil, fragment, input},
+        {ds_image, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, depth | stencil, fragment | fragment_tests,
+         input | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT},
+        {ds_image, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, depth | stencil, fragment_tests,
+         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT},
+        {color_image, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, color, fragment | color_output,
+         input | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT},
+        {color_image, VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL, color, color_output,
+         VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT},
+    };
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    m_command_buffer.Begin();
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.subresourceRange = {0u, 0u, 1u, 0u, 1u};
+    for (const auto& test_case : test_cases) {
+        barrier.image = test_case.image;
+        barrier.srcStageMask = test_case.stage;
+        barrier.srcAccessMask = test_case.access;
+        barrier.dstStageMask = test_case.stage;
+        barrier.dstAccessMask = test_case.access;
+        barrier.oldLayout = test_case.layout;
+        barrier.newLayout = test_case.layout;
+        barrier.subresourceRange.aspectMask = test_case.aspect;
+        m_command_buffer.Barrier(barrier);
+    }
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveBestPractices, BindPipelineInDifferentCommandBuffers) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11477");
+    RETURN_IF_SKIP(InitBestPractices("validate_best_practices_amd"));
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    m_command_buffer.End();
+
+    cb2.Begin();
+    vk::CmdBindPipeline(cb2, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    cb2.End();
 }

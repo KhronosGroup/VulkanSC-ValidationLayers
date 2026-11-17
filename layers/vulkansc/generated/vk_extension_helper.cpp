@@ -172,8 +172,10 @@ vvl::Extension GetExtension(std::string extension) {
         {"VK_KHR_present_mode_fifo_latest_ready", vvl::Extension::_VK_KHR_present_mode_fifo_latest_ready},
         {"VK_KHR_opacity_micromap", vvl::Extension::_VK_KHR_opacity_micromap},
         {"VK_KHR_maintenance10", vvl::Extension::_VK_KHR_maintenance10},
+        {"VK_KHR_pipeline_library_group_handles", vvl::Extension::_VK_KHR_pipeline_library_group_handles},
         {"VK_KHR_maintenance11", vvl::Extension::_VK_KHR_maintenance11},
         {"VK_KHR_extended_flags", vvl::Extension::_VK_KHR_extended_flags},
+        {"VK_KHR_maintenance12", vvl::Extension::_VK_KHR_maintenance12},
         {"VK_EXT_debug_report", vvl::Extension::_VK_EXT_debug_report},
         {"VK_NV_glsl_shader", vvl::Extension::_VK_NV_glsl_shader},
         {"VK_EXT_depth_range_unrestricted", vvl::Extension::_VK_EXT_depth_range_unrestricted},
@@ -492,14 +494,24 @@ vvl::Extension GetExtension(std::string extension) {
         {"VK_SEC_pipeline_cache_incremental_mode", vvl::Extension::_VK_SEC_pipeline_cache_incremental_mode},
         {"VK_EXT_shader_uniform_buffer_unsized_array", vvl::Extension::_VK_EXT_shader_uniform_buffer_unsized_array},
         {"VK_NV_compute_occupancy_priority", vvl::Extension::_VK_NV_compute_occupancy_priority},
+        {"VK_EXT_cooperative_matrix_maintenance1", vvl::Extension::_VK_EXT_cooperative_matrix_maintenance1},
         {"VK_EXT_shader_subgroup_partitioned", vvl::Extension::_VK_EXT_shader_subgroup_partitioned},
         {"VK_SEC_ubm_surface", vvl::Extension::_VK_SEC_ubm_surface},
+        {"VK_NV_internal_handle", vvl::Extension::_VK_NV_internal_handle},
+        {"VK_ARM_cooperative_matrix_layouts", vvl::Extension::_VK_ARM_cooperative_matrix_layouts},
         {"VK_EXT_shader_ocp_microscaling_types", vvl::Extension::_VK_EXT_shader_ocp_microscaling_types},
         {"VK_VALVE_shader_mixed_float_dot_product", vvl::Extension::_VK_VALVE_shader_mixed_float_dot_product},
         {"VK_SEC_throttle_hint", vvl::Extension::_VK_SEC_throttle_hint},
         {"VK_ARM_data_graph_neural_accelerator_statistics", vvl::Extension::_VK_ARM_data_graph_neural_accelerator_statistics},
         {"VK_EXT_primitive_restart_index", vvl::Extension::_VK_EXT_primitive_restart_index},
+        {"VK_EXT_vertex_address_binding_unrestricted", vvl::Extension::_VK_EXT_vertex_address_binding_unrestricted},
+        {"VK_EXT_image_tiling_control", vvl::Extension::_VK_EXT_image_tiling_control},
         {"VK_NV_cooperative_matrix_decode_vector", vvl::Extension::_VK_NV_cooperative_matrix_decode_vector},
+        {"VK_NV_private_data_base_handle", vvl::Extension::_VK_NV_private_data_base_handle},
+        {"VK_INTEL_device_info", vvl::Extension::_VK_INTEL_device_info},
+        {"VK_VALVE_buffer_device_address_allocation_alignment",
+         vvl::Extension::_VK_VALVE_buffer_device_address_allocation_alignment},
+        {"VK_GOOGLE_hdr_smpte_st_209450_metadata", vvl::Extension::_VK_GOOGLE_hdr_smpte_st_209450_metadata},
         {"VK_KHR_acceleration_structure", vvl::Extension::_VK_KHR_acceleration_structure},
         {"VK_KHR_ray_tracing_pipeline", vvl::Extension::_VK_KHR_ray_tracing_pipeline},
         {"VK_KHR_ray_query", vvl::Extension::_VK_KHR_ray_query},
@@ -660,13 +672,13 @@ InstanceExtensions::InstanceExtensions(APIVersion requested_api_version, const V
         return;
     }
 
-    const auto promotion_info_map = GetInstancePromotionInfoMap();
+    const auto& promotion_info_map = GetInstancePromotionInfoMap();
     for (const auto& version_it : promotion_info_map) {
-        auto info = GetInstanceVersionMap(version_it.second.first);
+        const auto& version_info = GetInstanceVersionMap(version_it.second.first);
         if (api_version >= version_it.first) {
-            if (info.state) this->*(info.state) = kEnabledByCreateinfo;
+            if (version_info.state) this->*(version_info.state) = kEnabledByCreateinfo;
             for (const auto& extension : version_it.second.second) {
-                info = GetInfo(extension);
+                const auto& info = GetInfo(extension);
                 assert(info.state);
                 if (info.state) this->*(info.state) = kEnabledByApiLevel;
             }
@@ -678,7 +690,7 @@ InstanceExtensions::InstanceExtensions(APIVersion requested_api_version, const V
         for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
             if (!pCreateInfo->ppEnabledExtensionNames[i]) continue;
             vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
-            auto info = GetInfo(extension);
+            const auto& info = GetInfo(extension);
             if (info.state) this->*(info.state) = kEnabledByCreateinfo;
         }
     }
@@ -692,13 +704,13 @@ DeviceExtensions::DeviceExtensions(const InstanceExtensions& instance_ext, APIVe
         return;
     }
 
-    const auto promotion_info_map = GetDevicePromotionInfoMap();
+    const auto& promotion_info_map = GetDevicePromotionInfoMap();
     for (const auto& version_it : promotion_info_map) {
-        auto info = GetDeviceVersionMap(version_it.second.first);
+        const auto& version_info = GetDeviceVersionMap(version_it.second.first);
         if (api_version >= version_it.first) {
-            if (info.state) this->*(info.state) = kEnabledByCreateinfo;
+            if (version_info.state) this->*(version_info.state) = kEnabledByCreateinfo;
             for (const auto& extension : version_it.second.second) {
-                info = GetInfo(extension);
+                const auto& info = GetInfo(extension);
                 assert(info.state);
                 if (info.state) this->*(info.state) = kEnabledByApiLevel;
             }
@@ -710,7 +722,7 @@ DeviceExtensions::DeviceExtensions(const InstanceExtensions& instance_ext, APIVe
         for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
             if (!pCreateInfo->ppEnabledExtensionNames[i]) continue;
             vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
-            auto info = GetInfo(extension);
+            const auto& info = GetInfo(extension);
             if (info.state) this->*(info.state) = kEnabledByCreateinfo;
         }
     }
@@ -725,11 +737,11 @@ DeviceExtensions::DeviceExtensions(const InstanceExtensions& instance_ext, APIVe
             vvl::Extension::_VK_EXT_extended_dynamic_state3,
             vvl::Extension::_VK_EXT_vertex_input_dynamic_state,
         };
-        auto info = GetInfo(vvl::Extension::_VK_EXT_shader_object);
-        if (info.state) {
-            if (IsExtEnabled(this->*(info.state))) {
+        const auto& shader_object_info = GetInfo(vvl::Extension::_VK_EXT_shader_object);
+        if (shader_object_info.state) {
+            if (IsExtEnabled(this->*(shader_object_info.state))) {
                 for (auto interaction_ext : shader_object_interactions) {
-                    info = GetInfo(interaction_ext);
+                    const auto& info = GetInfo(interaction_ext);
                     assert(info.state);
                     if (this->*(info.state) != kEnabledByCreateinfo) {
                         this->*(info.state) = kEnabledByInteraction;
@@ -748,13 +760,13 @@ DeviceExtensions::DeviceExtensions(const InstanceExtensions& instance_ext, APIVe
         return;
     }
 
-    const auto promotion_info_map = GetDevicePromotionInfoMap();
+    const auto& promotion_info_map = GetDevicePromotionInfoMap();
     for (const auto& version_it : promotion_info_map) {
-        auto info = GetDeviceVersionMap(version_it.second.first);
+        const auto& version_info = GetDeviceVersionMap(version_it.second.first);
         if (api_version >= version_it.first) {
-            if (info.state) this->*(info.state) = kEnabledByCreateinfo;
+            if (version_info.state) this->*(version_info.state) = kEnabledByCreateinfo;
             for (const auto& extension : version_it.second.second) {
-                info = GetInfo(extension);
+                const auto& info = GetInfo(extension);
                 assert(info.state);
                 if (info.state) this->*(info.state) = kEnabledByApiLevel;
             }
@@ -762,7 +774,7 @@ DeviceExtensions::DeviceExtensions(const InstanceExtensions& instance_ext, APIVe
     }
     for (const auto& prop : props) {
         vvl::Extension extension = GetExtension(prop.extensionName);
-        auto info = GetInfo(extension);
+        const auto& info = GetInfo(extension);
         if (info.state) this->*(info.state) = kEnabledByCreateinfo;
     }
 
@@ -776,11 +788,11 @@ DeviceExtensions::DeviceExtensions(const InstanceExtensions& instance_ext, APIVe
             vvl::Extension::_VK_EXT_extended_dynamic_state3,
             vvl::Extension::_VK_EXT_vertex_input_dynamic_state,
         };
-        auto info = GetInfo(vvl::Extension::_VK_EXT_shader_object);
-        if (info.state) {
-            if (IsExtEnabled(this->*(info.state))) {
+        const auto& shader_object_info = GetInfo(vvl::Extension::_VK_EXT_shader_object);
+        if (shader_object_info.state) {
+            if (IsExtEnabled(this->*(shader_object_info.state))) {
                 for (auto interaction_ext : shader_object_interactions) {
-                    info = GetInfo(interaction_ext);
+                    const auto& info = GetInfo(interaction_ext);
                     assert(info.state);
                     if (this->*(info.state) != kEnabledByCreateinfo) {
                         this->*(info.state) = kEnabledByInteraction;
@@ -1354,12 +1366,19 @@ static const DeviceExtensionsInfoMap& GetDeviceInfoMap() {
         {vvl::Extension::_VK_KHR_maintenance10,
          Info(&DeviceExtensions::vk_khr_maintenance10, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_KHR_pipeline_library_group_handles,
+         Info(&DeviceExtensions::vk_khr_pipeline_library_group_handles,
+              {{{{&DeviceExtensions::vk_khr_ray_tracing_pipeline, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME}},
+                {{&DeviceExtensions::vk_khr_pipeline_library, VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_KHR_maintenance11,
          Info(&DeviceExtensions::vk_khr_maintenance11, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_KHR_extended_flags,
          Info(&DeviceExtensions::vk_khr_extended_flags, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                             VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_KHR_maintenance12,
+         Info(&DeviceExtensions::vk_khr_maintenance12, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                                                           VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_NV_glsl_shader, Info(&DeviceExtensions::vk_nv_glsl_shader, {})},
         {vvl::Extension::_VK_EXT_depth_range_unrestricted, Info(&DeviceExtensions::vk_ext_depth_range_unrestricted, {})},
         {vvl::Extension::_VK_IMG_filter_cubic, Info(&DeviceExtensions::vk_img_filter_cubic, {})},
@@ -1993,7 +2012,8 @@ static const DeviceExtensionsInfoMap& GetDeviceInfoMap() {
                                                                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_EXT_image_compression_control_swapchain,
          Info(&DeviceExtensions::vk_ext_image_compression_control_swapchain,
-              {{{{&DeviceExtensions::vk_ext_image_compression_control, VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME}}}})},
+              {{{{&DeviceExtensions::vk_ext_image_compression_control, VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME}},
+                {{&DeviceExtensions::vk_khr_swapchain, VK_KHR_SWAPCHAIN_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_QCOM_image_processing,
          Info(&DeviceExtensions::vk_qcom_image_processing,
               {{{{&DeviceExtensions::vk_khr_format_feature_flags2, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME}}}})},
@@ -2292,9 +2312,14 @@ static const DeviceExtensionsInfoMap& GetDeviceInfoMap() {
         {vvl::Extension::_VK_NV_compute_occupancy_priority,
          Info(&DeviceExtensions::vk_nv_compute_occupancy_priority, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                                        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_EXT_cooperative_matrix_maintenance1,
+         Info(&DeviceExtensions::vk_ext_cooperative_matrix_maintenance1,
+              {{{{&DeviceExtensions::vk_khr_cooperative_matrix, VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_EXT_shader_subgroup_partitioned, Info(&DeviceExtensions::vk_ext_shader_subgroup_partitioned,
                                                                    {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                                        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_NV_internal_handle, Info(&DeviceExtensions::vk_nv_internal_handle, {})},
+        {vvl::Extension::_VK_ARM_cooperative_matrix_layouts, Info(&DeviceExtensions::vk_arm_cooperative_matrix_layouts, {})},
         {vvl::Extension::_VK_EXT_shader_ocp_microscaling_types,
          Info(&DeviceExtensions::vk_ext_shader_ocp_microscaling_types,
               {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
@@ -2306,13 +2331,37 @@ static const DeviceExtensionsInfoMap& GetDeviceInfoMap() {
                 {{&DeviceExtensions::vk_khr_shader_float16_int8, VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_SEC_throttle_hint, Info(&DeviceExtensions::vk_sec_throttle_hint, {})},
         {vvl::Extension::_VK_ARM_data_graph_neural_accelerator_statistics,
-         Info(&DeviceExtensions::vk_arm_data_graph_neural_accelerator_statistics, {})},
+         Info(&DeviceExtensions::vk_arm_data_graph_neural_accelerator_statistics,
+              {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_EXT_primitive_restart_index,
          Info(&DeviceExtensions::vk_ext_primitive_restart_index, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                                      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_EXT_vertex_address_binding_unrestricted,
+         Info(&DeviceExtensions::vk_ext_vertex_address_binding_unrestricted,
+              {{{{&DeviceExtensions::vk_khr_device_address_commands, VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_EXT_image_tiling_control,
+         Info(&DeviceExtensions::vk_ext_image_tiling_control, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                                                                  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_NV_cooperative_matrix_decode_vector,
          Info(&DeviceExtensions::vk_nv_cooperative_matrix_decode_vector,
               {{{{&DeviceExtensions::vk_nv_cooperative_matrix2, VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_NV_private_data_base_handle,
+         Info(&DeviceExtensions::vk_nv_private_data_base_handle,
+              {{{{&DeviceExtensions::vk_ext_private_data, VK_EXT_PRIVATE_DATA_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_INTEL_device_info,
+         Info(&DeviceExtensions::vk_intel_device_info, {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                                                           VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_VALVE_buffer_device_address_allocation_alignment,
+         Info(&DeviceExtensions::vk_valve_buffer_device_address_allocation_alignment,
+              {{{{&DeviceExtensions::vk_khr_buffer_device_address, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME}}}})},
+        {vvl::Extension::_VK_GOOGLE_hdr_smpte_st_209450_metadata,
+         Info(&DeviceExtensions::vk_google_hdr_smpte_st_209450_metadata,
+              {{{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}},
+                {{&DeviceExtensions::vk_khr_get_surface_capabilities2, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME}},
+                {{&DeviceExtensions::vk_khr_swapchain, VK_KHR_SWAPCHAIN_EXTENSION_NAME}},
+                {{&DeviceExtensions::vk_ext_hdr_metadata, VK_EXT_HDR_METADATA_EXTENSION_NAME}}}})},
         {vvl::Extension::_VK_KHR_acceleration_structure,
          Info(&DeviceExtensions::vk_khr_acceleration_structure,
               {{{{&DeviceExtensions::vk_feature_version_1_1, "VK_VERSION_1_1"}},

@@ -123,7 +123,9 @@ std::string DescribeDynamicStateDependency(CBDynamicState dynamic_state, const v
 // All state is only tied to VK_SHADER_STAGE_FRAGMENT_BIT
 const CBDynamicFlags kFragmentDynamicState =
     CBDynamicFlags(1) << CB_DYNAMIC_STATE_BLEND_CONSTANTS | CBDynamicFlags(1) << CB_DYNAMIC_STATE_LOGIC_OP_EXT |
-    CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT |
     CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT |
     CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT |
     CBDynamicFlags(1) << CB_DYNAMIC_STATE_COVERAGE_TO_COLOR_ENABLE_NV |
@@ -141,9 +143,42 @@ const CBDynamicFlags kTessEvalDynamicState = CBDynamicFlags(1) << CB_DYNAMIC_STA
 // All state is only tied to VK_SHADER_STAGE_VERTEX_BIT
 const CBDynamicFlags kVertexDynamicState =
     CBDynamicFlags(1) << CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY | CBDynamicFlags(1) << CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE |
-    CBDynamicFlags(1) << CB_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_VERTEX_INPUT_EXT |
-    CBDynamicFlags(1) << CB_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT |
-    CBDynamicFlags(1) << CB_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT |
-    CBDynamicFlags(1) << CB_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT;
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_VERTEX_INPUT_EXT;
+
+// Some extra const also used, not sure where to put these otherwise
+//
+// VkPipelineColorBlendStateCreateInfo::attachmentCount
+const CBDynamicFlags kColorBlendStateAttachmentCountDynamic =
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT;
+
+// VkGraphicsPipelineCreateInfo::pDepthStencilState
+const CBDynamicFlags kDepthStencilStateDynamic =
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_COMPARE_OP | CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_STENCIL_OP |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BOUNDS;
+
+// VkGraphicsPipelineCreateInfo::pRasterizationState
+const CBDynamicFlags kRasterizationStateDynamic =
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_POLYGON_MODE_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_CULL_MODE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_FRONT_FACE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BIAS_ENABLE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BIAS | CBDynamicFlags(1) << CB_DYNAMIC_STATE_LINE_WIDTH;
+
+// VkGraphicsPipelineCreateInfo::pColorBlendState
+const CBDynamicFlags kColorBlendStateDynamic =
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_LOGIC_OP_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_BLEND_CONSTANTS;
+
+// VK_EXT_extended_dynamic_state
+const CBDynamicFlags kExtendedDynamicState1 =
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_CULL_MODE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_FRONT_FACE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY | CBDynamicFlags(1) << CB_DYNAMIC_STATE_VIEWPORT_WITH_COUNT |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_SCISSOR_WITH_COUNT | CBDynamicFlags(1) << CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_COMPARE_OP | CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE |
+    CBDynamicFlags(1) << CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE | CBDynamicFlags(1) << CB_DYNAMIC_STATE_STENCIL_OP;
 
 // NOLINTEND

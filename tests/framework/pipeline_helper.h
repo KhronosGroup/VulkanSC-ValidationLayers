@@ -118,12 +118,19 @@ class CreatePipelineHelper {
     }
 
     void AddDynamicState(VkDynamicState dynamic_state);
+    void SetDynamicRendering(const std::vector<VkFormat>& color_formats, VkFormat depth_format = VK_FORMAT_UNDEFINED,
+                             VkFormat stencil_format = VK_FORMAT_UNDEFINED);
+    // binding and attribute must remain alive for each CreateGraphicsPipeline that uses them
+    void SetVertexInput(const VkVertexInputBindingDescription& binding, const VkVertexInputAttributeDescription& attribute);
 
   private:
     void InitPipelineCache();
     VkPipeline pipeline_ = VK_NULL_HANDLE;
     // Hold some state for making certain pipeline creations easier
     std::vector<VkDynamicState> dynamic_states_;
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_ci_ = {};
+    std::vector<VkFormat> color_formats_;
 
     VkViewport viewport_ = {};
     VkRect2D scissor_ = {};
@@ -227,18 +234,34 @@ class SimpleGPL {
 
 // Helper to more quickly build heap pipelines
 // (which don't have things like pipeline layouts or descriptor sets)
-class HeapComputePipeline {
+class HeapComputePipelineEXT {
   public:
     // Force spirv env as likely don't want to build with 1.0
-    HeapComputePipeline(vkt::Device& device, const char* source, const spv_target_env env,
-                        const VkShaderDescriptorSetAndBindingMappingInfoEXT* mapping_info = nullptr,
-                        SpvSourceType source_type = SPV_SOURCE_GLSL, const VkSpecializationInfo* specialization_info = nullptr);
+    HeapComputePipelineEXT(vkt::Device& device, const char* source, const spv_target_env env,
+                           const VkShaderDescriptorSetAndBindingMappingInfoEXT* mapping_info = nullptr,
+                           SpvSourceType source_type = SPV_SOURCE_GLSL, const VkSpecializationInfo* specialization_info = nullptr);
 
     const VkPipeline& Handle() const { return pipe_.handle(); }
     operator VkPipeline() const { return pipe_; }
 
   private:
     vkt::Pipeline pipe_;
+};
+
+class HeapGraphicsPipelineEXT {
+  public:
+    HeapGraphicsPipelineEXT(VkLayerTest& test, const VkPipelineShaderStageCreateInfo* stages, uint32_t stage_count,
+                            void* pNext = nullptr, VkRenderPass render_pass = VK_NULL_HANDLE);
+    HeapGraphicsPipelineEXT(VkLayerTest& test, const VkPipelineShaderStageCreateInfo& vert,
+                            const VkPipelineShaderStageCreateInfo& frag);
+
+    const VkPipeline& Handle() const { return pipe_.Handle(); }
+    operator VkPipeline() const { return pipe_; }
+
+  private:
+    void Init(const VkPipelineShaderStageCreateInfo* stages, uint32_t stage_count, void* pNext, VkRenderPass render_pass);
+
+    CreatePipelineHelper pipe_;
 };
 
 }  // namespace vkt

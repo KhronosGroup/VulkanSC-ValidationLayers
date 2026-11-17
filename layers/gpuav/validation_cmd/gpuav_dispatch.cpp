@@ -23,6 +23,7 @@
 #include "gpuav/shaders/validation_cmd/push_data.h"
 #include "generated/gpuav_offline_spirv.h"
 #include "state_tracker/last_bound_state.h"
+#include "utils/assert_utils.h"
 
 namespace gpuav {
 namespace valcmd {
@@ -59,12 +60,19 @@ void DispatchIndirect(Validator& gpuav, const Location& loc, CommandBufferSubSta
         return;
     }
 
+    // TODO https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12657
+    for (const auto& lb : cb_state.base.lastBound) {
+        if (lb.GetDescriptorMode() == vvl::DescriptorModeBuffer) {
+            return;
+        }
+    }
+
     ValidationCommandsGpuavState& val_cmd_gpuav_state =
         gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
     valpipe::ComputePipeline<DispatchValidationShader>& validation_pipeline =
         gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<DispatchValidationShader>>(
-            gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
-    if (!validation_pipeline.valid) {
+            gpuav, loc, val_cmd_gpuav_state.desc_set_mode.error_logging_desc_set_layout_);
+    if (!validation_pipeline.Valid()) {
         gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create DispatchValidationShader.");
         return;
     }
@@ -82,17 +90,16 @@ void DispatchIndirect(Validator& gpuav, const Location& loc, CommandBufferSubSta
 
         shader_resources.indirect_buffer_binding.info = {indirect_buffer, 0, VK_WHOLE_SIZE};
 
-        if (!BindShaderResources(validation_pipeline, gpuav, cb_state, cb_state.compute_index, cb_state.GetErrorLoggerIndex(),
-                                 shader_resources)) {
-            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
-            return;
-        }
+        ASSERT_AND_RETURN(validation_pipeline.BindShaderResources(
+            gpuav, cb_state, shader_resources, valpipe::ErrorLogging{cb_state.compute_index, cb_state.GetErrorLoggerIndex()}));
     }
 
     // Setup validation pipeline
     // ---
     {
-        DispatchCmdBindPipeline(cb_state.VkHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, validation_pipeline.pipeline);
+        if (!validation_pipeline.BindComputePipeline(gpuav, cb_state)) {
+            return;
+        }
 
         DispatchCmdDispatch(cb_state.VkHandle(), 1, 1, 1);
     }
@@ -129,7 +136,7 @@ void DispatchIndirect(Validator& gpuav, const Location& loc, CommandBufferSubSta
                     skip |= gpuav.LogError("VUID-VkDispatchIndirectCommand-z-00419", objlist, loc_with_debug_region,
                                            "Indirect dispatch VkDispatchIndirectCommand::z of %" PRIu32
                                            " would exceed maxComputeWorkGroupCount[2] limit of %" PRIu32 ".",
-                                           count, gpuav.phys_dev_props.limits.maxComputeWorkGroupCount[0]);
+                                           count, gpuav.phys_dev_props.limits.maxComputeWorkGroupCount[2]);
                     break;
                 }
                 default:

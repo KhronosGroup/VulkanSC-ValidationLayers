@@ -177,7 +177,7 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::IMAGE_VIEW_NUMERIC_07753: suffix = "format-07753"; break;
 
         // ### VUID-vkCmdDraw-None-06537
-        case ActionVUID::SUBRESOURCE_RP_WRTIE_06537: suffix = "None-06537"; break;
+        case ActionVUID::SUBRESOURCE_RP_WRITE_06537: suffix = "None-06537"; break;
         // ### VUID-vkCmdDraw-None-12338
         case ActionVUID::SUBRESOURCE_SUBPASS_12338: suffix = "None-12338"; break;
         // ### VUID-vkCmdDraw-None-12339
@@ -215,16 +215,14 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
 
         // ### VUID-vkCmdDraw-None-08601
         case ActionVUID::PUSH_CONSTANT_08601: suffix = "None-08601"; break;
+        // ### VUID-vkCmdDraw-flags-12491
+        case ActionVUID::INDEPENDENT_SETS_12491: suffix = "flags-12491"; break;
         // ### VUID-vkCmdDraw-flags-13361
         case ActionVUID::INDEPENDENT_SETS_13361: suffix = "flags-13361"; break;
         // ### VUID-vkCmdDraw-flags-13362
         case ActionVUID::INDEPENDENT_SETS_13362: suffix = "flags-13362"; break;
         // ### VUID-vkCmdDraw-flags-13363
         case ActionVUID::INDEPENDENT_SETS_13363: suffix = "flags-13363"; break;
-        // ### VUID-vkCmdDraw-flags-13364
-        case ActionVUID::INDEPENDENT_SETS_13364: suffix = "flags-13364"; break;
-        // ### VUID-vkCmdDraw-flags-13365
-        case ActionVUID::INDEPENDENT_SETS_13365: suffix = "flags-13365"; break;
 
         // ### VUID-vkCmdDraw-None-08608
         case ActionVUID::DYNAMIC_STATE_ALL_SET_08608: suffix = "None-08608"; break;
@@ -418,6 +416,14 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::SET_VIEWPORT_SWIZZLE_09421: suffix = "viewportCount-09421"; break;
         // ### VUID-vkCmdDraw-viewportCount-07493
         case ActionVUID::SET_VIEWPORT_SWIZZLE_07493: suffix = "viewportCount-07493"; break;
+        // ### VUID-vkCmdDraw-viewportCount-04137
+        case ActionVUID::PIPELINE_VIEWPORT_W_SCALING_04137: suffix = "viewportCount-04137"; break;
+        // ### VUID-vkCmdDraw-viewportCount-04139
+        case ActionVUID::PIPELINE_SHADING_RATE_PALETTE_04139: suffix = "viewportCount-04139"; break;
+        // ### VUID-vkCmdDraw-VkPipelineViewportCreateInfo-04141
+        case ActionVUID::PIPELINE_VIEWPORT_SWIZZLE_04141: suffix = "VkPipelineViewportCreateInfo-04141"; break;
+        // ### VUID-vkCmdDraw-VkPipelineViewportCreateInfo-04142
+        case ActionVUID::PIPELINE_EXCLUSIVE_SCISSOR_04142: suffix = "VkPipelineViewportCreateInfo-04142"; break;
         // ### VUID-vkCmdDraw-alphaToCoverageEnable-08920
         case ActionVUID::ALPHA_COMPONENT_WORD_08920: suffix = "alphaToCoverageEnable-08920"; break;
         // ### VUID-vkCmdDraw-multiviewPerViewViewports-12262
@@ -425,7 +431,7 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         // ### VUID-vkCmdDraw-multiviewPerViewViewports-12263
         case ActionVUID::SCISSOR_MULTIVIEW_12263: suffix = "multiviewPerViewViewports-12263"; break;
         // ### VUID-vkCmdDraw-conservativePointAndLineRasterization-07499
-        case ActionVUID::CONVERVATIVE_RASTERIZATION_07499: suffix = "conservativePointAndLineRasterization-07499"; break;
+        case ActionVUID::CONSERVATIVE_RASTERIZATION_07499: suffix = "conservativePointAndLineRasterization-07499"; break;
         // ### VUID-vkCmdDraw-blendEnable-04727
         case ActionVUID::BLEND_ENABLE_04727: suffix = "blendEnable-04727"; break;
         // ### VUID-vkCmdDraw-maxFragmentDualSrcAttachments-09239
@@ -564,6 +570,10 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::PIPELINE_BOUND_08606: suffix = "None-08606"; break;
         // ### VUID-vkCmdDraw-None-02721
         case ActionVUID::VERTEX_BINDING_ATTRIBUTE_02721: suffix = "None-02721"; break;
+        // ### VUID-vkCmdDraw-format-10389
+        case ActionVUID::VERTEX_ATTRIBUTE_ALIGNMENT_10389: suffix = "format-10389"; break;
+        // ### VUID-vkCmdDraw-format-10390
+        case ActionVUID::VERTEX_ATTRIBUTE_ALIGNMENT_10390: suffix = "format-10390"; break;
         // ### VUID-vkCmdDraw-commandBuffer-02707
         case ActionVUID::CB_UNPROTECTED_02707: suffix = "commandBuffer-02707"; break;
         // ### VUID-vkCmdDraw-commandBuffer-02712
@@ -572,6 +582,8 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::DESCRIPTOR_08114: suffix = "None-08114"; break;
         // ### VUID-vkCmdDraw-pDescription-09900
         case ActionVUID::TENSOR_09900: suffix = "pDescription-09900"; break;
+        // ### VUID-vkCmdDispatchDataGraphARM-pDescription-09930
+        case ActionVUID::TENSOR_DATA_GRAPH_09930: suffix = "pDescription-09930"; break;
         // ### VUID-vkCmdDraw-dimensionCount-09905
         case ActionVUID::TENSOR_09905: suffix = "dimensionCount-09905"; break;
         // ### VUID-vkCmdDraw-None-10677
@@ -593,6 +605,12 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::IMAGE_PROCESSING_SAMPLE_QCOM_06977: suffix = "OpImageSampleWeightedQCOM-06977"; break;
         // ### VUID-vkCmdDraw-OpImageSampleWeightedQCOM-06978
         case ActionVUID::IMAGE_PROCESSING_SAMPLE_QCOM_06978: suffix = "OpImageSampleWeightedQCOM-06978"; break;
+        // ### VUID-vkCmdDraw-cubicRangeClamp-09212
+        case ActionVUID::CUBIC_RANGE_CLAMP_09212: suffix = "cubicRangeClamp-09212"; break;
+        // ### VUID-vkCmdDraw-reductionMode-09213
+        case ActionVUID::REDUCTION_MODE_09213: suffix = "reductionMode-09213"; break;
+        // ### VUID-vkCmdDraw-selectableCubicWeights-09214
+        case ActionVUID::SELECTABLE_CUBIC_WEIGHTS_09214: suffix = "selectableCubicWeights-09214"; break;
         // ### VUID-vkCmdDraw-OpImageBlockMatchWindow-09215
         case ActionVUID::IMAGE_BLOCK_MATCH_WINDOW_QCOM_09215: suffix = "OpImageBlockMatchWindow-09215"; break;
         // ### VUID-vkCmdDraw-OpImageBlockMatchWindow-09216
@@ -683,6 +701,10 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::PG_QUERIES_07075: suffix = "None-07075"; break;
         // ### VUID-vkCmdDrawMeshTasksEXT-pipelineStatistics-07076
         case ActionVUID::PIPELINE_STATISTICS_QUERIES_07076: suffix = "pipelineStatistics-07076"; break;
+        // ### VUID-vkCmdDrawMeshTasksEXT-flags-13364
+        case ActionVUID::INDEPENDENT_SETS_13364: suffix = "flags-13364"; break;
+        // ### VUID-vkCmdDrawMeshTasksEXT-flags-13365
+        case ActionVUID::INDEPENDENT_SETS_13365: suffix = "flags-13365"; break;
 
         // ### VUID-vkCmdTraceRaysKHR-None-09458
         case ActionVUID::RTX_STACK_SIZE_09458: suffix = "None-09458"; break;
@@ -697,10 +719,10 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::UNIFORM_ACCESS_OOB_08612: suffix = "None-08612"; break;
         // ### VUID-vkCmdDraw-None-08613
         case ActionVUID::STORAGE_ACCESS_OOB_08613: suffix = "None-08613"; break;
-        // ### VUID-vkCmdDraw-None-08114
-        case ActionVUID::INVALID_DESCRIPTOR_08114: suffix = "None-08114"; break;
         // ### VUID-vkCmdDraw-None-10068
         case ActionVUID::DESCRIPTOR_INDEX_OOB_10068: suffix = "None-10068"; break;
+        // ### VUID-vkCmdDraw-None-08116
+        case ActionVUID::DESCRIPTOR_BUFFER_08116: suffix = "None-08116"; break;
         // ### VUID-vkCmdDraw-None-11309
         case ActionVUID::DESCRIPTOR_HEAP_OOB_11309: suffix = "None-11309"; break;
         // ### VUID-vkCmdDraw-None-11297
@@ -725,8 +747,8 @@ std::string CreateActionVuid(Func function, const ActionVUID id) {
         case ActionVUID::DESCRIPTOR_HEAP_INVALID_ADDRESS_11305: suffix = "None-11305"; break;
         // ### VUID-vkCmdDraw-None-11306
         case ActionVUID::DESCRIPTOR_HEAP_INVALID_ADDRESS_11306: suffix = "None-11306"; break;
-        // ### VUID-vkCmdDrawIndirectCount-countBuffer-02717
-        case ActionVUID::INDIRECT_COUNT_LIMIT: suffix = "countBuffer-02717"; break;
+        // ### VUID-vkCmdDraw-None-12472
+        case ActionVUID::DESCRIPTOR_HEAP_HASHING_12472: suffix = "None-12472"; break;
     }
     // clang-format on
 

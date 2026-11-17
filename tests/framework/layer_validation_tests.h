@@ -18,8 +18,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include "../layers/vk_lunarg_device_profile_api_layer.h"
-
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 #include <android/log.h>
 #include <android_native_app_glue.h>
@@ -74,6 +72,10 @@
 [[maybe_unused]] static const VkBool32 kVkFalse = VK_FALSE;
 [[maybe_unused]] static const VkBool32 kVkTrue = VK_TRUE;
 
+// Way to inject lower limits for tests that need to test limits
+static const VkLayerSettingEXT kLowerLimitsSetting = {OBJECT_LAYER_NAME, "gpuav_debug_test_lower_limits",
+                                                      VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+
 // This is only for tests where you have a good reason to have more than the default (10) duplicate message limit.
 // It is highly suggested you first try to breakup your test up into smaller tests if you are trying to use this.
 static const VkLayerSettingEXT kDisableMessageLimitSetting = {OBJECT_LAYER_NAME, "enable_message_limit",
@@ -110,6 +112,12 @@ bool FormatFeatures2AreSupported(VkPhysicalDevice gpu, VkFormat format, VkImageT
 // Small wrapprer around vkGetPhysicalDeviceImageFormatProperties
 VkResult GetImageFormatProps(VkPhysicalDevice gpu, const VkImageCreateInfo &ci, VkImageFormatProperties &out_limits);
 
+// VK_EXT_image_drm_format_modifier
+bool IsDrmModifierSupported(VkPhysicalDevice gpu, uint64_t drm_format_modifier, const VkImageCreateInfo& ci,
+                            const void* image_format_info_pnext = nullptr);
+std::vector<uint64_t> GetSupportedDrmModifiers(VkPhysicalDevice gpu, const std::vector<uint64_t>& drm_format_modifiers,
+                                               const VkImageCreateInfo& ci, const void* image_format_info_pnext = nullptr);
+
 // Returns true if format and *all* requested features are available.
 bool IsImageFormatSupported(VkPhysicalDevice gpu, const VkImageCreateInfo &ci, const VkFormatFeatureFlags features);
 
@@ -130,7 +138,7 @@ float NearestSmaller(const float from);
 
 // Defining VVL_TESTS_USE_CUSTOM_TEST_FRAMEWORK allows downstream users
 // to inject custom test framework changes. This includes the ability
-// to override the the base class of the VkLayerTest class so that
+// to override the base class of the VkLayerTest class so that
 // appropriate test framework customizations can be injected into the
 // class hierarchy at the closest possible place to the base class used
 // by all validation layer tests. Downstream users can provide their
@@ -204,17 +212,6 @@ class VkLayerTest : public VkLayerTestBase {
 
   protected:
     void SetTargetApiVersion(APIVersion target_api_version);
-    bool LoadDeviceProfileLayer(
-        PFN_vkSetPhysicalDeviceFormatPropertiesEXT &fpvkSetPhysicalDeviceFormatPropertiesEXT,
-        PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT &fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT);
-    bool LoadDeviceProfileLayer(
-        PFN_vkSetPhysicalDeviceFormatProperties2EXT &fpvkSetPhysicalDeviceFormatProperties2EXT,
-        PFN_vkGetOriginalPhysicalDeviceFormatProperties2EXT &fpvkGetOriginalPhysicalDeviceFormatProperties2EXT);
-    bool LoadDeviceProfileLayer(PFN_vkSetPhysicalDeviceLimitsEXT &fpvkSetPhysicalDeviceLimitsEXT,
-                                PFN_vkGetOriginalPhysicalDeviceLimitsEXT &fpvkGetOriginalPhysicalDeviceLimitsEXT);
-    bool LoadDeviceProfileLayer(PFN_vkSetPhysicalDeviceFeaturesEXT &fpvkSetPhysicalDeviceFeaturesEXT,
-                                PFN_vkGetOriginalPhysicalDeviceFeaturesEXT &fpvkGetOriginalPhysicalDeviceFeaturesEXT);
-    bool LoadDeviceProfileLayer(PFN_VkSetPhysicalDeviceProperties2EXT &fpvkSetPhysicalDeviceProperties2EXT);
 
     VkLayerTest();
 };
@@ -293,34 +290,11 @@ class GpuAVRayQueryTest : public GpuAVTest {
     void InitGpuAVRayQuery(std::vector<VkLayerSettingEXT> layer_settings = {});
 };
 
-class GpuAVDescriptorHeap : public GpuAVTest {
+class GpuAVDescriptorHeapEXT : public GpuAVTest {
   public:
     void InitGpuAVDescriptorHeap(std::vector<VkLayerSettingEXT> layer_settings = {}, bool safe_mode = true);
 
-    void CreateResourceHeap(VkDeviceSize app_size, bool reserved_range_in_front = false);
-    void CreateSamplerHeap(VkDeviceSize app_size, bool reserved_range_in_front = false, bool use_embedded_samplers = false);
-
-    void BindResourceHeap();
-    void BindSamplerHeap();
-
-    void WriteBufferToHeap(const vkt::Buffer& buffer, uint32_t stride = 0,
-                           VkDescriptorType type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    void WriteImageToHeap(const vkt::Image& image, uint32_t stride = 0, VkDescriptorType type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
-
     VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
-
-    vkt::Buffer resource_heap_;
-    uint8_t *resource_heap_data_ = nullptr;
-    bool resource_reserved_range_in_front_ = false;
-    vkt::Buffer sampler_heap_;
-    uint8_t *sampler_heap_data_ = nullptr;
-    bool sampler_reserved_range_in_front_ = false;
-
-    VkDeviceSize AlignResource(VkDeviceSize offset);
-    VkDeviceSize AlignSampler(VkDeviceSize offset);
-
-  private:
-    bool embedded_samplers = false;
 };
 
 class GpuAVRayHitObjectTest : public GpuAVTest {
@@ -362,32 +336,13 @@ class DescriptorIndexingTest : public VkLayerTest {
     void ComputePipelineShaderTest(const char *shader, std::vector<VkDescriptorSetLayoutBinding> &bindings);
 };
 
-class DescriptorHeapTest : public VkLayerTest {
+class DescriptorHeapTestEXT : public VkLayerTest {
   public:
     void InitBasicDescriptorHeap();
     void InitUntypedDescriptorHeap();
-    void CreateResourceHeap(VkDeviceSize app_size, bool reserved_range_in_front = false);
-    void CreateSamplerHeap(VkDeviceSize app_size, bool reserved_range_in_front = false, bool use_embedded_samplers = false);
-
-    void BindResourceHeap();
-    void BindSamplerHeap();
-
-    VkDeviceSize AlignedAppend(VkDeviceSize& end, VkDescriptorType type, uint32_t count = 1);
-    VkDeviceSize AlignResource(VkDeviceSize offset);
-    VkDeviceSize AlignSampler(VkDeviceSize offset);
 
     VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
     VkPhysicalDeviceDescriptorHeapTensorPropertiesARM tensor_heap_props = vku::InitStructHelper();
-
-    vkt::Buffer resource_heap_;
-    uint8_t* resource_heap_data_ = nullptr;
-    bool resource_reserved_range_in_front_ = false;
-    vkt::Buffer sampler_heap_;
-    uint8_t *sampler_heap_data_ = nullptr;
-    bool sampler_reserved_range_in_front_ = false;
-
-  private:
-    bool embedded_samplers = false;
 };
 
 class DeviceAddressCommands : public VkLayerTest {
@@ -424,6 +379,7 @@ class DeviceGeneratedCommandsTest : public VkLayerTest {
     void InitBasicDeviceGeneratedCommands();
 
     void SetPreProcessBuffer(VkGeneratedCommandsInfoEXT &generated_commands_info, void *pipeline_or_shader_object = nullptr);
+    vkt::DeviceMemory pre_process_memory_;
     std::unique_ptr<vkt::Buffer> pre_process_buffer_ = std::make_unique<vkt::Buffer>();
 };
 
@@ -474,22 +430,19 @@ class QueryTest : public VkLayerTest {
 
 class RayTracingTest : public virtual VkLayerTest {
   public:
-    void InitFrameworkForRayTracingTest(VkValidationFeaturesEXT *enabled_features = nullptr);
-
-    void NvInitFrameworkForRayTracingTest(VkPhysicalDeviceFeatures2KHR *features2 = nullptr,
-                                          VkValidationFeaturesEXT *enabled_features = nullptr);
+    void InitFrameworkForRayTracingTest(VkValidationFeaturesEXT* enabled_features = nullptr, bool safe_mode = true);
 };
 
 class GpuAVRayTracingTest : public GpuAVTest, public RayTracingTest {};
 
-class ShaderObjectTest : public virtual VkLayerTest {
+class ShaderObjectTestEXT : public virtual VkLayerTest {
   public:
     void InitBasicShaderObject(void *instance_pnext = nullptr);
     void InitBasicMeshShaderObject(APIVersion target_api_version);
 
     // Many tests just need a basic vert/frag shader
-    vkt::Shader m_vert_shader;
-    vkt::Shader m_frag_shader;
+    vkt::ShaderEXT m_vert_shader;
+    vkt::ShaderEXT m_frag_shader;
     void CreateMinimalShaders();
 };
 
@@ -505,14 +458,19 @@ class SyncObjectTest : public VkLayerTest {
 class TensorTest : public VkLayerTest {
   public:
     void InitBasicTensor();
+    void InitTensorControls();
     static VkTensorDescriptionARM DefaultDesc();
     static VkTensorDescriptionARM TensorShaderDesc();
     static VkTensorCreateInfoARM DefaultCreateInfo(VkTensorDescriptionARM *desc = nullptr);
+    static VkTensorRollingBackingCreateInfoARM InitTensorRollingInfo(const uint32_t (&wraps)[4]);
 };
 
 class DataGraphTest : public VkLayerTest {
   public:
     void InitBasicDataGraph(bool optical_flow = false);
+    void InitDataGraphModel();
+    uint32_t model_queue_family_index_ = 0;
+    std::vector<VkQueueFamilyDataGraphPropertiesARM> model_properties_;
     static std::vector<VkBindDataGraphPipelineSessionMemoryInfoARM> InitSessionBindInfo(const vkt::DataGraphPipelineSession& session, const std::vector<vkt::DeviceMemory>& device_mem);
     static VkTensorDescriptionARM DefaultDesc();
     static VkTensorDescriptionARM DefaultConstantTensorDesc();

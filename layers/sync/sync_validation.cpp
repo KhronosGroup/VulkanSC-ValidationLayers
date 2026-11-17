@@ -16,20 +16,25 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <iostream>
 #include <memory>
 #include <vector>
 
 #include "sync/sync_error_messages.h"
 #include "sync/sync_validation.h"
+#include "sync/sync_event.h"
 #include "sync/sync_image.h"
+#include "sync/sync_queue_command.h"
 #include "state_tracker/buffer_state.h"
 #include "state_tracker/ray_tracing_state.h"
+#include "state_tracker/render_pass_state.h"
 #include "utils/convert_utils.h"
+#include "utils/image_utils.h"
 #include "utils/ray_tracing_utils.h"
 #include "utils/text_utils.h"
+#include "utils/vk_api_utils.h"
 #include "vk_layer_config.h"
-#include "containers/tls_guard.h"
 
 namespace syncval {
 
@@ -132,7 +137,7 @@ void SyncValidator::ApplySignalsUpdate(SignalsUpdate& update, const BatchContext
         stats.AddTimelineSignals((uint32_t)new_signals.size());
 
         // Update host sync points
-        std::deque<TimelineHostSyncPoint>& host_sync_points = host_waitable_semaphores_[semaphore];
+        std::deque<TimelineHostSyncPoint>& host_sync_points = host_waitable_semaphores_[semaphore].sync_points;
         for (SignalInfo& new_signal : new_signals) {
             if (new_signal.batch) {
                 // The lifetimes of the semaphore host sync points are managed by vkWaitSemaphores.
@@ -149,8 +154,9 @@ void SyncValidator::ApplySignalsUpdate(SignalsUpdate& update, const BatchContext
                 TimelineHostSyncPoint sync_point;
                 assert(new_signal.first_scope.queue != kQueueIdInvalid);
                 sync_point.queue_id = new_signal.first_scope.queue;
-                sync_point.tag = new_signal.batch->GetTagRange().end - 1;
+                sync_point.tag = new_signal.batch->GetTagRange().end;
                 sync_point.timeline_value = new_signal.timeline_value;
+                sync_point.queue_sync_tags = new_signal.batch->GetQueueSyncTags();
                 host_sync_points.emplace_back(sync_point);
             }
         }
@@ -175,6 +181,8 @@ void SyncValidator::ApplySignalsUpdate(SignalsUpdate& update, const BatchContext
     EnsureTimelineSignalsLimit(kMaxTimelineSignalsPerQueue);
 }
 
+// TODO: Account for semaphore stage scopes during host-wait cleanup.
+// Using only queue tag limits can discard accesses outside a signal's scope
 void SyncValidator::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag,
                                     const LastSynchronizedPresent& last_synchronized_present,
                                     const std::vector<ResourceUsageTag>& queue_sync_tags) {
@@ -193,7 +201,10 @@ void SyncValidator::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag,
         sync_points.reserve(queue_id_limit_);
         for (const auto [sync_queue, sync_tag] : vvl::enumerate(queue_sync_tags)) {
             if (sync_tag > 0) {
-                sync_points.emplace_back((QueueId)sync_queue, sync_tag);
+                // Queue sync tag is an exclusive limit (the first unsynchronized tag).
+                // The wait predicate is inclusive, so exclude the boundary tag
+                const ResourceUsageTag last_synchronized_tag = sync_tag - 1;
+                sync_points.emplace_back((QueueId)sync_queue, last_synchronized_tag);
             }
         }
     }
@@ -241,20 +252,13 @@ std::vector<BatchContextPtr> SyncValidator::GetAllQueueBatchContexts() {
     return batch_contexts;
 }
 
-void SyncValidator::UpdateFenceHostSyncPoint(VkFence fence, FenceHostSyncPoint&& sync_point) {
-    std::shared_ptr<const vvl::Fence> fence_state = Get<vvl::Fence>(fence);
-    if (!vvl::StateObject::Invalid(fence_state)) {
-        waitable_fences_[fence_state->VkHandle()] = std::move(sync_point);
-    }
-}
-
 void SyncValidator::WaitForFence(VkFence fence) {
     if (auto fence_it = waitable_fences_.find(fence); fence_it != waitable_fences_.end()) {
         FenceHostSyncPoint& wait_for = fence_it->second;
         if (wait_for.queue_id != kQueueIdInvalid) {
             const QueueState& queue_state = GetQueueState(wait_for.queue_id);
             ApplyTaggedWait(wait_for.queue_id, wait_for.tag, queue_state.GetLastSynchronizedPresent(), wait_for.queue_sync_tags);
-        } else if (!vvl::StateObject::Invalid(wait_for.acquired.image)) {
+        } else if (!wait_for.acquired.image->Destroyed()) {
             ApplyAcquireWait(wait_for.acquired);
         }
         waitable_fences_.erase(fence_it);
@@ -262,21 +266,29 @@ void SyncValidator::WaitForFence(VkFence fence) {
 }
 
 void SyncValidator::WaitForSemaphore(VkSemaphore semaphore, uint64_t value) {
-    std::deque<TimelineHostSyncPoint>* sync_points = vvl::Find(host_waitable_semaphores_, semaphore);
-    if (!sync_points) {
+    TimelineHostSyncState* host_sync_state = vvl::Find(host_waitable_semaphores_, semaphore);
+    if (!host_sync_state) {
         return;
     }
+
+    // An imported payload replaces the value synchronized_value was derived from
+    const auto semaphore_state = Get<vvl::Semaphore>(semaphore);
+    const bool imported = semaphore_state && semaphore_state->ImportedHandleType().has_value();
+
+    if (!imported && value <= host_sync_state->synchronized_value) {
+        return;
+    }
+    auto& sync_points = host_sync_state->sync_points;
     auto matching_sync_point = [value](const TimelineHostSyncPoint& sync_point) { return sync_point.timeline_value >= value; };
-    auto sync_point_it = std::find_if(sync_points->begin(), sync_points->end(), matching_sync_point);
-    if (sync_point_it == sync_points->end()) {
+    auto sync_point_it = std::find_if(sync_points.begin(), sync_points.end(), matching_sync_point);
+    if (sync_point_it == sync_points.end()) {
         return;
     }
 
     const TimelineHostSyncPoint& sync_point = *sync_point_it;
     const QueueState& queue_state = GetQueueState(sync_point.queue_id);
 
-    // TODO: specify queue sync tags argument similar to WaitForFence
-    ApplyTaggedWait(sync_point.queue_id, sync_point.tag, queue_state.GetLastSynchronizedPresent(), {});
+    ApplyTaggedWait(sync_point.queue_id, sync_point.tag, queue_state.GetLastSynchronizedPresent(), sync_point.queue_sync_tags);
 
     // Remove signals before the resolving one (keep the resolving signal).
     std::vector<SignalInfo>& signals = timeline_signals_[semaphore];
@@ -286,10 +298,12 @@ void SyncValidator::WaitForSemaphore(VkSemaphore semaphore, uint64_t value) {
     });
     stats.RemoveTimelineSignals(uint32_t(initial_signal_count - signals.size()));
 
-    // We can remove all sync points that are in the scope of current wait.
-    // Subsequent attempts to synchronize on the host with already synchronized
-    // timeline values will result in noop.
-    sync_points->erase(sync_points->begin(), sync_point_it + 1 /* include resolving sync point too*/);
+    // Remember the resolving signal value, which can be greater than the requested wait value
+    host_sync_state->synchronized_value = sync_point.timeline_value;
+
+    // Remove the resolving sync point and all preceding points.
+    // For non-imported semaphores, synchronized_value makes later waits for these values no-ops
+    sync_points.erase(sync_points.begin(), sync_point_it + 1 /* include resolving sync point too*/);
 }
 
 void SyncValidator::UpdateSyncImageMemoryBindState(uint32_t count, const VkBindImageMemoryInfo* infos) {
@@ -304,6 +318,16 @@ void SyncValidator::UpdateSyncImageMemoryBindState(uint32_t count, const VkBindI
         if (sub_state.IsTiled()) {
             sub_state.SetOpaqueBaseAddress(*device_state);
         }
+    }
+}
+
+void SyncValidator::ExecuteQueueCommands() {
+    while (!queue_commands_.empty()) {
+        if (!IsQueueCommandReady(queue_commands_.front())) {
+            break;
+        }
+        ExecuteQueueCommand(queue_commands_.front(), *this);
+        queue_commands_.pop_front();
     }
 }
 
@@ -339,116 +363,73 @@ void SyncValidator::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer,
     if (const auto buffer_state = Get<vvl::Buffer>(buffer)) {
         const VkDeviceSize base_address = ResourceBaseAddress(*buffer_state);
         const AccessRange buffer_range(base_address, base_address + buffer_state->GetSize());
-        for (const auto& batch : GetAllQueueBatchContexts()) {
-            batch->OnResourceDestroyed(buffer_range);
-            batch->Trim();
-        }
+        ProcessQueueCommand(ResourceDestroyedCommand{{buffer_range}});
     }
 }
 
 void SyncValidator::PreCallRecordDestroyImage(VkDevice device, VkImage image, const VkAllocationCallbacks* pAllocator,
                                               const RecordObject& record_obj) {
     if (const auto image_state = Get<vvl::Image>(image)) {
-        for (const auto& batch : GetAllQueueBatchContexts()) {
-            const auto& sub_state = SubState(*image_state);
-            ImageRangeGen range_gen = sub_state.MakeImageRangeGen(image_state->full_range, false);
-            for (; range_gen->non_empty(); ++range_gen) {
-                const AccessRange subresource_range = *range_gen;
-                batch->OnResourceDestroyed(subresource_range);
-            }
-            batch->Trim();
+        ResourceDestroyedCommand command;
+        ImageRangeGen range_gen = SubState(*image_state).MakeImageRangeGen(image_state->full_range, false);
+        for (; range_gen->non_empty(); ++range_gen) {
+            command.ranges.emplace_back(*range_gen);
         }
+        ProcessQueueCommand(std::move(command));
     }
 }
 
 void SyncValidator::PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
                                                      const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
-    for (const auto& batch : GetAllQueueBatchContexts()) {
-        batch->last_synchronized_present.OnDestroySwapchain(swapchain);
-    }
+    ProcessQueueCommand(SwapchainDestroyedCommand{swapchain});
 }
 
 bool SyncValidator::PreCallValidateCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer,
                                                  uint32_t regionCount, const VkBufferCopy* pRegions,
                                                  const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-
-    const auto* cb_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_context->GetCurrentAccessContext();
-
-    // If we have no previous accesses, we have no hazards
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     auto src_buffer = Get<vvl::Buffer>(srcBuffer);
     auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
-
-    for (const auto [region_index, copy_region] : vvl::enumerate(pRegions, regionCount)) {
-        if (src_buffer) {
-            const AccessRange src_range = MakeRange(*src_buffer, copy_region.srcOffset, copy_region.size);
-            auto hazard = context.DetectHazard(*src_buffer, SYNC_COPY_TRANSFER_READ, src_range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, srcBuffer);
-                const std::string error = error_messages_.BufferCopyError(hazard, *cb_context, error_obj.location.function,
-                                                                          FormatHandle(srcBuffer), region_index, src_range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-        if (dst_buffer) {
-            const AccessRange dst_range = MakeRange(*dst_buffer, copy_region.dstOffset, copy_region.size);
-            auto hazard = context.DetectHazard(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, dst_range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, dstBuffer);
-                const std::string error = error_messages_.BufferCopyError(hazard, *cb_context, error_obj.location.function,
-                                                                          FormatHandle(dstBuffer), region_index, dst_range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-        if (skip) {
-            break;
-        }
+    if (!src_buffer || !dst_buffer) {
+        return false;
     }
-    return skip;
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    small_vector<BufferCopyRegion, 1> regions;
+    regions.reserve(regionCount);
+    for (const VkBufferCopy& region : vvl::make_span(pRegions, regionCount)) {
+        regions.emplace_back(BufferCopyRegion{region.srcOffset, region.dstOffset, region.size});
+    }
+    const BufferCopyCommand command{*src_buffer, *dst_buffer, regions};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyBuffer2(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo,
                                                   const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_context->GetCurrentAccessContext();
-
-    // If we have no previous accesses, we have no hazards
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pCopyBufferInfo) {
+        return false;
+    }
     auto src_buffer = Get<vvl::Buffer>(pCopyBufferInfo->srcBuffer);
     auto dst_buffer = Get<vvl::Buffer>(pCopyBufferInfo->dstBuffer);
-
-    for (const auto [region_index, copy_region] : vvl::enumerate(pCopyBufferInfo->pRegions, pCopyBufferInfo->regionCount)) {
-        if (src_buffer) {
-            const AccessRange src_range = MakeRange(*src_buffer, copy_region.srcOffset, copy_region.size);
-            auto hazard = context.DetectHazard(*src_buffer, SYNC_COPY_TRANSFER_READ, src_range);
-            if (hazard.IsHazard()) {
-                // TODO -- add tag information to log msg when useful.
-                // TODO: there are no tests for this error
-                const LogObjectList objlist(commandBuffer, pCopyBufferInfo->srcBuffer);
-                const std::string error =
-                    error_messages_.BufferCopyError(hazard, *cb_context, error_obj.location.function,
-                                                    FormatHandle(pCopyBufferInfo->srcBuffer), region_index, src_range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-        if (dst_buffer && !skip) {
-            const AccessRange dst_range = MakeRange(*dst_buffer, copy_region.dstOffset, copy_region.size);
-            auto hazard = context.DetectHazard(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, dst_range);
-            if (hazard.IsHazard()) {
-                // TODO: there are no tests for this error
-                const LogObjectList objlist(commandBuffer, pCopyBufferInfo->dstBuffer);
-                const std::string error =
-                    error_messages_.BufferCopyError(hazard, *cb_context, error_obj.location.function,
-                                                    FormatHandle(pCopyBufferInfo->dstBuffer), region_index, dst_range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-        if (skip) break;
+    if (!src_buffer || !dst_buffer) {
+        return false;
     }
-    return skip;
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    small_vector<BufferCopyRegion, 1> regions;
+    regions.reserve(pCopyBufferInfo->regionCount);
+    for (const VkBufferCopy2& region : vvl::make_span(pCopyBufferInfo->pRegions, pCopyBufferInfo->regionCount)) {
+        regions.emplace_back(BufferCopyRegion{region.srcOffset, region.dstOffset, region.size});
+    }
+    const BufferCopyCommand command{*src_buffer, *dst_buffer, regions};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR* pCopyBufferInfo,
@@ -459,84 +440,45 @@ bool SyncValidator::PreCallValidateCmdCopyBuffer2KHR(VkCommandBuffer commandBuff
 bool SyncValidator::PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                 VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                                 const VkImageCopy* pRegions, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     auto src_image = Get<vvl::Image>(srcImage);
     auto dst_image = Get<vvl::Image>(dstImage);
-    for (const auto [region_index, copy_region] : vvl::enumerate(pRegions, regionCount)) {
-        if (src_image) {
-            auto hazard = context.DetectHazard(*src_image, RangeFromLayers(copy_region.srcSubresource), copy_region.srcOffset,
-                                               copy_region.extent, SYNC_COPY_TRANSFER_READ);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, srcImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(srcImage), region_index,
-                    copy_region.srcOffset, copy_region.extent, copy_region.srcSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-
-        if (dst_image) {
-            auto hazard = context.DetectHazard(*dst_image, RangeFromLayers(copy_region.dstSubresource), copy_region.dstOffset,
-                                               copy_region.extent, SYNC_COPY_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, dstImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(dstImage), region_index,
-                    copy_region.dstOffset, copy_region.extent, copy_region.dstSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-        if (skip) {
-            break;
-        }
+    if (!src_image || !dst_image) {
+        return false;
     }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    return skip;
+    const ImageCopyCommand command{*src_image, *dst_image, vvl::make_span(pRegions, regionCount)};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2* pCopyImageInfo,
                                                  const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pCopyImageInfo) {
+        return false;
+    }
     auto src_image = Get<vvl::Image>(pCopyImageInfo->srcImage);
     auto dst_image = Get<vvl::Image>(pCopyImageInfo->dstImage);
-
-    for (const auto [region_index, copy_region] : vvl::enumerate(pCopyImageInfo->pRegions, pCopyImageInfo->regionCount)) {
-        if (src_image) {
-            auto hazard = context.DetectHazard(*src_image, RangeFromLayers(copy_region.srcSubresource), copy_region.srcOffset,
-                                               copy_region.extent, SYNC_COPY_TRANSFER_READ);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, pCopyImageInfo->srcImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(pCopyImageInfo->srcImage), region_index,
-                    copy_region.srcOffset, copy_region.extent, copy_region.srcSubresource);
-                // TODO: this error not covered by the test
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-
-        if (dst_image) {
-            auto hazard = context.DetectHazard(*dst_image, RangeFromLayers(copy_region.dstSubresource), copy_region.dstOffset,
-                                               copy_region.extent, SYNC_COPY_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, pCopyImageInfo->dstImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(pCopyImageInfo->dstImage), region_index,
-                    copy_region.dstOffset, copy_region.extent, copy_region.dstSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-            if (skip) break;
-        }
+    if (!src_image || !dst_image) {
+        return false;
     }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    return skip;
+    small_vector<VkImageCopy, 1> regions;
+    regions.reserve(pCopyImageInfo->regionCount);
+    for (const VkImageCopy2& region : vvl::make_span(pCopyImageInfo->pRegions, pCopyImageInfo->regionCount)) {
+        regions.emplace_back(
+            VkImageCopy{region.srcSubresource, region.srcOffset, region.dstSubresource, region.dstOffset, region.extent});
+    }
+    const ImageCopyCommand command{*src_image, *dst_image, regions};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyImage2KHR(VkCommandBuffer commandBuffer, const VkCopyImageInfo2KHR* pCopyImageInfo,
@@ -549,17 +491,50 @@ bool SyncValidator::PreCallValidateCmdPipelineBarrier(
     VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers,
     uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
     const VkImageMemoryBarrier* pImageMemoryBarriers, const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    SyncOpPipelineBarrier pipeline_barrier(error_obj.location.function, *this, cb_access_context->GetQueueFlags(), srcStageMask,
-                                           dstStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
-                                           pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+    const SyncExecScope src_exec_scope(SyncExecScope::MakeSrc(queue_flags, srcStageMask));
+    const SyncExecScope dst_exec_scope(SyncExecScope::MakeDst(queue_flags, dstStageMask));
+    const BarrierSet barrier_set(*this, src_exec_scope, dst_exec_scope, memoryBarrierCount, pMemoryBarriers,
+                                 bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
     stats.OnBarrierCommand(memoryBarrierCount, bufferMemoryBarrierCount, imageMemoryBarrierCount,
-                           pipeline_barrier.GetExecutionDependencyBarrierCount());
-    skip |= pipeline_barrier.Validate(*cb_access_context);
-    return skip;
+                           barrier_set.execution_dependency_barrier_count);
+
+    const BarrierCommand command{barrier_set};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::RecordCmdPipelineBarrier(CommandBufferContext& cb_context, BarrierSet&& barrier_set,
+                                             const Location& loc) const {
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+    const uint32_t barrier_set_index = static_cast<uint32_t>(cb_context.GetCommandData().barrier_sets.size());
+    bool has_layout_transition = false;
+    for (const SyncBufferBarrier& buffer_barrier : barrier_set.buffer_barriers) {
+        cb_context.AddCommandHandle(tag, buffer_barrier.buffer->Handle());
+    }
+    for (SyncImageBarrier& image_barrier : barrier_set.image_barriers) {
+        if (image_barrier.IsLayoutTransition()) {
+            const ResourceUsageTagEx tag_ex =
+                cb_context.AddCommandHandleIndexed(tag, image_barrier.image->Handle(), barrier_set_index);
+            image_barrier.handle_index = tag_ex.handle_index;
+            has_layout_transition = true;
+        }
+    }
+    const BarrierCommand command{barrier_set};
+    if (syncval_settings.record_time_validation) {
+        AccessContext& access_context = cb_context.GetCurrentAccessContext();
+        command.Apply(cb_context.GetSyncEnvironment(), tag, access_context);
+    }
+    if (cb_context.NeedsCommandStorage()) {
+        cb_context.StoreCommand(tag, command);
+    } else if (has_layout_transition) {
+        cb_context.StoreBarriersForReporting(vvl::make_span<const BarrierSet>(&barrier_set, 1));
+    }
 }
 
 void SyncValidator::PostCallRecordCmdPipelineBarrier(
@@ -568,11 +543,15 @@ void SyncValidator::PostCallRecordCmdPipelineBarrier(
     uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
     const VkImageMemoryBarrier* pImageMemoryBarriers, const RecordObject& record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    cb_access_context->RecordSyncOp<SyncOpPipelineBarrier>(
-        record_obj.location.function, *this, cb_access_context->GetQueueFlags(), srcStageMask, dstStageMask, memoryBarrierCount,
-        pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+    const SyncExecScope src_exec_scope(SyncExecScope::MakeSrc(queue_flags, srcStageMask));
+    const SyncExecScope dst_exec_scope(SyncExecScope::MakeDst(queue_flags, dstStageMask));
+
+    BarrierSet barrier_set(*this, src_exec_scope, dst_exec_scope, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
+                           pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+    RecordCmdPipelineBarrier(cb_context, std::move(barrier_set), record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfoKHR* pDependencyInfo,
@@ -582,16 +561,22 @@ bool SyncValidator::PreCallValidateCmdPipelineBarrier2KHR(VkCommandBuffer comman
 
 bool SyncValidator::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
                                                        const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pDependencyInfo) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    SyncOpPipelineBarrier pipeline_barrier(error_obj.location.function, *this, cb_access_context->GetQueueFlags(),
-                                           *pDependencyInfo);
+    const BarrierSet barrier_set(*this, queue_flags, *pDependencyInfo);
     stats.OnBarrierCommand(pDependencyInfo->memoryBarrierCount, pDependencyInfo->bufferMemoryBarrierCount,
-                           pDependencyInfo->imageMemoryBarrierCount, pipeline_barrier.GetExecutionDependencyBarrierCount());
-    skip |= pipeline_barrier.Validate(*cb_access_context);
-    return skip;
+                           pDependencyInfo->imageMemoryBarrierCount, barrier_set.execution_dependency_barrier_count);
+
+    const BarrierCommand command{barrier_set};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer commandBuffer, const VkDependencyInfoKHR* pDependencyInfo,
@@ -601,11 +586,14 @@ void SyncValidator::PostCallRecordCmdPipelineBarrier2KHR(VkCommandBuffer command
 
 void SyncValidator::PostCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo,
                                                       const RecordObject& record_obj) {
+    if (!pDependencyInfo) {
+        return;
+    }
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-
-    cb_access_context->RecordSyncOp<SyncOpPipelineBarrier>(record_obj.location.function, *this, cb_access_context->GetQueueFlags(),
-                                                           *pDependencyInfo);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
+    BarrierSet barrier_set(*this, queue_flags, *pDependencyInfo);
+    RecordCmdPipelineBarrier(cb_context, std::move(barrier_set), record_obj.location);
 }
 
 void SyncValidator::FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) {
@@ -643,6 +631,7 @@ void SyncValidator::FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, con
 
 void SyncValidator::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator,
                                                const RecordObject& record_obj) {
+    queue_commands_.clear();
     queue_states_.clear();
     binary_signals_.clear();
     timeline_signals_.clear();
@@ -657,25 +646,66 @@ void SyncValidator::PostCallRecordCreateSemaphore(VkDevice device, const VkSemap
         return;
     }
     assert(!vvl::Contains(timeline_signals_, *pSemaphore));
+
+    if (auto sem_state = Get<vvl::Semaphore>(*pSemaphore); sem_state && sem_state->type == VK_SEMAPHORE_TYPE_TIMELINE) {
+        host_waitable_semaphores_[*pSemaphore].synchronized_value = sem_state->initial_value;
+    }
 }
 
 void SyncValidator::PreCallRecordDestroySemaphore(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks* pAllocator,
                                                   const RecordObject& record_obj) {
-    if (auto sem_state = Get<vvl::Semaphore>(semaphore); sem_state && (sem_state->type == VK_SEMAPHORE_TYPE_TIMELINE)) {
-        if (auto it = timeline_signals_.find(semaphore); it != timeline_signals_.end()) {
-            stats.RemoveTimelineSignals((uint32_t)it->second.size());
-            timeline_signals_.erase(it);
-        }
+    if (auto sem_state = Get<vvl::Semaphore>(semaphore); sem_state && sem_state->type == VK_SEMAPHORE_TYPE_TIMELINE) {
+        ProcessQueueCommand(SemaphoreDestroyedCommand{semaphore});
     }
 }
 
 bool SyncValidator::ValidateBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
                                             const VkSubpassBeginInfo* pSubpassBeginInfo, const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pRenderPassBegin) {
+        return false;
+    }
+    auto rp_state = Get<vvl::RenderPass>(pRenderPassBegin->renderPass);
+    if (!rp_state) {
+        return false;
+    }
+    auto fb_state = Get<vvl::Framebuffer>(pRenderPassBegin->framebuffer);
+    if (!fb_state) {
+        return false;
+    }
+    const auto attachments = device_state->GetAttachmentViews(*pRenderPassBegin, *fb_state);
+    if (attachments.empty()) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    SyncOpBeginRenderPass sync_op(error_obj.location.function, *this, pRenderPassBegin, pSubpassBeginInfo);
-    skip |= sync_op.Validate(*GetAccessContext(*cb_state));
-    return skip;
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const uint32_t render_pass_instance_id = cb_context.GetCurrentRenderPassInstanceId();
+
+    const BeginRenderPassCommand command{*rp_state, attachments, pRenderPassBegin->renderArea, render_pass_instance_id};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+bool SyncValidator::ValidateCmdNextSubpass(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
+                                           const VkSubpassEndInfo* pSubpassEndInfo, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    NextSubpassCommand command{};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+bool SyncValidator::ValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    EndRenderPassCommand command{};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
@@ -698,14 +728,6 @@ bool SyncValidator::PreCallValidateCmdBeginRenderPass2KHR(VkCommandBuffer comman
     return PreCallValidateCmdBeginRenderPass2(commandBuffer, pRenderPassBegin, pSubpassBeginInfo, error_obj);
 }
 
-bool SyncValidator::ValidateCmdNextSubpass(VkCommandBuffer commandBuffer, const VkSubpassBeginInfo* pSubpassBeginInfo,
-                                           const VkSubpassEndInfo* pSubpassEndInfo, const ErrorObject& error_obj) const {
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
-    SyncOpNextSubpass sync_op(error_obj.location.function, *this, pSubpassBeginInfo, pSubpassEndInfo);
-    return sync_op.Validate(*cb_context);
-}
-
 bool SyncValidator::PreCallValidateCmdNextSubpass(VkCommandBuffer commandBuffer, VkSubpassContents contents,
                                                   const ErrorObject& error_obj) const {
     // Convert to a NextSubpass2
@@ -725,25 +747,13 @@ bool SyncValidator::PreCallValidateCmdNextSubpass2(VkCommandBuffer commandBuffer
     return ValidateCmdNextSubpass(commandBuffer, pSubpassBeginInfo, pSubpassEndInfo, error_obj);
 }
 
-bool SyncValidator::ValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
-                                             const ErrorObject& error_obj) const {
-    bool skip = false;
-
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_context = GetAccessContext(*cb_state);
-
-    SyncOpEndRenderPass sync_op(error_obj.location.function, *this, pSubpassEndInfo);
-    skip |= sync_op.Validate(*cb_context);
-    return skip;
-}
-
 bool SyncValidator::PreCallValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const {
-    return ValidateCmdEndRenderPass(commandBuffer, nullptr, error_obj);
+    return ValidateCmdEndRenderPass(commandBuffer, error_obj);
 }
 
 bool SyncValidator::PreCallValidateCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
                                                      const ErrorObject& error_obj) const {
-    return ValidateCmdEndRenderPass(commandBuffer, pSubpassEndInfo, error_obj);
+    return ValidateCmdEndRenderPass(commandBuffer, error_obj);
 }
 
 bool SyncValidator::PreCallValidateCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
@@ -758,16 +768,24 @@ bool SyncValidator::PreCallValidateCmdBeginRenderingKHR(VkCommandBuffer commandB
 
 bool SyncValidator::PreCallValidateCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo,
                                                      const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    if (!pRenderingInfo) return skip;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pRenderingInfo) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    vvl::TlsGuard<BeginRenderingCmdState> cmd_state(&skip, std::move(cb_state));
-    cmd_state->AddRenderingInfo(*this, *pRenderingInfo);
+    const auto attachments = CollectAttachments(*this, *pRenderingInfo);
+    RenderingInstance rendering_instance{pRenderingInfo->flags, pRenderingInfo->renderArea, pRenderingInfo->viewMask,
+                                         pRenderingInfo->colorAttachmentCount, vvl::make_span(attachments)};
 
-    // We need to set skip, because the TlsGuard destructor is looking at the skip value for RAII cleanup.
-    skip |= GetAccessContext(*cmd_state->cb_state)->ValidateBeginRendering(error_obj, *cmd_state);
-    return skip;
+    std::vector<ImageRangeGen> view_gens;
+    rendering_instance.InitViewGens(view_gens);
+
+    const BeginRenderingCommand command{rendering_instance, cb_context.GetCurrentRenderPassInstanceId()};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdBeginRenderingKHR(VkCommandBuffer commandBuffer, const VkRenderingInfoKHR* pRenderingInfo,
@@ -777,12 +795,20 @@ void SyncValidator::PostCallRecordCmdBeginRenderingKHR(VkCommandBuffer commandBu
 
 void SyncValidator::PostCallRecordCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo,
                                                     const RecordObject& record_obj) {
-    vvl::TlsGuard<BeginRenderingCmdState> cmd_state;
+    if (!pRenderingInfo) {
+        return;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
 
-    assert(cmd_state && cmd_state->cb_state && (cmd_state->cb_state->VkHandle() == commandBuffer));
-    // Note: for fine grain locking need to to something other than cast.
-    auto cb_state = std::const_pointer_cast<vvl::CommandBuffer>(cmd_state->cb_state);
-    GetAccessContext(*cb_state)->RecordBeginRendering(*cmd_state, record_obj.location);
+    const RenderingInstance& rendering_instance = cb_context.BeginRenderingInstance(*pRenderingInfo);
+
+    const BeginRenderingCommand command{rendering_instance, cb_context.GetCurrentRenderPassInstanceId()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdEndRenderingKHR(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const {
@@ -790,10 +816,18 @@ bool SyncValidator::PreCallValidateCmdEndRenderingKHR(VkCommandBuffer commandBuf
 }
 
 bool SyncValidator::PreCallValidateCmdEndRendering(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    skip |= GetAccessContext(*cb_state)->ValidateEndRendering(error_obj);
-    return skip;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const RenderingInstance* rendering_instance = cb_context.GetRenderingInstance();
+    if (!rendering_instance) {
+        return false;
+    }
+    const EndRenderingCommand command{*rendering_instance, cb_context.GetCurrentRenderPassInstanceId()};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PreCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffer, const RecordObject& record_obj) {
@@ -801,59 +835,40 @@ void SyncValidator::PreCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffe
 }
 
 void SyncValidator::PreCallRecordCmdEndRendering(VkCommandBuffer commandBuffer, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    GetAccessContext(*cb_state)->RecordEndRendering(record_obj);
-}
-
-template <typename RegionType>
-bool SyncValidator::ValidateCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-                                                 VkImageLayout dstImageLayout, uint32_t regionCount, const RegionType* pRegions,
-                                                 const Location& loc) const {
-    bool skip = false;
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto src_buffer = Get<vvl::Buffer>(srcBuffer);
-    auto dst_image = Get<vvl::Image>(dstImage);
-
-    for (const auto [region_index, copy_region] : vvl::enumerate(pRegions, regionCount)) {
-        HazardResult hazard;
-        if (dst_image) {
-            if (src_buffer) {
-                AccessRange src_range = MakeRange(copy_region.bufferOffset, dst_image->GetBufferSizeFromCopyImage(copy_region));
-                hazard = context.DetectHazard(*src_buffer, SYNC_COPY_TRANSFER_READ, src_range);
-                if (hazard.IsHazard()) {
-                    // PHASE1 TODO -- add tag information to log msg when useful.
-                    const LogObjectList objlist(commandBuffer, srcBuffer);
-                    const std::string error = error_messages_.BufferCopyError(hazard, *cb_access_context, loc.function,
-                                                                              FormatHandle(srcBuffer), region_index, src_range);
-                    skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-                }
-            }
-
-            hazard = context.DetectHazard(*dst_image, RangeFromLayers(copy_region.imageSubresource), copy_region.imageOffset,
-                                          copy_region.imageExtent, SYNC_COPY_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, dstImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, loc.function, FormatHandle(dstImage), region_index, copy_region.imageOffset,
-                    copy_region.imageExtent, copy_region.imageSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-            }
-            if (skip) break;
-        }
-        if (skip) break;
+    const RenderingInstance* rendering_instance = cb_context.GetRenderingInstance();
+    if (!rendering_instance) {
+        return;
     }
-    return skip;
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function, SubCommandType::kStoreOp);
+
+    const EndRenderingCommand command{*rendering_instance, cb_context.GetCurrentRenderPassInstanceId()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
+    cb_context.EndRenderingInstance();
 }
 
 bool SyncValidator::PreCallValidateCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
                                                         VkImageLayout dstImageLayout, uint32_t regionCount,
                                                         const VkBufferImageCopy* pRegions, const ErrorObject& error_obj) const {
-    return ValidateCmdCopyBufferToImage(commandBuffer, srcBuffer, dstImage, dstImageLayout, regionCount, pRegions,
-                                        error_obj.location);
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto buffer = Get<vvl::Buffer>(srcBuffer);
+    const auto image = Get<vvl::Image>(dstImage);
+    if (!buffer || !image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const BufferImageCopyCommand command{
+        *buffer, *image, {pRegions, regionCount}, BufferImageCopyCommand::Direction::kBufferToImage};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyBufferToImage2KHR(VkCommandBuffer commandBuffer,
@@ -865,56 +880,41 @@ bool SyncValidator::PreCallValidateCmdCopyBufferToImage2KHR(VkCommandBuffer comm
 bool SyncValidator::PreCallValidateCmdCopyBufferToImage2(VkCommandBuffer commandBuffer,
                                                          const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo,
                                                          const ErrorObject& error_obj) const {
-    return ValidateCmdCopyBufferToImage(commandBuffer, pCopyBufferToImageInfo->srcBuffer, pCopyBufferToImageInfo->dstImage,
-                                        pCopyBufferToImageInfo->dstImageLayout, pCopyBufferToImageInfo->regionCount,
-                                        pCopyBufferToImageInfo->pRegions, error_obj.location.dot(Field::pCopyBufferToImageInfo));
-}
-
-template <typename RegionType>
-bool SyncValidator::ValidateCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                                 VkBuffer dstBuffer, uint32_t regionCount, const RegionType* pRegions,
-                                                 const Location& loc) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto src_image = Get<vvl::Image>(srcImage);
-    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
-    const VkDeviceMemory dst_memory = (dst_buffer && !dst_buffer->sparse) ? dst_buffer->MemoryState()->VkHandle() : VK_NULL_HANDLE;
-    for (const auto [region_index, copy_region] : vvl::enumerate(pRegions, regionCount)) {
-        if (src_image) {
-            auto hazard = context.DetectHazard(*src_image, RangeFromLayers(copy_region.imageSubresource), copy_region.imageOffset,
-                                               copy_region.imageExtent, SYNC_COPY_TRANSFER_READ);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, srcImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, loc.function, FormatHandle(srcImage), region_index, copy_region.imageOffset,
-                    copy_region.imageExtent, copy_region.imageSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-            }
-            if (dst_memory != VK_NULL_HANDLE) {
-                AccessRange dst_range = MakeRange(copy_region.bufferOffset, src_image->GetBufferSizeFromCopyImage(copy_region));
-                hazard = context.DetectHazard(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, dst_range);
-                if (hazard.IsHazard()) {
-                    const LogObjectList objlist(commandBuffer, dstBuffer);
-                    const std::string error = error_messages_.BufferCopyError(hazard, *cb_access_context, loc.function,
-                                                                              FormatHandle(dstBuffer), region_index, dst_range);
-                    skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-                }
-            }
-        }
-        if (skip) break;
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
+    const auto buffer = Get<vvl::Buffer>(pCopyBufferToImageInfo->srcBuffer);
+    const auto image = Get<vvl::Image>(pCopyBufferToImageInfo->dstImage);
+    if (!buffer || !image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const auto regions =
+        BufferImageCopyCommand::MakeRegions({pCopyBufferToImageInfo->pRegions, pCopyBufferToImageInfo->regionCount});
+
+    const BufferImageCopyCommand command{*buffer, *image, regions, BufferImageCopyCommand::Direction::kBufferToImage};
+    return command.Validate(cb_context, error_obj.location.dot(Field::pCopyBufferToImageInfo));
 }
 
 bool SyncValidator::PreCallValidateCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage,
                                                         VkImageLayout srcImageLayout, VkBuffer dstBuffer, uint32_t regionCount,
                                                         const VkBufferImageCopy* pRegions, const ErrorObject& error_obj) const {
-    return ValidateCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, dstBuffer, regionCount, pRegions,
-                                        error_obj.location);
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto buffer = Get<vvl::Buffer>(dstBuffer);
+    const auto image = Get<vvl::Image>(srcImage);
+    if (!buffer || !image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const BufferImageCopyCommand command{
+        *buffer, *image, {pRegions, regionCount}, BufferImageCopyCommand::Direction::kImageToBuffer};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyImageToBuffer2KHR(VkCommandBuffer commandBuffer,
@@ -926,71 +926,39 @@ bool SyncValidator::PreCallValidateCmdCopyImageToBuffer2KHR(VkCommandBuffer comm
 bool SyncValidator::PreCallValidateCmdCopyImageToBuffer2(VkCommandBuffer commandBuffer,
                                                          const VkCopyImageToBufferInfo2* pCopyImageToBufferInfo,
                                                          const ErrorObject& error_obj) const {
-    return ValidateCmdCopyImageToBuffer(commandBuffer, pCopyImageToBufferInfo->srcImage, pCopyImageToBufferInfo->srcImageLayout,
-                                        pCopyImageToBufferInfo->dstBuffer, pCopyImageToBufferInfo->regionCount,
-                                        pCopyImageToBufferInfo->pRegions, error_obj.location.dot(Field::pCopyImageToBufferInfo));
-}
-
-template <typename RegionType>
-bool SyncValidator::ValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                         const RegionType* pRegions, VkFilter filter, const Location& loc) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto src_image = Get<vvl::Image>(srcImage);
-    auto dst_image = Get<vvl::Image>(dstImage);
-
-    for (const auto [region_index, blit_region] : vvl::enumerate(pRegions, regionCount)) {
-        if (src_image) {
-            VkOffset3D offset = {std::min(blit_region.srcOffsets[0].x, blit_region.srcOffsets[1].x),
-                                 std::min(blit_region.srcOffsets[0].y, blit_region.srcOffsets[1].y),
-                                 std::min(blit_region.srcOffsets[0].z, blit_region.srcOffsets[1].z)};
-            VkExtent3D extent = {static_cast<uint32_t>(abs(blit_region.srcOffsets[1].x - blit_region.srcOffsets[0].x)),
-                                 static_cast<uint32_t>(abs(blit_region.srcOffsets[1].y - blit_region.srcOffsets[0].y)),
-                                 static_cast<uint32_t>(abs(blit_region.srcOffsets[1].z - blit_region.srcOffsets[0].z))};
-            auto hazard = context.DetectHazard(*src_image, RangeFromLayers(blit_region.srcSubresource), offset, extent,
-                                               SYNC_BLIT_TRANSFER_READ);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, srcImage);
-                const std::string error =
-                    error_messages_.ImageCopyResolveBlitError(hazard, *cb_access_context, loc.function, FormatHandle(srcImage),
-                                                              region_index, offset, extent, blit_region.srcSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-            }
-        }
-
-        if (dst_image) {
-            VkOffset3D offset = {std::min(blit_region.dstOffsets[0].x, blit_region.dstOffsets[1].x),
-                                 std::min(blit_region.dstOffsets[0].y, blit_region.dstOffsets[1].y),
-                                 std::min(blit_region.dstOffsets[0].z, blit_region.dstOffsets[1].z)};
-            VkExtent3D extent = {static_cast<uint32_t>(abs(blit_region.dstOffsets[1].x - blit_region.dstOffsets[0].x)),
-                                 static_cast<uint32_t>(abs(blit_region.dstOffsets[1].y - blit_region.dstOffsets[0].y)),
-                                 static_cast<uint32_t>(abs(blit_region.dstOffsets[1].z - blit_region.dstOffsets[0].z))};
-            auto hazard = context.DetectHazard(*dst_image, RangeFromLayers(blit_region.dstSubresource), offset, extent,
-                                               SYNC_BLIT_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, dstImage);
-                const std::string error =
-                    error_messages_.ImageCopyResolveBlitError(hazard, *cb_access_context, loc.function, FormatHandle(dstImage),
-                                                              region_index, offset, extent, blit_region.dstSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-            }
-            if (skip) break;
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
+    const auto buffer = Get<vvl::Buffer>(pCopyImageToBufferInfo->dstBuffer);
+    const auto image = Get<vvl::Image>(pCopyImageToBufferInfo->srcImage);
+    if (!buffer || !image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    return skip;
+    const auto regions =
+        BufferImageCopyCommand::MakeRegions({pCopyImageToBufferInfo->pRegions, pCopyImageToBufferInfo->regionCount});
+
+    const BufferImageCopyCommand command{*buffer, *image, regions, BufferImageCopyCommand::Direction::kImageToBuffer};
+    return command.Validate(cb_context, error_obj.location.dot(Field::pCopyImageToBufferInfo));
 }
 
 bool SyncValidator::PreCallValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                 VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                                 const VkImageBlit* pRegions, VkFilter filter, const ErrorObject& error_obj) const {
-    return ValidateCmdBlitImage(commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, regionCount, pRegions, filter,
-                                error_obj.location);
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto src_image = Get<vvl::Image>(srcImage);
+    const auto dst_image = Get<vvl::Image>(dstImage);
+    if (!src_image || !dst_image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ImageBlitCommand command{*src_image, *dst_image, {pRegions, regionCount}};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR* pBlitImageInfo,
@@ -1000,139 +968,54 @@ bool SyncValidator::PreCallValidateCmdBlitImage2KHR(VkCommandBuffer commandBuffe
 
 bool SyncValidator::PreCallValidateCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo,
                                                  const ErrorObject& error_obj) const {
-    return ValidateCmdBlitImage(commandBuffer, pBlitImageInfo->srcImage, pBlitImageInfo->srcImageLayout, pBlitImageInfo->dstImage,
-                                pBlitImageInfo->dstImageLayout, pBlitImageInfo->regionCount, pBlitImageInfo->pRegions,
-                                pBlitImageInfo->filter, error_obj.location.dot(Field::pBlitImageInfo));
-}
-
-bool SyncValidator::ValidateIndirectBuffer(const CommandBufferAccessContext& cb_context, const AccessContext& context,
-                                           const VkDeviceSize struct_size, const VkBuffer buffer, const VkDeviceSize offset,
-                                           const uint32_t drawCount, const uint32_t stride, const Location& loc) const {
-    bool skip = false;
-    if (drawCount == 0) return skip;
-
-    auto buf_state = Get<vvl::Buffer>(buffer);
-    VkDeviceSize size = struct_size;
-    if (drawCount == 1 || stride == size) {
-        if (drawCount > 1) size *= drawCount;
-        const AccessRange range = MakeRange(offset, size);
-        auto hazard = context.DetectHazard(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, range);
-        if (hazard.IsHazard()) {
-            const LogObjectList objlist(cb_context.GetCBState().Handle(), buf_state->Handle());
-            const std::string resource_description = "indirect " + FormatHandle(buffer);
-            const auto error = error_messages_.BufferError(hazard, cb_context, loc.function, resource_description, range);
-            skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-        }
-    } else {
-        for (uint32_t i = 0; i < drawCount; ++i) {
-            const AccessRange range = MakeRange(offset + i * stride, size);
-            auto hazard = context.DetectHazard(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(cb_context.GetCBState().Handle(), buf_state->Handle());
-                const std::string resource_description = "indirect " + FormatHandle(buffer);
-                const auto error = error_messages_.BufferError(hazard, cb_context, loc.function, resource_description, range);
-                skip |= SyncError(hazard.Hazard(), objlist, loc, error);
-                break;
-            }
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
-}
-
-void SyncValidator::RecordIndirectBuffer(CommandBufferAccessContext& cb_context, const ResourceUsageTag tag,
-                                         const VkDeviceSize struct_size, const VkBuffer buffer, const VkDeviceSize offset,
-                                         const uint32_t drawCount, uint32_t stride) {
-    auto buf_state = Get<vvl::Buffer>(buffer);
-    auto tag_ex = buf_state ? cb_context.AddCommandHandle(tag, buf_state->Handle()) : ResourceUsageTagEx{tag};
-
-    VkDeviceSize size = struct_size;
-    AccessContext& context = cb_context.GetCurrentAccessContext();
-    if (drawCount == 1 || stride == size) {
-        if (drawCount > 1) size *= drawCount;
-        const AccessRange range = MakeRange(offset, size);
-        context.UpdateAccessState(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, range, tag_ex);
-    } else {
-        for (uint32_t i = 0; i < drawCount; ++i) {
-            const AccessRange range = MakeRange(offset + i * stride, size);
-            context.UpdateAccessState(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, range, tag_ex);
-        }
+    const auto src_image = Get<vvl::Image>(pBlitImageInfo->srcImage);
+    const auto dst_image = Get<vvl::Image>(pBlitImageInfo->dstImage);
+    if (!src_image || !dst_image) {
+        return false;
     }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const auto regions = ImageBlitCommand::MakeRegions({pBlitImageInfo->pRegions, pBlitImageInfo->regionCount});
+    const ImageBlitCommand command{*src_image, *dst_image, regions};
+    return command.Validate(cb_context, error_obj.location.dot(Field::pBlitImageInfo));
 }
 
-bool SyncValidator::ValidateCountBuffer(const CommandBufferAccessContext& cb_context, const AccessContext& context, VkBuffer buffer,
-                                        VkDeviceSize offset, const Location& loc) const {
-    bool skip = false;
-
-    auto count_buf_state = Get<vvl::Buffer>(buffer);
-    const AccessRange range = MakeRange(offset, 4);
-    auto hazard = context.DetectHazard(*count_buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, range);
-    if (hazard.IsHazard()) {
-        const LogObjectList objlist(cb_context.GetCBState().Handle(), count_buf_state->Handle());
-        const std::string resource_description = "draw count " + FormatHandle(buffer);
-        const auto error = error_messages_.BufferError(hazard, cb_context, loc.function, resource_description, range);
-        skip |= SyncError(hazard.Hazard(), objlist, loc, error);
+bool SyncValidator::ValidateDispatch(VkCommandBuffer commandBuffer, const Location& loc) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_COMPUTE);
+    const ShaderAccessCommand command = descriptor_accesses.MakeCommand();
+    return command.Validate(cb_context, loc);
 }
 
-void SyncValidator::RecordCountBuffer(CommandBufferAccessContext& cb_context, const ResourceUsageTag tag, VkBuffer buffer,
-                                      VkDeviceSize offset) {
-    auto count_buf_state = Get<vvl::Buffer>(buffer);
-    const AccessRange range = MakeRange(offset, 4);
-    const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, count_buf_state->Handle());
-    AccessContext& context = cb_context.GetCurrentAccessContext();
-    context.UpdateAccessState(*count_buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, range, tag_ex);
+void SyncValidator::RecordDispatch(VkCommandBuffer commandBuffer, const Location& loc) {
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+    auto descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_COMPUTE);
+    cb_context.RecordShaderAccesses(tag, descriptor_accesses);
 }
 
 bool SyncValidator::PreCallValidateCmdDispatch(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z,
                                                const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    skip |= GetAccessContext(*cb_state)->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, error_obj.location);
-    return skip;
+    return ValidateDispatch(commandBuffer, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDispatch(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z,
                                               const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, tag);
-}
-
-bool SyncValidator::PreCallValidateCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                                       const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_context->GetCurrentAccessContext();
-
-    skip |= cb_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, error_obj.location);
-    skip |= ValidateIndirectBuffer(*cb_context, context, sizeof(VkDispatchIndirectCommand), buffer, offset, 1,
-                                   sizeof(VkDispatchIndirectCommand), error_obj.location);
-    return skip;
-}
-
-void SyncValidator::PostCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
-                                                      const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, tag);
-    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDispatchIndirectCommand), buffer, offset, 1,
-                         sizeof(VkDispatchIndirectCommand));
+    RecordDispatch(commandBuffer, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdDispatchBase(VkCommandBuffer commandBuffer, uint32_t baseGroupX, uint32_t baseGroupY,
                                                    uint32_t baseGroupZ, uint32_t groupCountX, uint32_t groupCountY,
                                                    uint32_t groupCountZ, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    skip |= GetAccessContext(*cb_state)->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, error_obj.location);
-    return skip;
+    return ValidateDispatch(commandBuffer, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdDispatchBaseKHR(VkCommandBuffer commandBuffer, uint32_t baseGroupX, uint32_t baseGroupY,
@@ -1145,10 +1028,7 @@ bool SyncValidator::PreCallValidateCmdDispatchBaseKHR(VkCommandBuffer commandBuf
 void SyncValidator::PostCallRecordCmdDispatchBase(VkCommandBuffer commandBuffer, uint32_t baseGroupX, uint32_t baseGroupY,
                                                   uint32_t baseGroupZ, uint32_t groupCountX, uint32_t groupCountY,
                                                   uint32_t groupCountZ, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto cb_access_context = GetAccessContext(*cb_state);
-    const ResourceUsageTag tag = cb_access_context->NextCommandTag(record_obj.location.function);
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, tag);
+    RecordDispatch(commandBuffer, record_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDispatchBaseKHR(VkCommandBuffer commandBuffer, uint32_t baseGroupX, uint32_t baseGroupY,
@@ -1158,157 +1038,161 @@ void SyncValidator::PostCallRecordCmdDispatchBaseKHR(VkCommandBuffer commandBuff
                                   record_obj);
 }
 
+bool SyncValidator::PreCallValidateCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                       const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    auto indirect_buffer = Get<vvl::Buffer>(buffer);
+    if (!indirect_buffer) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_COMPUTE);
+    const AccessRange range = MakeRange(offset, sizeof(VkDispatchIndirectCommand));
+
+    const DispatchIndirectCommand command{
+        descriptor_accesses.MakeCommand(),
+        BufferAccessCommand{*indirect_buffer, range, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, vvl::kNoIndex32, 0,
+                            BufferName::kIndirect}};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::PostCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
+                                                      const RecordObject& record_obj) {
+    auto indirect_buffer = Get<vvl::Buffer>(buffer);
+    if (!indirect_buffer) {
+        return;
+    }
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
+    auto indirect_buffer_tag_ex = cb_context.AddCommandHandle(tag, indirect_buffer->Handle());
+
+    auto descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_COMPUTE);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+    const AccessRange range = MakeRange(offset, sizeof(VkDispatchIndirectCommand));
+
+    const DispatchIndirectCommand command{
+        descriptor_accesses.MakeCommand(),
+        BufferAccessCommand{*indirect_buffer, range, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, indirect_buffer_tag_ex.handle_index,
+                            0, BufferName::kIndirect}};
+
+    if (syncval_settings.record_time_validation) {
+        AccessContext& access_context = cb_context.GetCurrentAccessContext();
+        command.Apply(cb_context.GetSyncEnvironment(), tag, access_context);
+    }
+    cb_context.StoreCommand(tag, command);
+}
+
 bool SyncValidator::PreCallValidateCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
                                            uint32_t firstVertex, uint32_t firstInstance, const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawVertex(vertexCount, firstVertex, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    return skip;
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const VertexInputAccesses vertex_accesses = cb_context.CollectVertexAccesses(firstVertex, vertexCount);
+
+    const DrawCommand command{descriptor_accesses.MakeCommand(), vertex_accesses.MakeCommand(),
+                              cb_context.GetDrawAttachmentCommand()};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
                                           uint32_t firstVertex, uint32_t firstInstance, const RecordObject& record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
 
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawVertex(vertexCount, firstVertex, tag);
-    cb_access_context->RecordDrawAttachment(tag);
+    DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+    VertexInputAccesses vertex_accesses = cb_context.CollectVertexAccesses(firstVertex, vertexCount);
+    vertex_accesses.RegisterResources(cb_context, tag);
+
+    const DrawCommand command{descriptor_accesses.MakeCommand(), vertex_accesses.MakeCommand(),
+                              cb_context.GetDrawAttachmentCommand()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
                                                   uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance,
                                                   const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawVertexIndex(indexCount, firstIndex, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    return skip;
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const VertexInputAccesses vertex_accesses = cb_context.CollectIndexAccesses(firstIndex, indexCount);
+
+    const DrawCommand command{descriptor_accesses.MakeCommand(), vertex_accesses.MakeCommand(),
+                              cb_context.GetDrawAttachmentCommand()};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount,
                                                  uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance,
                                                  const RecordObject& record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
 
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawVertexIndex(indexCount, firstIndex, tag);
-    cb_access_context->RecordDrawAttachment(tag);
+    DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+    VertexInputAccesses vertex_accesses = cb_context.CollectIndexAccesses(firstIndex, indexCount);
+    vertex_accesses.RegisterResources(cb_context, tag);
+
+    const DrawCommand command{descriptor_accesses.MakeCommand(), vertex_accesses.MakeCommand(),
+                              cb_context.GetDrawAttachmentCommand()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                    uint32_t drawCount, uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (drawCount == 0) return skip;
-
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    skip |= ValidateIndirectBuffer(*cb_access_context, context, sizeof(VkDrawIndirectCommand), buffer, offset, drawCount, stride,
-                                   error_obj.location);
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // skip |= cb_access_context->ValidateDrawVertex(?, ?, error_obj.location);
-    return skip;
+    return ValidateDrawIndirect(commandBuffer, buffer, offset, drawCount, stride, sizeof(VkDrawIndirectCommand),
+                                BufferName::kIndirect, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                   uint32_t drawCount, uint32_t stride, const RecordObject& record_obj) {
-    if (drawCount == 0) {
-        return;
-    }
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndirectCommand), buffer, offset, drawCount, stride);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // cb_access_context->RecordDrawVertex(?, ?, tag);
+    RecordDrawIndirect(commandBuffer, buffer, offset, drawCount, stride, sizeof(VkDrawIndirectCommand), BufferName::kIndirect,
+                       record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                           uint32_t drawCount, uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (drawCount == 0) return skip;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    skip |= ValidateIndirectBuffer(*cb_access_context, context, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, drawCount,
-                                   stride, error_obj.location);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // skip |= cb_access_context->ValidateDrawVertexIndex(?, ?, error_obj.location);
-    return skip;
+    return ValidateDrawIndirect(commandBuffer, buffer, offset, drawCount, stride, sizeof(VkDrawIndexedIndirectCommand),
+                                BufferName::kIndirect, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                          uint32_t drawCount, uint32_t stride, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, drawCount, stride);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // cb_access_context->RecordDrawVertexIndex(?, ?, tag);
+    RecordDrawIndirect(commandBuffer, buffer, offset, drawCount, stride, sizeof(VkDrawIndexedIndirectCommand),
+                       BufferName::kIndirect, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                         VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                         uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    skip |= ValidateIndirectBuffer(*cb_access_context, context, sizeof(VkDrawIndirectCommand), buffer, offset, maxDrawCount, stride,
-                                   error_obj.location);
-    skip |= ValidateCountBuffer(*cb_access_context, context, countBuffer, countBufferOffset, error_obj.location);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // skip |= cb_access_context->ValidateDrawVertex(?, ?, error_obj.location);
-    return skip;
+    return ValidateDrawIndirectCount(commandBuffer, countBuffer, countBufferOffset, error_obj.location);
 }
 
 void SyncValidator::RecordCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                uint32_t stride, Func command) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(command);
-
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndirectCommand), buffer, offset, 1, stride);
-    RecordCountBuffer(*cb_access_context, tag, countBuffer, countBufferOffset);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // cb_access_context->RecordDrawVertex(?, ?, tag);
+    RecordDrawIndirectCount(commandBuffer, countBuffer, countBufferOffset, Location(command));
 }
 
 void SyncValidator::PostCallRecordCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
@@ -1351,37 +1235,13 @@ bool SyncValidator::PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer c
                                                                VkBuffer countBuffer, VkDeviceSize countBufferOffset,
                                                                uint32_t maxDrawCount, uint32_t stride,
                                                                const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    skip |= ValidateIndirectBuffer(*cb_access_context, context, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, maxDrawCount,
-                                   stride, error_obj.location);
-    skip |= ValidateCountBuffer(*cb_access_context, context, countBuffer, countBufferOffset, error_obj.location);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // skip |= cb_access_context->ValidateDrawVertexIndex(?, ?, error_obj.location);
-    return skip;
+    return ValidateDrawIndirectCount(commandBuffer, countBuffer, countBufferOffset, error_obj.location);
 }
 
 void SyncValidator::RecordCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                       VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                       uint32_t stride, Func command) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(command);
-
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, 1, stride);
-    RecordCountBuffer(*cb_access_context, tag, countBuffer, countBufferOffset);
-
-    // TODO: Shader instrumentation support is needed to read indirect buffer content (new syncval mode)
-    // cb_access_context->RecordDrawVertexIndex(?, ?, tag);
+    RecordDrawIndirectCount(commandBuffer, countBuffer, countBufferOffset, Location(command));
 }
 
 void SyncValidator::PostCallRecordCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
@@ -1424,88 +1284,268 @@ void SyncValidator::PostCallRecordCmdDrawIndexedIndirectCountAMD(VkCommandBuffer
                                               record_obj);
 }
 
+bool SyncValidator::PreCallValidateCmdDrawMeshTasksEXT(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY,
+                                                       uint32_t groupCountZ, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const DrawMeshTasksCommand command{descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand()};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::PostCallRecordCmdDrawMeshTasksEXT(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY,
+                                                      uint32_t groupCountZ, const RecordObject& record_obj) {
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
+
+    auto descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+
+    const DrawMeshTasksCommand command{descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
+}
+
 bool SyncValidator::PreCallValidateCmdDrawMeshTasksIndirectEXT(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                                uint32_t drawCount, uint32_t stride,
                                                                const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (drawCount == 0) {
-        return skip;
-    }
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    skip |= ValidateIndirectBuffer(*cb_access_context, context, sizeof(VkDrawMeshTasksIndirectCommandEXT), buffer, offset,
-                                   drawCount, stride, error_obj.location);
-    return skip;
+    return ValidateDrawIndirect(commandBuffer, buffer, offset, drawCount, stride, sizeof(VkDrawMeshTasksIndirectCommandEXT),
+                                BufferName::kIndirect, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDrawMeshTasksIndirectEXT(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                               uint32_t drawCount, uint32_t stride, const RecordObject& record_obj) {
-    if (drawCount == 0) {
+    RecordDrawIndirect(commandBuffer, buffer, offset, drawCount, stride, sizeof(VkDrawMeshTasksIndirectCommandEXT),
+                       BufferName::kIndirect, record_obj.location);
+}
+
+bool SyncValidator::PreCallValidateCmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
+                                                          const VkMultiDrawIndexedInfoEXT* pIndexInfo, uint32_t instanceCount,
+                                                          uint32_t firstInstance, uint32_t stride, const int32_t* pVertexOffset,
+                                                          const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation || !pIndexInfo) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const MultiDrawVertexInputAccesses vertex_accesses = cb_context.CollectMultiDrawIndexAccesses(drawCount, pIndexInfo, stride);
+
+    const DrawMultiCommand command{descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+                                   vertex_accesses.MakeCommand()};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::PostCallRecordCmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
+                                                         const VkMultiDrawIndexedInfoEXT* pIndexInfo, uint32_t instanceCount,
+                                                         uint32_t firstInstance, uint32_t stride, const int32_t* pVertexOffset,
+                                                         const RecordObject& record_obj) {
+    if (!pIndexInfo) {
         return;
     }
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
 
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawMeshTasksIndirectCommandEXT), buffer, offset, drawCount, stride);
+    DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+    MultiDrawVertexInputAccesses vertex_accesses = cb_context.CollectMultiDrawIndexAccesses(drawCount, pIndexInfo, stride);
+    vertex_accesses.RegisterResources(cb_context, tag);
+
+    const DrawMultiCommand command{descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+                                   vertex_accesses.MakeCommand()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
+}
+
+bool SyncValidator::PreCallValidateCmdDrawMultiEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
+                                                   const VkMultiDrawInfoEXT* pVertexInfo, uint32_t instanceCount,
+                                                   uint32_t firstInstance, uint32_t stride, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation || !pVertexInfo) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const MultiDrawVertexInputAccesses vertex_accesses = cb_context.CollectMultiDrawVertexAccesses(drawCount, pVertexInfo, stride);
+
+    const DrawMultiCommand command{descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+                                   vertex_accesses.MakeCommand()};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::PostCallRecordCmdDrawMultiEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
+                                                  const VkMultiDrawInfoEXT* pVertexInfo, uint32_t instanceCount,
+                                                  uint32_t firstInstance, uint32_t stride, const RecordObject& record_obj) {
+    if (!pVertexInfo) {
+        return;
+    }
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
+
+    DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+    MultiDrawVertexInputAccesses vertex_accesses = cb_context.CollectMultiDrawVertexAccesses(drawCount, pVertexInfo, stride);
+    vertex_accesses.RegisterResources(cb_context, tag);
+
+    const DrawMultiCommand command{descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+                                   vertex_accesses.MakeCommand()};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
+}
+
+bool SyncValidator::ValidateDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t count,
+                                         uint32_t stride, uint32_t access_size, BufferName buffer_name, const Location& loc) const {
+    if (!syncval_settings.record_time_validation || count == 0) {
+        return false;
+    }
+    const auto buffer_state = Get<vvl::Buffer>(buffer);
+    if (!buffer_state) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const DrawIndirectCommand command{
+        descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+        StridedBufferAccessCommand{*buffer_state, offset, count, stride, access_size, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ,
+                                   vvl::kNoIndex32, buffer_name}};
+    return command.Validate(cb_context, loc);
+}
+
+void SyncValidator::RecordDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t count,
+                                       uint32_t stride, uint32_t access_size, BufferName buffer_name, const Location& loc) {
+    if (count == 0) {
+        return;
+    }
+    const auto buffer_state = Get<vvl::Buffer>(buffer);
+    if (!buffer_state) {
+        return;
+    }
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+
+    auto descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+
+    const ResourceUsageTagEx buffer_tag_ex = cb_context.AddCommandHandle(tag, buffer_state->Handle());
+    const DrawIndirectCommand command{
+        descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+        StridedBufferAccessCommand{*buffer_state, offset, count, stride, access_size, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ,
+                                   buffer_tag_ex.handle_index, buffer_name}};
+
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
+}
+
+bool SyncValidator::ValidateDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer countBuffer, VkDeviceSize countBufferOffset,
+                                              const Location& loc) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto count_buffer = Get<vvl::Buffer>(countBuffer);
+    if (!count_buffer) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const DrawIndirectCountCommand command{
+        descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+        BufferAccessCommand{*count_buffer, MakeRange(countBufferOffset, sizeof(uint32_t)), SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ,
+                            vvl::kNoIndex32, 0, BufferName::kDrawCount}};
+    return command.Validate(cb_context, loc);
+}
+
+void SyncValidator::RecordDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer countBuffer, VkDeviceSize countBufferOffset,
+                                            const Location& loc) {
+    const auto count_buffer = Get<vvl::Buffer>(countBuffer);
+    if (!count_buffer) {
+        return;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+
+    auto descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+
+    const ResourceUsageTagEx count_tag_ex = cb_context.AddCommandHandle(tag, count_buffer->Handle());
+
+    const DrawIndirectCountCommand command{
+        descriptor_accesses.MakeCommand(), cb_context.GetDrawAttachmentCommand(),
+        BufferAccessCommand{*count_buffer, MakeRange(countBufferOffset, sizeof(uint32_t)), SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ,
+                            count_tag_ex.handle_index, 0, BufferName::kDrawCount}};
+
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdDrawMeshTasksIndirectCountEXT(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                                                     VkDeviceSize offset, VkBuffer countBuffer,
                                                                     VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                                     uint32_t stride, const ErrorObject& error_obj) const {
-    bool skip = false;
-
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    skip |= cb_access_context->ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, error_obj.location);
-    skip |= cb_access_context->ValidateDrawAttachment(error_obj.location);
-    skip |= ValidateCountBuffer(*cb_access_context, context, countBuffer, countBufferOffset, error_obj.location);
-    return skip;
+    return ValidateDrawIndirectCount(commandBuffer, countBuffer, countBufferOffset, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdDrawMeshTasksIndirectCountEXT(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                                                    VkDeviceSize offset, VkBuffer countBuffer,
                                                                    VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                                    uint32_t stride, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
+    RecordDrawIndirectCount(commandBuffer, countBuffer, countBufferOffset, record_obj.location);
+}
 
-    cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
-    cb_access_context->RecordDrawAttachment(tag);
-    RecordCountBuffer(*cb_access_context, tag, countBuffer, countBufferOffset);
+bool SyncValidator::PreCallValidateCmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer, uint32_t instanceCount,
+                                                               uint32_t firstInstance, VkBuffer counterBuffer,
+                                                               VkDeviceSize counterBufferOffset, uint32_t counterOffset,
+                                                               uint32_t vertexStride, const ErrorObject& error_obj) const {
+    return ValidateDrawIndirect(commandBuffer, counterBuffer, counterBufferOffset, 1, sizeof(uint32_t), sizeof(uint32_t),
+                                BufferName::kTransformFeedbackCounter, error_obj.location);
+}
+
+void SyncValidator::PostCallRecordCmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer, uint32_t instanceCount,
+                                                              uint32_t firstInstance, VkBuffer counterBuffer,
+                                                              VkDeviceSize counterBufferOffset, uint32_t counterOffset,
+                                                              uint32_t vertexStride, const RecordObject& record_obj) {
+    RecordDrawIndirect(commandBuffer, counterBuffer, counterBufferOffset, 1, sizeof(uint32_t), sizeof(uint32_t),
+                       BufferName::kTransformFeedbackCounter, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                       const VkClearColorValue* pColor, uint32_t rangeCount,
                                                       const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    if (auto image_state = Get<vvl::Image>(image)) {
-        for (const auto [range_index, range] : vvl::enumerate(pRanges, rangeCount)) {
-            auto hazard = context.DetectHazard(*image_state, range, SYNC_CLEAR_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, image);
-                const auto error = error_messages_.ImageClearError(hazard, *cb_access_context, error_obj.location.function,
-                                                                   FormatHandle(image), range_index, range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
+    const auto image_state = Get<vvl::Image>(image);
+    if (!image_state) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ImageClearCommand command{*image_state, {pRanges, rangeCount}};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image,
@@ -1513,179 +1553,95 @@ bool SyncValidator::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer com
                                                              const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
                                                              const VkImageSubresourceRange* pRanges,
                                                              const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    if (auto image_state = Get<vvl::Image>(image)) {
-        for (const auto [range_index, range] : vvl::enumerate(pRanges, rangeCount)) {
-            auto hazard = context.DetectHazard(*image_state, range, SYNC_CLEAR_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, image);
-                const auto error = error_messages_.ImageClearError(hazard, *cb_access_context, error_obj.location.function,
-                                                                   FormatHandle(image), range_index, range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
+    const auto image_state = Get<vvl::Image>(image);
+    if (!image_state) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ImageClearCommand command{*image_state, {pRanges, rangeCount}};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                                        const VkClearAttachment* pAttachments, uint32_t rectCount,
                                                        const VkClearRect* pRects, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-
-    for (const VkClearAttachment& attachment : vvl::make_span(pAttachments, attachmentCount)) {
-        for (const auto [rect_index, rect] : vvl::enumerate(pRects, rectCount)) {
-            skip |= GetAccessContext(*cb_state)->ValidateClearAttachment(error_obj.location, attachment, rect_index, rect);
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const auto attachments = cb_context.CollectClearAttachments({pAttachments, attachmentCount});
+    if (attachments.empty()) {
+        return false;
+    }
+
+    const auto* render_pass_context = cb_context.GetCurrentRenderPassContext();
+    const uint32_t current_subpass = render_pass_context ? render_pass_context->GetCurrentSubpass() : vvl::kNoIndex32;
+
+    const ClearAttachmentsCommand command{
+        attachments, {pRects, rectCount}, cb_context.GetViewMask(), cb_context.GetCurrentRenderPassInstanceId(), current_subpass};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool,
                                                            uint32_t firstQuery, uint32_t queryCount, VkBuffer dstBuffer,
                                                            VkDeviceSize dstOffset, VkDeviceSize stride, VkQueryResultFlags flags,
                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
-
-    if (dst_buffer && queryCount > 0) {
-        const uint32_t query_size = (flags & VK_QUERY_RESULT_64_BIT) ? 8 : 4;
-        const VkDeviceSize range_size = (queryCount - 1) * stride + query_size;
-        const AccessRange range = MakeRange(dstOffset, range_size);
-        auto hazard = context.DetectHazard(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, range);
-        if (hazard.IsHazard()) {
-            const LogObjectList objlist(commandBuffer, queryPool, dstBuffer);
-            const std::string resource_description = "dstBuffer " + FormatHandle(dstBuffer);
-            const auto error =
-                error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function, resource_description, range);
-            skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-        }
+    if (!syncval_settings.record_time_validation || queryCount == 0) {
+        return false;
     }
-
-    // TODO:Track VkQueryPool
-    return skip;
-}
-
-bool SyncValidator::PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
-                                                 VkDeviceSize size, uint32_t data, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
-
-    if (dst_buffer) {
-        const AccessRange range = MakeRange(*dst_buffer, dstOffset, size);
-        auto hazard = context.DetectHazard(*dst_buffer, SYNC_CLEAR_TRANSFER_WRITE, range);
-        if (hazard.IsHazard()) {
-            const LogObjectList objlist(commandBuffer, dstBuffer);
-            const std::string resource_description = "dstBuffer " + FormatHandle(dstBuffer);
-            const auto error =
-                error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function, resource_description, range);
-            skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-        }
+    const auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    if (!dst_buffer) {
+        return false;
     }
-    return skip;
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const uint32_t query_size = (flags & VK_QUERY_RESULT_64_BIT) ? 8 : 4;
+    const VkDeviceSize range_size = (queryCount - 1) * stride + query_size;
+    const AccessRange range = MakeRange(dstOffset, range_size);
+
+    const QueryCopyCommand command{*dst_buffer, range, queryPool};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                    VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
                                                    const VkImageResolve* pRegions, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto src_image = Get<vvl::Image>(srcImage);
-    auto dst_image = Get<vvl::Image>(dstImage);
-
-    for (const auto [region_index, resolve_region] : vvl::enumerate(pRegions, regionCount)) {
-        if (src_image) {
-            auto hazard = context.DetectHazard(*src_image, RangeFromLayers(resolve_region.srcSubresource), resolve_region.srcOffset,
-                                               resolve_region.extent, SYNC_RESOLVE_TRANSFER_READ);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, srcImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(srcImage), region_index,
-                    resolve_region.srcOffset, resolve_region.extent, resolve_region.srcSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-
-        if (dst_image) {
-            auto hazard = context.DetectHazard(*dst_image, RangeFromLayers(resolve_region.dstSubresource),
-                                                resolve_region.dstOffset, resolve_region.extent, SYNC_RESOLVE_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, dstImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(dstImage), region_index,
-                    resolve_region.dstOffset, resolve_region.extent, resolve_region.dstSubresource);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-            if (skip) break;
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-
-    return skip;
+    const auto src_image = Get<vvl::Image>(srcImage);
+    const auto dst_image = Get<vvl::Image>(dstImage);
+    if (!src_image || !dst_image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ImageResolveCommand command{*src_image, *dst_image, {pRegions, regionCount}};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
                                                     const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    const Location image_info_loc = error_obj.location.dot(Field::pResolveImageInfo);
-    auto src_image = Get<vvl::Image>(pResolveImageInfo->srcImage);
-    auto dst_image = Get<vvl::Image>(pResolveImageInfo->dstImage);
-
-    for (const auto [region_index, resolve_region] : vvl::enumerate(pResolveImageInfo->pRegions, pResolveImageInfo->regionCount)) {
-        const Location region_loc = image_info_loc.dot(Field::pRegions, region_index);
-        if (src_image) {
-            auto hazard = context.DetectHazard(*src_image, RangeFromLayers(resolve_region.srcSubresource), resolve_region.srcOffset,
-                                               resolve_region.extent, SYNC_RESOLVE_TRANSFER_READ);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, pResolveImageInfo->srcImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(pResolveImageInfo->srcImage),
-                    region_index, resolve_region.srcOffset, resolve_region.extent, resolve_region.srcSubresource);
-                // TODO: this error is not covered by the test
-                skip |= SyncError(hazard.Hazard(), objlist, region_loc, error);
-            }
-        }
-
-        if (dst_image) {
-            auto hazard = context.DetectHazard(*dst_image, RangeFromLayers(resolve_region.dstSubresource), resolve_region.dstOffset,
-                                               resolve_region.extent, SYNC_RESOLVE_TRANSFER_WRITE);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, pResolveImageInfo->dstImage);
-                const std::string error = error_messages_.ImageCopyResolveBlitError(
-                    hazard, *cb_access_context, error_obj.location.function, FormatHandle(pResolveImageInfo->dstImage),
-                    region_index, resolve_region.dstOffset, resolve_region.extent, resolve_region.dstSubresource);
-                // TODO: this error is not covered by the test
-                skip |= SyncError(hazard.Hazard(), objlist, region_loc, error);
-            }
-            if (skip) break;
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-
-    return skip;
+    const auto src_image = Get<vvl::Image>(pResolveImageInfo->srcImage);
+    const auto dst_image = Get<vvl::Image>(pResolveImageInfo->dstImage);
+    if (!src_image || !dst_image) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const auto regions = ImageResolveCommand::MakeRegions({pResolveImageInfo->pRegions, pResolveImageInfo->regionCount});
+    const ImageResolveCommand command{*src_image, *dst_image, regions};
+    return command.Validate(cb_context, error_obj.location.dot(Field::pResolveImageInfo));
 }
 
 bool SyncValidator::PreCallValidateCmdResolveImage2KHR(VkCommandBuffer commandBuffer,
@@ -1694,302 +1650,272 @@ bool SyncValidator::PreCallValidateCmdResolveImage2KHR(VkCommandBuffer commandBu
     return PreCallValidateCmdResolveImage2(commandBuffer, pResolveImageInfo, error_obj);
 }
 
+bool SyncValidator::PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                                 VkDeviceSize size, uint32_t data, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    if (!dst_buffer) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const AccessRange range = MakeRange(*dst_buffer, dstOffset, size);
+    const BufferAccessCommand command{*dst_buffer, range, SYNC_CLEAR_TRANSFER_WRITE};
+    return command.Validate(cb_context, error_obj.location);
+}
+
 bool SyncValidator::PreCallValidateCmdUpdateBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
                                                    VkDeviceSize dataSize, const void* pData, const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
-
-    if (dst_buffer) {
-        // VK_WHOLE_SIZE not allowed
-        const AccessRange range = MakeRange(dstOffset, dataSize);
-        auto hazard = context.DetectHazard(*dst_buffer, SYNC_CLEAR_TRANSFER_WRITE, range);
-        if (hazard.IsHazard()) {
-            const LogObjectList objlist(commandBuffer, dstBuffer);
-            const std::string resource_description = "dstBuffer " + FormatHandle(dstBuffer);
-            const auto error =
-                error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function, resource_description, range);
-            skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-        }
+    if (!syncval_settings.record_time_validation) {
+        return false;
     }
-    return skip;
+    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    if (!dst_buffer) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const AccessRange range = MakeRange(dstOffset, dataSize);  // VK_WHOLE_SIZE not allowed
+    const BufferAccessCommand command{*dst_buffer, range, SYNC_CLEAR_TRANSFER_WRITE};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+bool SyncValidator::ValidateBufferMarkerAMD(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                            const Location& loc) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    if (!dst_buffer) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const AccessRange range = MakeRange(dstOffset, 4);
+    const BufferAccessCommand command{*dst_buffer, range, SYNC_COPY_TRANSFER_WRITE, vvl::kNoIndex32, SyncFlag::kMarker};
+    return command.Validate(cb_context, loc);
+}
+
+void SyncValidator::RecordBufferMarkerAMD(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset,
+                                          const Location& loc) {
+    auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    if (!dst_buffer) {
+        return;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+    const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, dst_buffer->Handle());
+    const AccessRange range = MakeRange(dstOffset, 4);
+    const BufferAccessCommand command{*dst_buffer, range, SYNC_COPY_TRANSFER_WRITE, tag_ex.handle_index, SyncFlag::kMarker};
+
+    const auto& settings = cb_context.GetSyncState().syncval_settings;
+    if (settings.record_time_validation) {
+        AccessContext& access_context = cb_context.GetCurrentAccessContext();
+        command.Apply(cb_context.GetSyncEnvironment(), tag, access_context);
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
                                                            VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
+    return ValidateBufferMarkerAMD(commandBuffer, dstBuffer, dstOffset, error_obj.location);
+}
 
-    if (auto dst_buffer = Get<vvl::Buffer>(dstBuffer)) {
-        const AccessRange range = MakeRange(dstOffset, 4);
-        auto hazard = context.DetectMarkerHazard(*dst_buffer, range);
-        if (hazard.IsHazard()) {
-            const std::string resource_description = "dstBuffer " + FormatHandle(dstBuffer);
-            const auto error =
-                error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function, resource_description, range);
-            skip |= SyncError(hazard.Hazard(), dstBuffer, error_obj.location, error);
-        }
-    }
-    return skip;
+void SyncValidator::PostCallRecordCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR pipelineStage,
+                                                           VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
+                                                           const RecordObject& record_obj) {
+    RecordBufferMarkerAMD(commandBuffer, dstBuffer, dstOffset, record_obj.location);
+}
+
+bool SyncValidator::PreCallValidateCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR pipelineStage,
+                                                            VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
+                                                            const ErrorObject& error_obj) const {
+    return ValidateBufferMarkerAMD(commandBuffer, dstBuffer, dstOffset, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
                                                           VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
                                                           const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-    AccessContext& context = cb_access_context->GetCurrentAccessContext();
+    RecordBufferMarkerAMD(commandBuffer, dstBuffer, dstOffset, record_obj.location);
+}
 
-    if (auto dst_buffer = Get<vvl::Buffer>(dstBuffer)) {
-        const AccessRange range = MakeRange(dstOffset, 4);
-        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
-        context.UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, range, tag_ex, SyncFlag::kMarker);
+static VideoPictureAccess MakeVideoPictureAccess(const vvl::VideoSession& video_session,
+                                                 const vvl::VideoPictureResource& resource) {
+    if (!resource) {
+        return {};
     }
+    return {resource.image_view_state.get(),
+            resource.coded_offset,
+            resource.coded_extent,
+            resource.base_array_layer,
+            resource.range,
+            resource.GetEffectiveImageOffset(video_session),
+            resource.GetEffectiveImageExtent(video_session)};
+}
+
+std::vector<VideoReferencePictureAccess> SyncValidator::CollectVideoReferencePictureAccesses(
+    const vvl::VideoSession& video_session, vvl::span<const VkVideoReferenceSlotInfoKHR> reference_slots) const {
+    std::vector<VideoReferencePictureAccess> references;
+    references.reserve(reference_slots.size());
+    for (uint32_t i = 0; i < reference_slots.size(); ++i) {
+        if (reference_slots[i].pPictureResource) {
+            const vvl::VideoPictureResource reference(*device_state, *reference_slots[i].pPictureResource);
+            if (reference) {
+                references.push_back({MakeVideoPictureAccess(video_session, reference), i});
+            }
+        }
+    }
+    return references;
+}
+
+VideoDecodeCommand SyncValidator::MakeVideoDecodeCommand(const vvl::VideoSession& video_session,
+                                                         const vvl::Buffer& bitstream_buffer, const VkVideoDecodeInfoKHR& info,
+                                                         vvl::span<const VideoReferencePictureAccess> reference_pictures,
+                                                         uint32_t bitstream_handle_index) const {
+    const vvl::VideoPictureResource output(*device_state, info.dstPictureResource);
+    VideoPictureAccess reconstructed_picture;
+    if (info.pSetupReferenceSlot && info.pSetupReferenceSlot->pPictureResource) {
+        const vvl::VideoPictureResource reconstructed(*device_state, *info.pSetupReferenceSlot->pPictureResource);
+        // Track one write when the decode output and reconstructed picture are the same
+        if (reconstructed != output) {
+            reconstructed_picture = MakeVideoPictureAccess(video_session, reconstructed);
+        }
+    }
+    return {bitstream_buffer,
+            MakeRange(bitstream_buffer, info.srcBufferOffset, info.srcBufferRange),
+            MakeVideoPictureAccess(video_session, output),
+            reconstructed_picture,
+            reference_pictures,
+            bitstream_handle_index};
+}
+
+VideoEncodeCommand SyncValidator::MakeVideoEncodeCommand(const vvl::VideoSession& video_session,
+                                                         const vvl::Buffer& bitstream_buffer, const VkVideoEncodeInfoKHR& info,
+                                                         vvl::span<const VideoReferencePictureAccess> reference_pictures,
+                                                         uint32_t bitstream_handle_index) const {
+    const vvl::VideoPictureResource input(*device_state, info.srcPictureResource);
+    VideoPictureAccess reconstructed_picture;
+    if (info.pSetupReferenceSlot && info.pSetupReferenceSlot->pPictureResource) {
+        const vvl::VideoPictureResource reconstructed(*device_state, *info.pSetupReferenceSlot->pPictureResource);
+        reconstructed_picture = MakeVideoPictureAccess(video_session, reconstructed);
+    }
+    VideoQuantizationMapAccess quantization_map;
+    if (info.flags & (VK_VIDEO_ENCODE_WITH_QUANTIZATION_DELTA_MAP_BIT_KHR | VK_VIDEO_ENCODE_WITH_EMPHASIS_MAP_BIT_KHR)) {
+        if (const auto* map_info = vku::FindStructInPNextChain<VkVideoEncodeQuantizationMapInfoKHR>(info.pNext)) {
+            if (const auto view = Get<vvl::ImageView>(map_info->quantizationMap)) {
+                quantization_map = {view.get(), map_info->quantizationMapExtent};
+            }
+        }
+    }
+    return {bitstream_buffer,
+            MakeRange(bitstream_buffer, info.dstBufferOffset, info.dstBufferRange),
+            MakeVideoPictureAccess(video_session, input),
+            reconstructed_picture,
+            reference_pictures,
+            quantization_map,
+            bitstream_handle_index};
 }
 
 bool SyncValidator::PreCallValidateCmdDecodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoDecodeInfoKHR* pDecodeInfo,
                                                      const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    const auto vs_state = cb_state->bound_video_session.get();
-    if (!vs_state) return skip;
-
-    auto src_buffer = Get<vvl::Buffer>(pDecodeInfo->srcBuffer);
-    if (src_buffer) {
-        const AccessRange src_range = MakeRange(*src_buffer, pDecodeInfo->srcBufferOffset, pDecodeInfo->srcBufferRange);
-        auto hazard = context.DetectHazard(*src_buffer, SYNC_VIDEO_DECODE_VIDEO_DECODE_READ, src_range);
-        if (hazard.IsHazard()) {
-            const std::string resource_description = "bitstream buffer " + FormatHandle(pDecodeInfo->srcBuffer);
-            // TODO: there are no tests for this error
-            const auto error = error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function,
-                                                           resource_description, src_range);
-            skip |= SyncError(hazard.Hazard(), src_buffer->Handle(), error_obj.location, error);
-        }
+    const auto* video_session = cb_state->bound_video_session.get();
+    if (!video_session) {
+        return false;
     }
-
-    auto dst_resource = vvl::VideoPictureResource(*device_state, pDecodeInfo->dstPictureResource);
-    if (dst_resource) {
-        auto hazard = context.DetectVideoHazard(*vs_state, dst_resource, SYNC_VIDEO_DECODE_VIDEO_DECODE_WRITE);
-        if (hazard.IsHazard()) {
-            std::ostringstream ss;
-            ss << "decode output picture ";
-            ss << Location(Func::Empty, Field::pDecodeInfo).dot(Field::dstPictureResource).Fields();
-            ss << " ";
-            FormatVideoPictureResouce(*this, pDecodeInfo->dstPictureResource, ss);
-            const std::string resouce_description = ss.str();
-            const std::string error =
-                error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resouce_description);
-            skip |= SyncError(hazard.Hazard(), dst_resource.image_view_state->Handle(), error_obj.location, error);
-        }
+    const auto buffer = Get<vvl::Buffer>(pDecodeInfo->srcBuffer);
+    if (!buffer) {
+        return false;
     }
-
-    if (pDecodeInfo->pSetupReferenceSlot != nullptr && pDecodeInfo->pSetupReferenceSlot->pPictureResource != nullptr) {
-        const VkVideoPictureResourceInfoKHR& video_picture = *pDecodeInfo->pSetupReferenceSlot->pPictureResource;
-        auto setup_resource = vvl::VideoPictureResource(*device_state, video_picture);
-        if (setup_resource && (setup_resource != dst_resource)) {
-            auto hazard = context.DetectVideoHazard(*vs_state, setup_resource, SYNC_VIDEO_DECODE_VIDEO_DECODE_WRITE);
-            if (hazard.IsHazard()) {
-                std::ostringstream ss;
-                ss << "reconstructed picture ";
-                ss << Location(Func::Empty, Field::pDecodeInfo)
-                          .dot(Field::pSetupReferenceSlot)
-                          .dot(Field::pPictureResource)
-                          .Fields();
-                ss << " ";
-                FormatVideoPictureResouce(*this, video_picture, ss);
-                const std::string resouce_description = ss.str();
-                const std::string error =
-                    error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resouce_description);
-                skip |= SyncError(hazard.Hazard(), setup_resource.image_view_state->Handle(), error_obj.location, error);
-            }
-        }
-    }
-
-    for (uint32_t i = 0; i < pDecodeInfo->referenceSlotCount; ++i) {
-        if (pDecodeInfo->pReferenceSlots[i].pPictureResource != nullptr) {
-            const VkVideoPictureResourceInfoKHR& video_picture = *pDecodeInfo->pReferenceSlots[i].pPictureResource;
-            auto reference_resource = vvl::VideoPictureResource(*device_state, video_picture);
-            if (reference_resource) {
-                auto hazard = context.DetectVideoHazard(*vs_state, reference_resource, SYNC_VIDEO_DECODE_VIDEO_DECODE_READ);
-                if (hazard.IsHazard()) {
-                    std::ostringstream ss;
-                    ss << "reference picture " << i << " ";
-                    ss << Location(Func::Empty, Field::pDecodeInfo)
-                              .dot(Field::pReferenceSlots, i)
-                              .dot(Field::pPictureResource)
-                              .Fields();
-                    ss << " ";
-                    FormatVideoPictureResouce(*this, video_picture, ss);
-                    const std::string resouce_description = ss.str();
-                    const std::string error =
-                        error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resouce_description);
-                    skip |= SyncError(hazard.Hazard(), reference_resource.image_view_state->Handle(), error_obj.location, error);
-                }
-            }
-        }
-    }
-
-    return skip;
+    const auto references =
+        CollectVideoReferencePictureAccesses(*video_session, {pDecodeInfo->pReferenceSlots, pDecodeInfo->referenceSlotCount});
+    const auto command = MakeVideoDecodeCommand(*video_session, *buffer, *pDecodeInfo, references);
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdEncodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoEncodeInfoKHR* pEncodeInfo,
                                                      const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    const auto vs_state = cb_state->bound_video_session.get();
-    if (!vs_state) return skip;
-
-    auto dst_buffer = Get<vvl::Buffer>(pEncodeInfo->dstBuffer);
-    if (dst_buffer) {
-        const AccessRange dst_range = MakeRange(*dst_buffer, pEncodeInfo->dstBufferOffset, pEncodeInfo->dstBufferRange);
-        auto hazard = context.DetectHazard(*dst_buffer, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_WRITE, dst_range);
-        if (hazard.IsHazard()) {
-            const std::string resource_description = "bitstream buffer " + FormatHandle(pEncodeInfo->dstBuffer);
-            const auto error = error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function,
-                                                           resource_description, dst_range);
-            skip |= SyncError(hazard.Hazard(), dst_buffer->Handle(), error_obj.location, error);
-        }
+    const auto* video_session = cb_state->bound_video_session.get();
+    if (!video_session) {
+        return false;
     }
-
-    if (auto src_resource = vvl::VideoPictureResource(*device_state, pEncodeInfo->srcPictureResource)) {
-        auto hazard = context.DetectVideoHazard(*vs_state, src_resource, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_READ);
-        if (hazard.IsHazard()) {
-            std::ostringstream ss;
-            ss << "encode input picture ";
-            ss << Location(Func::Empty, Field::pEncodeInfo).dot(Field::srcPictureResource).Fields();
-            ss << " ";
-            FormatVideoPictureResouce(*this, pEncodeInfo->srcPictureResource, ss);
-            const std::string resouce_description = ss.str();
-            // TODO: there are no tests for this error
-            const std::string error =
-                error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resouce_description);
-            skip |= SyncError(hazard.Hazard(), src_resource.image_view_state->Handle(), error_obj.location, error);
-        }
+    const auto buffer = Get<vvl::Buffer>(pEncodeInfo->dstBuffer);
+    if (!buffer) {
+        return false;
     }
-
-    if (pEncodeInfo->pSetupReferenceSlot != nullptr && pEncodeInfo->pSetupReferenceSlot->pPictureResource != nullptr) {
-        const VkVideoPictureResourceInfoKHR& video_picture = *pEncodeInfo->pSetupReferenceSlot->pPictureResource;
-        auto setup_resource = vvl::VideoPictureResource(*device_state, video_picture);
-        if (setup_resource) {
-            auto hazard = context.DetectVideoHazard(*vs_state, setup_resource, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_WRITE);
-            if (hazard.IsHazard()) {
-                std::ostringstream ss;
-                ss << "reconstructed picture ";
-                ss << Location(Func::Empty, Field::pEncodeInfo)
-                          .dot(Field::pSetupReferenceSlot)
-                          .dot(Field::pPictureResource)
-                          .Fields();
-                ss << " ";
-                FormatVideoPictureResouce(*this, video_picture, ss);
-                const std::string resouce_description = ss.str();
-                const std::string error =
-                    error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resouce_description);
-                skip |= SyncError(hazard.Hazard(), setup_resource.image_view_state->Handle(), error_obj.location, error);
-            }
-        }
-    }
-
-    for (uint32_t i = 0; i < pEncodeInfo->referenceSlotCount; ++i) {
-        if (pEncodeInfo->pReferenceSlots[i].pPictureResource != nullptr) {
-            const VkVideoPictureResourceInfoKHR& video_picture = *pEncodeInfo->pReferenceSlots[i].pPictureResource;
-            auto reference_resource = vvl::VideoPictureResource(*device_state, video_picture);
-            if (reference_resource) {
-                auto hazard = context.DetectVideoHazard(*vs_state, reference_resource, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_READ);
-                if (hazard.IsHazard()) {
-                    std::ostringstream ss;
-                    ss << "reference picture " << i << " ";
-                    ss << Location(Func::Empty, Field::pEncodeInfo)
-                              .dot(Field::pReferenceSlots, i)
-                              .dot(Field::pPictureResource)
-                              .Fields();
-                    ss << " ";
-                    FormatVideoPictureResouce(*this, video_picture, ss);
-                    const std::string resource_description = ss.str();
-                    const std::string error =
-                        error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resource_description);
-                    skip |= SyncError(hazard.Hazard(), reference_resource.image_view_state->Handle(), error_obj.location, error);
-                }
-            }
-        }
-    }
-
-    if (pEncodeInfo->flags & (VK_VIDEO_ENCODE_WITH_QUANTIZATION_DELTA_MAP_BIT_KHR | VK_VIDEO_ENCODE_WITH_EMPHASIS_MAP_BIT_KHR)) {
-        auto quantization_map_info = vku::FindStructInPNextChain<VkVideoEncodeQuantizationMapInfoKHR>(pEncodeInfo->pNext);
-        if (quantization_map_info) {
-            auto image_view_state = Get<vvl::ImageView>(quantization_map_info->quantizationMap);
-            if (image_view_state) {
-                VkOffset3D offset = {0, 0, 0};
-                VkExtent3D extent = {quantization_map_info->quantizationMapExtent.width,
-                                     quantization_map_info->quantizationMapExtent.height, 1};
-                auto hazard = context.DetectHazard(*image_view_state, offset, extent, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_READ);
-                if (hazard.IsHazard()) {
-                    std::ostringstream ss;
-                    ss << "quantization map ";
-                    ss << Location(Func::Empty, Field::pEncodeInfo).dot(Field::quantizationMap).Fields();
-                    ss << " ";
-                    FormatVideoQuantizationMap(*this, *quantization_map_info, ss);
-                    const std::string resource_description = ss.str();
-                    const std::string error =
-                        error_messages_.VideoError(hazard, *cb_access_context, error_obj.location.function, resource_description);
-                    skip |= SyncError(hazard.Hazard(), image_view_state->Handle(), error_obj.location, error);
-                }
-            }
-        }
-    }
-
-    return skip;
+    const auto references =
+        CollectVideoReferencePictureAccesses(*video_session, {pEncodeInfo->pReferenceSlots, pEncodeInfo->referenceSlotCount});
+    const auto command = MakeVideoEncodeCommand(*video_session, *buffer, *pEncodeInfo, references);
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordResetEvent(VkDevice device, VkEvent event, const RecordObject& record_obj) {
     if (record_obj.result != VK_SUCCESS) {
         return;
     }
-    if (auto event_state = Get<vvl::Event>(event)) {
-        const auto all_batches = GetAllQueueBatchContexts();
-        for (const auto& batch : all_batches) {
-            SyncEventsContext& events_context = batch->GetEventsContext();
-            if (SyncEventState* sync_event = events_context.GetFromShared(event_state)) {
-                sync_event->last_command = record_obj.location.function;
-                sync_event->unsynchronized_set = vvl::Func::Empty;
-                sync_event->ResetFirstScope();
-                sync_event->barriers = 0;
-            }
-        }
-    }
+    ProcessQueueCommand(HostResetEventCommand{event});
 }
 
 bool SyncValidator::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                                const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    SyncOpSetEvent set_event_op(error_obj.location.function, *this, cb_context->GetQueueFlags(), event, stageMask, nullptr);
-    return set_event_op.Validate(*cb_context);
+    const SyncExecScope src_exec_scope = SyncExecScope::MakeSrc(cb_state->GetQueueFlags(), stageMask);
+    const SetEventCommand command{*event_state, src_exec_scope, error_obj.location.function};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::RecordCmdSetEvent(CommandBufferContext& cb_context, const vvl::Event& event,
+                                      const SyncExecScope& src_exec_scope, const Location& loc) const {
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+
+    const SetEventCommand command{event, src_exec_scope, loc.function};
+
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 void SyncValidator::PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                               const RecordObject& record_obj) {
+    auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return;
+    }
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_context = GetAccessContext(*cb_state);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    cb_context->RecordSyncOp<SyncOpSetEvent>(record_obj.location.function, *this, cb_context->GetQueueFlags(), event, stageMask,
-                                             &cb_context->GetCurrentAccessContext());
+    const SyncExecScope src_exec_scope = SyncExecScope::MakeSrc(queue_flags, stageMask);
+    RecordCmdSetEvent(cb_context, *event_state, src_exec_scope, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -1999,13 +1925,23 @@ bool SyncValidator::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer
 
 bool SyncValidator::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event,
                                                 const VkDependencyInfo* pDependencyInfo, const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pDependencyInfo) {
+        return false;
+    }
+    const auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
-    if (!pDependencyInfo) return skip;
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    SyncOpSetEvent set_event_op(error_obj.location.function, *this, cb_context->GetQueueFlags(), event, *pDependencyInfo, nullptr);
-    return set_event_op.Validate(*cb_context);
+    const SyncExecScope src_exec_scope = SyncExecScope::MakeSrc(queue_flags, sync_utils::GetExecScopes(*pDependencyInfo).src);
+    const SetEventCommand command{*event_state, src_exec_scope, error_obj.location.function};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -2015,44 +1951,77 @@ void SyncValidator::PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer,
 
 void SyncValidator::PostCallRecordCmdSetEvent2(VkCommandBuffer commandBuffer, VkEvent event,
                                                const VkDependencyInfo* pDependencyInfo, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_context = GetAccessContext(*cb_state);
     if (!pDependencyInfo) {
         return;
     }
+    auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return;
+    }
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    cb_context->RecordSyncOp<SyncOpSetEvent>(record_obj.location.function, *this, cb_context->GetQueueFlags(), event,
-                                             *pDependencyInfo, &cb_context->GetCurrentAccessContext());
+    const SyncExecScope src_exec_scope = SyncExecScope::MakeSrc(queue_flags, sync_utils::GetExecScopes(*pDependencyInfo).src);
+    RecordCmdSetEvent(cb_context, *event_state, src_exec_scope, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                                  const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    SyncOpResetEvent reset_event_op(error_obj.location.function, *this, cb_context->GetQueueFlags(), event, stageMask);
-    return reset_event_op.Validate(*cb_context);
+    const SyncExecScope exec_scope = SyncExecScope::MakeSrc(cb_state->GetQueueFlags(), stageMask);
+    const ResetEventCommand command{*event_state, exec_scope, error_obj.location.function};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::RecordCmdResetEvent(CommandBufferContext& cb_context, const vvl::Event& event, const SyncExecScope& exec_scope,
+                                        const Location& loc) const {
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+    const ResetEventCommand command{event, exec_scope, loc.function};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 void SyncValidator::PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask,
                                                 const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    assert(cb_state);
-    if (!cb_state) {
+    auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
         return;
     }
-    auto* cb_context = GetAccessContext(*cb_state);
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    cb_context->RecordSyncOp<SyncOpResetEvent>(record_obj.location.function, *this, cb_context->GetQueueFlags(), event, stageMask);
+    const SyncExecScope exec_scope = SyncExecScope::MakeSrc(queue_flags, stageMask);
+    RecordCmdResetEvent(cb_context, *event_state, exec_scope, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
                                                   const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
-    SyncOpResetEvent reset_event_op(error_obj.location.function, *this, cb_context->GetQueueFlags(), event, stageMask);
-    return reset_event_op.Validate(*cb_context);
+    const SyncExecScope exec_scope = SyncExecScope::MakeSrc(cb_state->GetQueueFlags(), stageMask);
+    const ResetEventCommand command{*event_state, exec_scope, error_obj.location.function};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
@@ -2067,10 +2036,16 @@ void SyncValidator::PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffe
 
 void SyncValidator::PostCallRecordCmdResetEvent2(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2 stageMask,
                                                  const RecordObject& record_obj) {
+    auto event_state = Get<vvl::Event>(event);
+    if (!event_state) {
+        return;
+    }
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_context = GetAccessContext(*cb_state);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    cb_context->RecordSyncOp<SyncOpResetEvent>(record_obj.location.function, *this, cb_context->GetQueueFlags(), event, stageMask);
+    const SyncExecScope exec_scope = SyncExecScope::MakeSrc(queue_flags, stageMask);
+    RecordCmdResetEvent(cb_context, *event_state, exec_scope, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
@@ -2080,13 +2055,52 @@ bool SyncValidator::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, 
                                                  const VkBufferMemoryBarrier* pBufferMemoryBarriers,
                                                  uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
                                                  const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    SyncOpWaitEvents wait_events_op(error_obj.location.function, *this, cb_context->GetQueueFlags(), eventCount, pEvents,
-                                    srcStageMask, dstStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
-                                    pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
-    return wait_events_op.Validate(*cb_context);
+    const SyncExecScope src_exec_scope = SyncExecScope::MakeSrc(queue_flags, srcStageMask);
+    const SyncExecScope dst_exec_scope = SyncExecScope::MakeDst(queue_flags, dstStageMask);
+    const BarrierSet barrier_set =
+        BarrierSet(*this, src_exec_scope, dst_exec_scope, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
+                   pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+
+    std::vector<std::shared_ptr<const vvl::Event>> events(eventCount);
+    for (uint32_t i = 0; i < eventCount; i++) {
+        events[i] = Get<vvl::Event>(pEvents[i]);
+    }
+
+    const WaitEventsCommand command{events, vvl::make_span(&barrier_set, 1), error_obj.location.function};
+    return command.Validate(cb_context, error_obj.location);
+}
+
+void SyncValidator::RecordCmdWaitEvents(CommandBufferContext& cb_context, std::vector<std::shared_ptr<const vvl::Event>>&& events,
+                                        std::vector<BarrierSet>&& barrier_sets, const Location& loc) const {
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+    uint32_t barrier_set_index = static_cast<uint32_t>(cb_context.GetCommandData().barrier_sets.size());
+    bool has_layout_transition = false;
+    for (BarrierSet& barrier_set : barrier_sets) {
+        for (SyncImageBarrier& image_barrier : barrier_set.image_barriers) {
+            if (image_barrier.IsLayoutTransition()) {
+                image_barrier.handle_index =
+                    cb_context.AddCommandHandleIndexed(tag, image_barrier.image->Handle(), barrier_set_index).handle_index;
+                has_layout_transition = true;
+            }
+        }
+        ++barrier_set_index;
+    }
+    const WaitEventsCommand command{events, barrier_sets, loc.function};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCurrentAccessContext());
+    }
+    if (cb_context.NeedsCommandStorage()) {
+        cb_context.StoreCommand(tag, command);
+    } else if (has_layout_transition) {
+        cb_context.StoreBarriersForReporting(barrier_sets);
+    }
 }
 
 void SyncValidator::PostCallRecordCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
@@ -2097,12 +2111,21 @@ void SyncValidator::PostCallRecordCmdWaitEvents(VkCommandBuffer commandBuffer, u
                                                 uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers,
                                                 const RecordObject& record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_context = GetAccessContext(*cb_state);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    cb_context->RecordSyncOp<SyncOpWaitEvents>(record_obj.location.function, *this, cb_context->GetQueueFlags(), eventCount,
-                                               pEvents, srcStageMask, dstStageMask, memoryBarrierCount, pMemoryBarriers,
-                                               bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount,
-                                               pImageMemoryBarriers);
+    std::vector<std::shared_ptr<const vvl::Event>> events(eventCount);
+    for (uint32_t i = 0; i < eventCount; i++) {
+        events[i] = Get<vvl::Event>(pEvents[i]);
+    }
+
+    const SyncExecScope src_exec_scope = SyncExecScope::MakeSrc(queue_flags, srcStageMask);
+    const SyncExecScope dst_exec_scope = SyncExecScope::MakeDst(queue_flags, dstStageMask);
+    std::vector<BarrierSet> barrier_sets;
+    barrier_sets.emplace_back(*this, src_exec_scope, dst_exec_scope, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount,
+                              pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+
+    RecordCmdWaitEvents(cb_context, std::move(events), std::move(barrier_sets), record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
@@ -2118,69 +2141,64 @@ void SyncValidator::PostCallRecordCmdWaitEvents2KHR(VkCommandBuffer commandBuffe
 
 bool SyncValidator::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
                                                   const VkDependencyInfo* pDependencyInfos, const ErrorObject& error_obj) const {
-    bool skip = false;
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    if (!pDependencyInfos) {
+        return false;
+    }
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    SyncOpWaitEvents wait_events_op(error_obj.location.function, *this, cb_context->GetQueueFlags(), eventCount, pEvents,
-                                    pDependencyInfos);
-    skip |= wait_events_op.Validate(*cb_context);
-    return skip;
+    std::vector<std::shared_ptr<const vvl::Event>> events(eventCount);
+    for (uint32_t i = 0; i < eventCount; i++) {
+        events[i] = Get<vvl::Event>(pEvents[i]);
+    }
+    std::vector<BarrierSet> barrier_sets(eventCount);
+    for (uint32_t i = 0; i < eventCount; i++) {
+        barrier_sets[i] = BarrierSet(*this, queue_flags, pDependencyInfos[i]);
+    }
+
+    const WaitEventsCommand command{events, barrier_sets, error_obj.location.function};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdWaitEvents2(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents,
                                                  const VkDependencyInfo* pDependencyInfos, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_context = GetAccessContext(*cb_state);
-
-    cb_context->RecordSyncOp<SyncOpWaitEvents>(record_obj.location.function, *this, cb_context->GetQueueFlags(), eventCount,
-                                               pEvents, pDependencyInfos);
-}
-
-bool SyncValidator::PreCallValidateCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR pipelineStage,
-                                                            VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
-                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_access_context = GetAccessContext(*cb_state);
-    const AccessContext& context = cb_access_context->GetCurrentAccessContext();
-
-    if (auto dst_buffer = Get<vvl::Buffer>(dstBuffer)) {
-        const AccessRange range = MakeRange(dstOffset, 4);
-        auto hazard = context.DetectMarkerHazard(*dst_buffer, range);
-        if (hazard.IsHazard()) {
-            const std::string resource_description = "dstBuffer " + FormatHandle(dstBuffer);
-            const auto error =
-                error_messages_.BufferError(hazard, *cb_access_context, error_obj.location.function, resource_description, range);
-            skip |= SyncError(hazard.Hazard(), dstBuffer, error_obj.location, error);
-        }
+    if (!pDependencyInfos) {
+        return;
     }
-    return skip;
-}
-
-void SyncValidator::PostCallRecordCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR pipelineStage,
-                                                           VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker,
-                                                           const RecordObject& record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto* cb_access_context = GetAccessContext(*cb_state);
-    const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-    AccessContext& context = cb_access_context->GetCurrentAccessContext();
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const VkQueueFlags queue_flags = cb_state->GetQueueFlags();
 
-    if (auto dst_buffer = Get<vvl::Buffer>(dstBuffer)) {
-        const AccessRange range = MakeRange(dstOffset, 4);
-        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
-        context.UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, range, tag_ex, SyncFlag::kMarker);
+    std::vector<std::shared_ptr<const vvl::Event>> events(eventCount);
+    for (uint32_t i = 0; i < eventCount; i++) {
+        events[i] = Get<vvl::Event>(pEvents[i]);
     }
+    std::vector<BarrierSet> barrier_sets(eventCount);
+    for (uint32_t i = 0; i < eventCount; i++) {
+        barrier_sets[i] = BarrierSet(*this, queue_flags, pDependencyInfos[i]);
+    }
+    RecordCmdWaitEvents(cb_context, std::move(events), std::move(barrier_sets), record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCount,
                                                       const VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
     bool skip = false;
     const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    const auto* cb_context = GetAccessContext(*cb_state);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
 
     // Heavyweight, but we need a proxy copy of the active command buffer access context
-    CommandBufferAccessContext proxy_cb_context(*cb_context, CommandBufferAccessContext::AsProxyContext());
+    CommandBufferContext proxy_cb_context(cb_context, CommandBufferContext::AsProxyContext());
+
+    // Collect errors from secondary replay to avoid reporting them again at queue submission.
+    // The proxy uses the tags that the primary command buffer will assign
+    std::vector<ReportedHazard> new_hazards;
 
     auto& proxy_label_commands = proxy_cb_context.GetProxyLabelCommands();
     proxy_label_commands = cb_state->GetLabelCommands();
@@ -2188,29 +2206,32 @@ bool SyncValidator::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuf
     // Make working copies of the access and events contexts
     for (uint32_t cb_index = 0; cb_index < commandBufferCount; ++cb_index) {
         if (cb_index == 0) {
-            proxy_cb_context.NextCommandTag(error_obj.location.function, SubCommandType::kIndex);
+            proxy_cb_context.NextCommandTag(error_obj.location.function);
         } else {
-            proxy_cb_context.NextSubCommandTag(error_obj.location.function, SubCommandType::kIndex);
+            proxy_cb_context.NextSubCommandTag(error_obj.location.function, SubCommandType::kNone);
         }
 
         const auto recorded_cb = Get<vvl::CommandBuffer>(pCommandBuffers[cb_index]);
-        if (!recorded_cb) continue;
-        const auto* recorded_cb_context = GetAccessContext(*recorded_cb);
-        assert(recorded_cb_context);
-
+        if (!recorded_cb) {
+            continue;
+        }
+        const CommandBufferContext& recorded_cb_context = GetCommandBufferContext(*recorded_cb);
         const ResourceUsageTag base_tag = proxy_cb_context.GetTagCount();
-        skip |= ReplayState(proxy_cb_context, *recorded_cb_context, error_obj, cb_index, base_tag).ValidateFirstUse();
+        const Location cb_loc = error_obj.location.dot(vvl::Field::pCommandBuffers, cb_index);
 
         // Update proxy label commands so they can be used by ImportRecordedAccessLog
-        const auto& recorded_label_commands = recorded_cb->GetLabelCommands();
-        proxy_label_commands.insert(proxy_label_commands.end(), recorded_label_commands.begin(), recorded_label_commands.end());
+        vvl::Append(proxy_label_commands, recorded_cb->GetLabelCommands());
 
-        // The barriers have already been applied in ValidatFirstUse
-        proxy_cb_context.ImportRecordedAccessLog(*recorded_cb_context);
-        proxy_cb_context.ResolveExecutedCommandBuffer(recorded_cb_context->GetCurrentAccessContext(), base_tag);
+        proxy_cb_context.ImportRecordedAccessLog(recorded_cb_context);
+
+        skip |= ReplayCommands(proxy_cb_context.GetSyncEnvironment(), proxy_cb_context.GetCbAccessContext(), recorded_cb_context,
+                               base_tag, cb_loc, &new_hazards, &cb_context);
+    }
+    // A skipped command is not recorded, its tag goes to the next command
+    if (!skip) {
+        cb_context.RecordReportedHazards(new_hazards);
     }
     proxy_label_commands.clear();
-
     return skip;
 }
 
@@ -2238,212 +2259,86 @@ void SyncValidator::PostCallRecordBindImageMemory2KHR(VkDevice device, uint32_t 
 }
 
 void SyncValidator::PostCallRecordQueueWaitIdle(VkQueue queue, const RecordObject& record_obj) {
-    if (record_obj.result != VK_SUCCESS || !syncval_settings.submit_time_validation || queue == VK_NULL_HANDLE) {
+    if (!syncval_settings.full_validation) {
         return;
     }
-    const QueueId waited_queue = GetQueueId(queue);
-    if (waited_queue == kQueueIdInvalid) {
+    if (record_obj.result != VK_SUCCESS || queue == VK_NULL_HANDLE) {
         return;
     }
-    const QueueState& queue_state = GetQueueState(waited_queue);
-    ApplyTaggedWait(waited_queue, ResourceUsageRecord::kMaxIndex, queue_state.GetLastSynchronizedPresent(), {});
-
-    // For each timeline, remove all signals signaled on the waited queue, except the last one.
-    // The last signal is needed to represent the current timeline state.
-    EnsureTimelineSignalsLimit(1, waited_queue);
-
-    // Eliminate host waitable objects from the current queue.
-    vvl::EraseIf(waitable_fences_, [waited_queue](const auto& sf) { return sf.second.queue_id == waited_queue; });
-    for (auto& [semaphore, sync_points] : host_waitable_semaphores_) {
-        vvl::EraseIf(sync_points, [waited_queue](const auto& sync_point) { return sync_point.queue_id == waited_queue; });
-    }
+    ProcessQueueCommand(QueueWaitIdleCommand{queue});
 }
 
 void SyncValidator::PostCallRecordDeviceWaitIdle(VkDevice device, const RecordObject& record_obj) {
-    const auto batches = GetAllQueueBatchContexts();
-
-    // Collect information about last synchronized present over all queues
-    LastSynchronizedPresent global_last_synchronized_present;
-    for (const auto& batch : batches) {
-        global_last_synchronized_present.Merge(batch->last_synchronized_present);
-    }
-
-    // Device wait will preserve unsynchronized present operations.
-    for (const auto& batch : batches) {
-        batch->ApplyDeviceWait(global_last_synchronized_present);
-    }
-
-    // For each timeline keep only the last signal per queue.
-    // The last signal is needed to represent the current timeline state.
-    EnsureTimelineSignalsLimit(1);
-
-    // Cleanup fence waits associated with queues. Acquire fence waits are preserved
-    auto is_queue_fence = [](const auto& waitable) { return waitable.second.queue_id != kQueueIdInvalid; };
-    vvl::EraseIf(waitable_fences_, is_queue_fence);
-    host_waitable_semaphores_.clear();
+    ProcessQueueCommand(DeviceWaitIdleCommand{});
 }
 
 bool SyncValidator::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo,
                                                    const ErrorObject& error_obj) const {
     bool skip = false;
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return skip;
     }
-    std::lock_guard lock_guard(queue_mutex_);
-    skip |= const_cast<SyncValidator*>(this)->ProcessQueuePresent(queue, pPresentInfo, error_obj);
-    return skip;
-}
-
-bool SyncValidator::ProcessQueuePresent(VkQueue queue, const VkPresentInfoKHR* pPresentInfo, const ErrorObject& error_obj) {
-    bool skip = false;
-
     const QueueId queue_id = GetQueueId(queue);
     if (queue_id == kQueueIdInvalid) {
         return skip;
     }
-    QueueState& queue_state = GetQueueState(queue_id);
-    const uint64_t submit_id = queue_state.ReserveSubmitId();
-
-    BatchContextPtr last_batch = queue_state.LastBatch();
-    BatchContextPtr batch(std::make_shared<QueueBatchContext>(*this, queue_state));
-
-    const auto wait_semaphores = vvl::make_span(pPresentInfo->pWaitSemaphores, pPresentInfo->waitSemaphoreCount);
-
-    PresentedImages presented_images;
-    uint32_t present_tag_count = SetupPresentInfo(*pPresentInfo, batch, presented_images);
-
-    SignalsUpdate signals_update(*this);
-    auto resolved_batches = batch->ResolvePresentWaits(wait_semaphores, presented_images, signals_update);
-
-    // Import the previous batch information
-    if (last_batch && !vvl::Contains(resolved_batches, last_batch)) {
-        batch->ResolveLastBatch(last_batch);
-        resolved_batches.emplace_back(std::move(last_batch));
-    }
-
-    // The purpose of keeping return value is to ensure async batches are alive during validation.
-    // Validation accesses raw pointer to async contexts stored in AsyncReference.
-    const auto async_batches = batch->RegisterAsyncContexts(resolved_batches);
-
-    // Convert present tags to global range
-    const ResourceUsageTag global_range_start = batch->SetupBatchTags(present_tag_count);
-    for (PresentedImage& presented : presented_images) {
-        presented.tag += global_range_start;
-    }
-
-    skip |= batch->DoQueuePresentValidate(error_obj.location, presented_images);
-    batch->DoPresentOperations(presented_images);
-    batch->LogPresentOperations(presented_images, submit_id);
-
-    // Update state if there are no validation errors
-    if (!skip) {
-        stats.UpdateAccessStats(*this);
-        stats.UpdateMemoryStats();
-        queue_state.SetLastBatch(std::move(batch));
-        ApplySignalsUpdate(signals_update, queue_state.LastBatch());
-        for (auto& presented : presented_images) {
-            presented.ExportToSwapchain();
-        }
-    }
+    std::lock_guard lock_guard(queue_mutex_);
+    SyncValidator& validator = *const_cast<SyncValidator*>(this);
+    QueuePresentCommand command(validator, queue_id, *pPresentInfo);
+    skip |= validator.ProcessQueueCommand(std::move(command));
     return skip;
-}
-
-uint32_t SyncValidator::SetupPresentInfo(const VkPresentInfoKHR& present_info, BatchContextPtr& batch,
-                                         PresentedImages& presented_images) {
-    const VkSwapchainKHR* swapchains = present_info.pSwapchains;
-    const uint32_t* image_indices = present_info.pImageIndices;
-    const uint32_t swapchain_count = present_info.swapchainCount;
-
-    presented_images.reserve(swapchain_count);
-    for (uint32_t present_index = 0; present_index < swapchain_count; present_index++) {
-        // Note: Given the "EraseIf" implementation for acquire fence waits, each presentation needs a unique tag.
-        const ResourceUsageTag tag = presented_images.size();
-        presented_images.emplace_back(*this, batch, swapchains[present_index], image_indices[present_index], present_index, tag);
-        if (presented_images.back().Invalid()) {
-            presented_images.pop_back();
-        }
-    }
-    // Present is tagged for each swapchain.
-    return static_cast<uint32_t>(presented_images.size());
 }
 
 void SyncValidator::PostCallRecordAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout,
                                                       VkSemaphore semaphore, VkFence fence, uint32_t* pImageIndex,
                                                       const RecordObject& record_obj) {
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return;
     }
-    RecordAcquireNextImageState(device, swapchain, timeout, semaphore, fence, pImageIndex, record_obj);
+    RecordAcquireNextImageState(swapchain, semaphore, fence, pImageIndex, record_obj);
 }
 
 void SyncValidator::PostCallRecordAcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* pAcquireInfo,
                                                        uint32_t* pImageIndex, const RecordObject& record_obj) {
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return;
     }
-    RecordAcquireNextImageState(device, pAcquireInfo->swapchain, pAcquireInfo->timeout, pAcquireInfo->semaphore,
-                                pAcquireInfo->fence, pImageIndex, record_obj);
+    RecordAcquireNextImageState(pAcquireInfo->swapchain, pAcquireInfo->semaphore, pAcquireInfo->fence, pImageIndex, record_obj);
 }
 
-void SyncValidator::RecordAcquireNextImageState(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore,
-                                                VkFence fence, uint32_t* pImageIndex, const RecordObject& record_obj) {
-    if ((VK_SUCCESS != record_obj.result) && (VK_SUBOPTIMAL_KHR != record_obj.result)) {
+void SyncValidator::RecordAcquireNextImageState(VkSwapchainKHR swapchain, VkSemaphore semaphore, VkFence fence,
+                                                uint32_t* pImageIndex, const RecordObject& record_obj) {
+    if (record_obj.result != VK_SUCCESS && record_obj.result != VK_SUBOPTIMAL_KHR) {
         return;
     }
-
-    // Get the image out of the presented list and create apppropriate fences/semaphores.
-    auto swapchain_base = Get<vvl::Swapchain>(swapchain);
-    if (vvl::StateObject::Invalid(swapchain_base)) {
-        return;
-    }  // Invalid acquire calls to be caught in CoreCheck/Parameter validation
-
-    auto& swapchain_state = SubState(*swapchain_base);
-
-    PresentedImage presented = swapchain_state.MovePresentedImage(*pImageIndex);
-    if (presented.Invalid()) {
+    if (semaphore == VK_NULL_HANDLE && fence == VK_NULL_HANDLE) {
+        return;  // [core validation check]: both sync primitives are missing
+    }
+    auto swapchain_state = Get<vvl::Swapchain>(swapchain);
+    if (!swapchain_state) {
         return;
     }
-
-    // No way to make access safe, so nothing to record
-    if ((semaphore == VK_NULL_HANDLE) && (fence == VK_NULL_HANDLE)) {
+    auto image = swapchain_state->GetSwapChainImageShared(*pImageIndex);
+    if (!image) {
         return;
     }
-
-    // We create a queue-less QBC for the Semaphore and fences to wait on
-
-    // Note: this is a heavyweight way to deal with the fact that all operation logs live in the QueueBatchContext... and
-    // acquire doesn't happen on a queue, but we need a place to put the acquire operation access record.
-    auto batch = std::make_shared<QueueBatchContext>(*this);
-    batch->SetupAccessContext(presented);
-    const ResourceUsageTag acquire_tag = batch->SetupBatchTags(1);
-    batch->DoAcquireOperation(presented);
-    batch->LogAcquireOperation(presented, record_obj.location.function);
-
-    // Now swap out the present queue batch with the acquired one.
-    // Note that fence and signal will read the acquire batch from presented, so this needs to be done before
-    // setting up the synchronization
-    presented.batch = std::move(batch);
-
-    if (semaphore != VK_NULL_HANDLE) {
-        std::shared_ptr<const vvl::Semaphore> sem_state = Get<vvl::Semaphore>(semaphore);
-        if (sem_state) {
-            // This will ignore any duplicated signal (emplace does not update existing entry),
-            // and the core validation reports and error in this case.
-            binary_signals_.emplace(sem_state->VkHandle(), SignalInfo(sem_state, presented, acquire_tag));
-        }
+    // Don't validate invalid semaphores or fences
+    if (semaphore != VK_NULL_HANDLE && !Get<vvl::Semaphore>(semaphore)) {
+        semaphore = VK_NULL_HANDLE;
     }
-    if (fence != VK_NULL_HANDLE) {
-        FenceHostSyncPoint sync_point;
-        sync_point.tag = acquire_tag;
-        sync_point.acquired = AcquiredImage(presented, acquire_tag);
-        UpdateFenceHostSyncPoint(fence, std::move(sync_point));
+    if (fence != VK_NULL_HANDLE && !Get<vvl::Fence>(fence)) {
+        fence = VK_NULL_HANDLE;
     }
+
+    AcquireNextImageCommand command{std::move(swapchain_state),   std::move(image), *pImageIndex,
+                                    record_obj.location.function, semaphore,        fence};
+    ProcessQueueCommand(std::move(command));
 }
 
 bool SyncValidator::PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
                                                const ErrorObject& error_obj) const {
     bool skip = false;
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return skip;
     }
 
@@ -2458,7 +2353,7 @@ bool SyncValidator::PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCou
 bool SyncValidator::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2* pSubmits, VkFence fence,
                                                 const ErrorObject& error_obj) const {
     bool skip = false;
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return skip;
     }
     std::lock_guard lock_guard(queue_mutex_);
@@ -2471,121 +2366,20 @@ bool SyncValidator::PreCallValidateQueueSubmit2KHR(VkQueue queue, uint32_t submi
     return PreCallValidateQueueSubmit2(queue, submitCount, pSubmits, fence, error_obj);
 }
 
-static std::vector<CommandBufferConstPtr> GetCommandBuffers(const vvl::DeviceState& device_state,
-                                                            const VkSubmitInfo2& submit_info) {
-    // Collected command buffers have the same indexing as in the input VkSubmitInfo2 for reporting purposes.
-    // If Get query returns null, it is stored in the result array to keep original indexing.
-    std::vector<CommandBufferConstPtr> command_buffers;
-    command_buffers.reserve(submit_info.commandBufferInfoCount);
-    for (const auto& cb_info : vvl::make_span(submit_info.pCommandBufferInfos, submit_info.commandBufferInfoCount)) {
-        command_buffers.emplace_back(device_state.Get<vvl::CommandBuffer>(cb_info.commandBuffer));
-    }
-    return command_buffers;
-}
-
 bool SyncValidator::ProcessQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2* pSubmits, VkFence fence,
                                        const ErrorObject& error_obj) {
-    bool skip = false;
-
     const QueueId queue_id = GetQueueId(queue);
     if (queue_id == kQueueIdInvalid) {
-        return skip;
+        return false;
     }
-
-    QueueState& queue_state = GetQueueState(queue_id);
-    SignalsUpdate signals_update(*this);
-
-    // The submit id is a mutable automic which is not recoverable on a skip == true condition
-    uint64_t submit_id = queue_state.ReserveSubmitId();
-
-    // Update label stack as we progress through batches and command buffers
-    auto current_label_stack = queue_state.GetQueue()->cmdbuf_label_stack;
-
-    BatchContextPtr last_batch = queue_state.LastBatch();
-    bool has_unresolved_batches = !queue_state.UnresolvedBatches().empty();
-
-    BatchContextPtr new_last_batch;
-    std::vector<UnresolvedBatch> new_unresolved_batches;
-    bool new_timeline_signals = false;
-
-    for (uint32_t batch_idx = 0; batch_idx < submitCount; batch_idx++) {
-        const VkSubmitInfo2& submit = pSubmits[batch_idx];
-        auto batch = std::make_shared<QueueBatchContext>(*this, queue_state);
-
-        const auto wait_semaphores = vvl::make_span(submit.pWaitSemaphoreInfos, submit.waitSemaphoreInfoCount);
-        std::vector<VkSemaphoreSubmitInfo> unresolved_waits;
-        auto resolved_batches = batch->ResolveSubmitWaits(wait_semaphores, unresolved_waits, signals_update);
-
-        // Add unresolved batch
-        if (has_unresolved_batches || !unresolved_waits.empty()) {
-            UnresolvedBatch unresolved_batch;
-            unresolved_batch.batch = std::move(batch);
-            unresolved_batch.submit_index = submit_id;
-            unresolved_batch.batch_index = batch_idx;
-            unresolved_batch.command_buffers = GetCommandBuffers(*device_state, submit);
-            unresolved_batch.unresolved_waits = std::move(unresolved_waits);
-            unresolved_batch.resolved_dependencies = std::move(resolved_batches);
-            if (submit.pSignalSemaphoreInfos && submit.signalSemaphoreInfoCount) {
-                const auto last_info = submit.pSignalSemaphoreInfos + submit.signalSemaphoreInfoCount;
-                unresolved_batch.signals.assign(submit.pSignalSemaphoreInfos, last_info);
-            }
-            unresolved_batch.label_stack = current_label_stack;
-            new_unresolved_batches.emplace_back(std::move(unresolved_batch));
-            has_unresolved_batches = true;
-            stats.AddUnresolvedBatch();
-            continue;
-        }
-        new_last_batch = batch;
-
-        // Import the previous batch information
-        if (last_batch && !vvl::Contains(resolved_batches, last_batch)) {
-            batch->ResolveLastBatch(last_batch);
-            resolved_batches.emplace_back(std::move(last_batch));
-        }
-
-        // The purpose of keeping return value is to ensure async batches are alive during validation.
-        // Validation accesses raw pointer to async contexts stored in AsyncReference.
-        // TODO: All syncval tests pass when the return value is ignored. Write a regression test that fails/crashes in this case.
-        const auto async_batches = batch->RegisterAsyncContexts(resolved_batches);
-
-        const auto command_buffers = GetCommandBuffers(*device_state, submit);
-        skip |= batch->ValidateSubmit(command_buffers, submit_id, batch_idx, current_label_stack, error_obj);
-
-        const auto submit_signals = vvl::make_span(submit.pSignalSemaphoreInfos, submit.signalSemaphoreInfoCount);
-        new_timeline_signals |= signals_update.RegisterSignals(batch, submit_signals);
-
-        // Unless the previous batch was referenced by a signal it will self destruct
-        // in the record phase when the last batch is updated.
-        last_batch = batch;
+    if (fence != VK_NULL_HANDLE && !Get<vvl::Fence>(fence)) {
+        fence = VK_NULL_HANDLE;
     }
-
-    if (new_last_batch && !skip) {
-        queue_state.SetLastBatch(std::move(new_last_batch));
-    }
-    if (!new_unresolved_batches.empty() && !skip) {
-        vvl::Append(queue_state.UnresolvedBatches(), new_unresolved_batches);
-    }
-
-    // Check if timeline signals resolve existing wait-before-signal dependencies
-    if (new_timeline_signals) {
-        skip |= PropagateTimelineSignals(signals_update, error_obj);
-    }
-
-    if (!skip) {
-        stats.UpdateMemoryStats();
-        ApplySignalsUpdate(signals_update, queue_state.LastBatch());
-        FenceHostSyncPoint sync_point;
-        sync_point.queue_id = queue_state.GetQueueId();
-        sync_point.tag = ReserveGlobalTagRange(1).begin;
-        if (queue_state.LastBatch()) {
-            sync_point.queue_sync_tags = queue_state.LastBatch()->GetQueueSyncTags();
-        }
-        UpdateFenceHostSyncPoint(fence, std::move(sync_point));
-    }
-    return skip;
+    QueueSubmitCommand command(*this, queue_id, vvl::make_span(pSubmits, submitCount), fence, error_obj.location.function);
+    return ProcessQueueCommand(std::move(command));
 }
 
-bool SyncValidator::PropagateTimelineSignals(SignalsUpdate& signals_update, const ErrorObject& error_obj) {
+bool SyncValidator::PropagateTimelineSignals(SignalsUpdate& signals_update) {
     bool skip = false;
 
     // The caller ensures we just registered new timeline signals
@@ -2628,16 +2422,13 @@ bool SyncValidator::PropagateTimelineSignals(SignalsUpdate& signals_update, cons
             while (!unresolved_batches.empty() && unresolved_batches.front().unresolved_waits.empty()) {
                 UnresolvedBatch& ready_batch = unresolved_batches.front();
 
-                // Import the previous batch information
-                if (last_batch && !vvl::Contains(ready_batch.resolved_dependencies, last_batch)) {
-                    ready_batch.batch->ResolveLastBatch(last_batch);
-                    ready_batch.resolved_dependencies.emplace_back(std::move(last_batch));
-                }
+                ready_batch.batch->ResolveLastBatch(std::move(last_batch), ready_batch.resolved_dependencies);
 
                 const auto async_batches = ready_batch.batch->RegisterAsyncContexts(ready_batch.resolved_dependencies);
 
                 skip |= ready_batch.batch->ValidateSubmit(ready_batch.command_buffers, ready_batch.submit_index,
-                                                          ready_batch.batch_index, ready_batch.label_stack, error_obj);
+                                                          ready_batch.batch_index, ready_batch.label_stack,
+                                                          Location(ready_batch.submit_func));
 
                 // Process signals. New timeline signals can resolve more batches on the next iteration
                 const auto submit_signals = vvl::make_span(ready_batch.signals.data(), ready_batch.signals.size());
@@ -2657,24 +2448,24 @@ bool SyncValidator::PropagateTimelineSignals(SignalsUpdate& signals_update, cons
 }
 
 void SyncValidator::PostCallRecordGetFenceStatus(VkDevice device, VkFence fence, const RecordObject& record_obj) {
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return;
     }
     if (record_obj.result == VK_SUCCESS) {
         // fence is signalled, mark it as waited for
-        WaitForFence(fence);
+        ProcessQueueCommand(WaitForFenceCommand{fence});
     }
 }
 
 void SyncValidator::PostCallRecordWaitForFences(VkDevice device, uint32_t fenceCount, const VkFence* pFences, VkBool32 waitAll,
                                                 uint64_t timeout, const RecordObject& record_obj) {
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return;
     }
     if ((record_obj.result == VK_SUCCESS) && ((VK_TRUE == waitAll) || (1 == fenceCount))) {
         // We can only know the pFences have signal if we waited for all of them, or there was only one of them
         for (uint32_t i = 0; i < fenceCount; i++) {
-            WaitForFence(pFences[i]);
+            ProcessQueueCommand(WaitForFenceCommand{pFences[i]});
         }
     }
 }
@@ -2682,14 +2473,18 @@ void SyncValidator::PostCallRecordWaitForFences(VkDevice device, uint32_t fenceC
 bool SyncValidator::PreCallValidateSignalSemaphore(VkDevice device, const VkSemaphoreSignalInfo* pSignalInfo,
                                                    const ErrorObject& error_obj) const {
     bool skip = false;
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
+        return skip;
+    }
+    if (!Get<vvl::Semaphore>(pSignalInfo->semaphore)) {
         return skip;
     }
     // Although SignalSemaphore does not run on the queue, the signalling can resolve
     // previously submitted batches that are waiting for this signal, and this will
-    // initiate validation that touches queue state. That's why queue mutex is used here.
+    // initiate validation that touches queue state. That's why queue mutex is used here
     std::lock_guard lock_guard(queue_mutex_);
-    skip |= const_cast<SyncValidator*>(this)->ProcessSignalSemaphore(device, pSignalInfo, error_obj);
+    SignalSemaphoreCommand command{pSignalInfo->semaphore, pSignalInfo->value};
+    skip |= const_cast<SyncValidator*>(this)->ProcessQueueCommand(std::move(command));
     return skip;
 }
 
@@ -2698,41 +2493,15 @@ bool SyncValidator::PreCallValidateSignalSemaphoreKHR(VkDevice device, const VkS
     return PreCallValidateSignalSemaphore(device, pSignalInfo, error_obj);
 }
 
-bool SyncValidator::ProcessSignalSemaphore(VkDevice device, const VkSemaphoreSignalInfo* pSignalInfo,
-                                           const ErrorObject& error_obj) {
-    bool skip = false;
-
-    auto semaphore_state = Get<vvl::Semaphore>(pSignalInfo->semaphore);
-    if (!semaphore_state) {
-        return skip;
-    }
-
-    SignalsUpdate signals_update(*this);
-    std::vector<SignalInfo>& signals = signals_update.timeline_signals[pSignalInfo->semaphore];
-
-    // Reject invalid signal
-    if (!signals.empty() && pSignalInfo->value <= signals.back().timeline_value) {
-        return skip;  // [core validation check]: strictly increasing signal values
-    }
-
-    signals.emplace_back(SignalInfo(semaphore_state, pSignalInfo->value));
-    skip |= PropagateTimelineSignals(signals_update, error_obj);
-
-    if (!skip) {
-        ApplySignalsUpdate(signals_update, nullptr);
-    }
-    return skip;
-}
-
 void SyncValidator::PostCallRecordWaitSemaphores(VkDevice device, const VkSemaphoreWaitInfo* pWaitInfo, uint64_t timeout,
                                                  const RecordObject& record_obj) {
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return;
     }
     const bool wait_all = pWaitInfo->semaphoreCount == 1 || (pWaitInfo->flags & VK_SEMAPHORE_WAIT_ANY_BIT) == 0;
     if (record_obj.result == VK_SUCCESS && wait_all) {
         for (uint32_t i = 0; i < pWaitInfo->semaphoreCount; i++) {
-            WaitForSemaphore(pWaitInfo->pSemaphores[i], pWaitInfo->pValues[i]);
+            ProcessQueueCommand(WaitForSemaphoreCommand{pWaitInfo->pSemaphores[i], pWaitInfo->pValues[i]});
         }
     }
 }
@@ -2744,11 +2513,11 @@ void SyncValidator::PostCallRecordWaitSemaphoresKHR(VkDevice device, const VkSem
 
 void SyncValidator::PostCallRecordGetSemaphoreCounterValue(VkDevice device, VkSemaphore semaphore, uint64_t* pValue,
                                                            const RecordObject& record_obj) {
-    if (!syncval_settings.submit_time_validation) {
+    if (!syncval_settings.full_validation) {
         return;
     }
     if (record_obj.result == VK_SUCCESS) {
-        WaitForSemaphore(semaphore, *pValue);
+        ProcessQueueCommand(WaitForSemaphoreCommand{semaphore, *pValue});
     }
 }
 
@@ -2866,378 +2635,261 @@ static std::optional<AccelerationStructureGeometryInfo> GetValidGeometryInfo(
     return {};
 }
 
-bool SyncValidator::PreCallValidateCmdBuildAccelerationStructuresKHR(
-    VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
-    const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos, const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    const AccessContext& context = cb_context.GetCurrentAccessContext();
+std::vector<BuildAccelerationStructuresCommand::Access> SyncValidator::CollectAccelerationStructureBuildAccesses(
+    uint32_t info_count, const VkAccelerationStructureBuildGeometryInfoKHR* infos,
+    const VkAccelerationStructureBuildRangeInfoKHR* const* build_range_infos) const {
+    using AccessType = BuildAccelerationStructuresCommand::AccessType;
+    std::vector<BuildAccelerationStructuresCommand::Access> accesses;
 
-    for (const auto [i, info] : vvl::enumerate(pInfos, infoCount)) {
-        const Location info_loc = error_obj.location.dot(Field::pInfos, i);
-        // Validate scratch buffer
-        if (const vvl::Buffer* p_scratch_buffer = GetSingleBufferFromDeviceAddress(*device_state, info.scratchData.deviceAddress)) {
-            const vvl::Buffer& scratch_buffer = *p_scratch_buffer;
-            const VkDeviceSize scratch_size = rt::ComputeScratchSize(rt::BuildType::Device, device, info, ppBuildRangeInfos[i]);
-            const VkDeviceSize offset = info.scratchData.deviceAddress - scratch_buffer.deviceAddress;
-            const AccessRange range = MakeRange(scratch_buffer, offset, scratch_size);
-            auto hazard =
-                context.DetectHazard(scratch_buffer, SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_WRITE, range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(commandBuffer, scratch_buffer.Handle());
-                const std::string resource_description = "scratch buffer " + FormatHandle(scratch_buffer.VkHandle());
-                const auto error =
-                    error_messages_.BufferError(hazard, cb_context, error_obj.location.function, resource_description, range);
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
+    for (const auto [i, info] : vvl::enumerate(infos, info_count)) {
+        // Scratch buffer
+        if (const vvl::Buffer* scratch_buffer = GetSingleBufferFromDeviceAddress(*device_state, info.scratchData.deviceAddress)) {
+            const VkDeviceSize scratch_size = rt::ComputeScratchSize(rt::BuildType::Device, device, info, build_range_infos[i]);
+            const VkDeviceSize offset = info.scratchData.deviceAddress - scratch_buffer->deviceAddress;
+            const AccessRange range = MakeRange(*scratch_buffer, offset, scratch_size);
+            accesses.push_back({scratch_buffer, range, AccessType::kScratch, i});
+        }
+        // Src/Dst acceleration structures
+        const auto src_accel = Get<vvl::AccelerationStructureKHR>(info.srcAccelerationStructure);
+        const auto dst_accel = Get<vvl::AccelerationStructureKHR>(info.dstAccelerationStructure);
+        if (src_accel && src_accel != dst_accel) {
+            if (const vvl::BufferAndOffset src_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
+                const AccessRange range = MakeRange(src_buffer.offset, src_accel->GetSize());
+                accesses.push_back({src_buffer.state, range, AccessType::kSource, i, info.srcAccelerationStructure});
             }
         }
-        // Validate access to source acceleration structure
-        if (const auto src_accel = Get<vvl::AccelerationStructureKHR>(info.srcAccelerationStructure)) {
-            if (const vvl::BufferAndOffset src_as_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
-                const AccessRange range = MakeRange(src_as_buffer.offset, src_accel->GetSize());
-                auto hazard = context.DetectHazard(*src_as_buffer.state,
-                                                   SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_READ, range);
-                if (hazard.IsHazard()) {
-                    const LogObjectList objlist(commandBuffer, src_as_buffer.state->Handle(), src_accel->Handle());
-                    const std::string resource_description = FormatHandle(src_as_buffer.state->VkHandle());
-                    const std::string error = error_messages_.AccelerationStructureError(
-                        hazard, cb_context, error_obj.location.function, resource_description, range, info.srcAccelerationStructure,
-                        info_loc.dot(Field::srcAccelerationStructure));
-                    skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-                }
+        if (dst_accel) {
+            if (const vvl::BufferAndOffset dst_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
+                const AccessRange dst_range = MakeRange(dst_buffer.offset, dst_accel->GetSize());
+                accesses.push_back({dst_buffer.state, dst_range, AccessType::kDestination, i, info.dstAccelerationStructure});
             }
         }
-        // Validate access to the acceleration structure being built
-        if (const auto dst_accel = Get<vvl::AccelerationStructureKHR>(info.dstAccelerationStructure)) {
-            if (const vvl::BufferAndOffset dst_as_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
-                const AccessRange dst_range = MakeRange(dst_as_buffer.offset, dst_accel->GetSize());
-                auto hazard = context.DetectHazard(*dst_as_buffer.state,
-                                                   SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_WRITE, dst_range);
-                if (hazard.IsHazard()) {
-                    const LogObjectList objlist(commandBuffer, dst_as_buffer.state->Handle(), dst_accel->Handle());
-                    const std::string resource_description = FormatHandle(dst_as_buffer.state->VkHandle());
-                    const std::string error = error_messages_.AccelerationStructureError(
-                        hazard, cb_context, error_obj.location.function, resource_description, dst_range,
-                        info.dstAccelerationStructure, info_loc.dot(Field::dstAccelerationStructure));
-                    skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-                }
-            }
-        }
-        // Validate geometry buffers
-        const VkAccelerationStructureBuildRangeInfoKHR* p_range_infos = ppBuildRangeInfos[i];
-        if (!p_range_infos) {
+        // Geometry buffers
+        const VkAccelerationStructureBuildRangeInfoKHR* range_infos = build_range_infos[i];
+        if (!range_infos) {
             continue;  // [core validation check]: range pointers should be valid
         }
         for (uint32_t k = 0; k < info.geometryCount; k++) {
-            const auto* p_geometry = info.pGeometries ? &info.pGeometries[k] : info.ppGeometries[k];
-            if (!p_geometry) {
+            const auto* geometry = info.pGeometries ? &info.pGeometries[k] : info.ppGeometries[k];
+            if (!geometry) {
                 continue;  // [core validation check]: null pointer in ppGeometries
             }
-            const auto geometry_info = GetValidGeometryInfo(*device_state, *p_geometry, p_range_infos[k]);
-            if (!geometry_info.has_value()) {
+            const auto geometry_info = GetValidGeometryInfo(*device_state, *geometry, range_infos[k]);
+            if (!geometry_info) {
                 continue;
             }
-            auto validate_accel_input_geometry = [this, &context, &cb_context, &commandBuffer, &error_obj](
-                                                     const vvl::Buffer& geometry_data, const AccessRange& geometry_range,
-                                                     const char* data_description) {
-                auto hazard = context.DetectHazard(geometry_data, SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ, geometry_range);
-                if (hazard.IsHazard()) {
-                    const LogObjectList objlist(commandBuffer, geometry_data.Handle());
-                    std::ostringstream ss;
-                    ss << data_description << " ";
-                    ss << FormatHandle(geometry_data.Handle());
-                    const std::string resource_description = ss.str();
-                    const std::string error = error_messages_.BufferError(hazard, cb_context, error_obj.location.function,
-                                                                          resource_description, geometry_range);
-                    return SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-                }
-                return false;
-            };
             if (geometry_info->vertex_data) {
-                skip |= validate_accel_input_geometry(*geometry_info->vertex_data, geometry_info->vertex_range, "vertex data");
+                accesses.push_back({geometry_info->vertex_data, geometry_info->vertex_range, AccessType::kVertex, i});
             }
             if (geometry_info->index_data) {
-                skip |= validate_accel_input_geometry(*geometry_info->index_data, geometry_info->index_range, "index data");
+                accesses.push_back({geometry_info->index_data, geometry_info->index_range, AccessType::kIndex, i});
             }
             if (geometry_info->transform_data) {
-                skip |=
-                    validate_accel_input_geometry(*geometry_info->transform_data, geometry_info->transform_range, "transform data");
+                accesses.push_back({geometry_info->transform_data, geometry_info->transform_range, AccessType::kTransform, i});
             }
             if (geometry_info->aabb_data) {
-                skip |= validate_accel_input_geometry(*geometry_info->aabb_data, geometry_info->aabb_range, "aabb data");
+                accesses.push_back({geometry_info->aabb_data, geometry_info->aabb_range, AccessType::kAABB, i});
             }
             if (geometry_info->instance_data) {
-                skip |=
-                    validate_accel_input_geometry(*geometry_info->instance_data, geometry_info->instance_range, "instance data");
+                accesses.push_back({geometry_info->instance_data, geometry_info->instance_range, AccessType::kInstance, i});
             }
         }
     }
-    return skip;
+    return accesses;
+}
+
+bool SyncValidator::PreCallValidateCmdBuildAccelerationStructuresKHR(
+    VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
+    const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos, const ErrorObject& error_obj) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const auto accesses = CollectAccelerationStructureBuildAccesses(infoCount, pInfos, ppBuildRangeInfos);
+    const BuildAccelerationStructuresCommand command{accesses};
+    return command.Validate(cb_context, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdBuildAccelerationStructuresKHR(
     VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
     const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    AccessContext& context = cb_context.GetCurrentAccessContext();
-
+    const auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
     const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
 
-    for (const auto [i, info] : vvl::enumerate(pInfos, infoCount)) {
-        // Record scratch buffer access
-        if (const vvl::Buffer* p_scratch_buffer = GetSingleBufferFromDeviceAddress(*device_state, info.scratchData.deviceAddress)) {
-            const vvl::Buffer& scratch_buffer = *p_scratch_buffer;
-            const VkDeviceSize scratch_size = rt::ComputeScratchSize(rt::BuildType::Device, device, info, ppBuildRangeInfos[i]);
-            const VkDeviceSize offset = info.scratchData.deviceAddress - scratch_buffer.deviceAddress;
-            const AccessRange scratch_range = MakeRange(scratch_buffer, offset, scratch_size);
-            const ResourceUsageTagEx scratch_tag_ex = cb_context.AddCommandHandle(tag, scratch_buffer.Handle());
-            context.UpdateAccessState(scratch_buffer, SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_WRITE, scratch_range,
-                                      scratch_tag_ex);
-        }
-
-        const auto src_accel = Get<vvl::AccelerationStructureKHR>(info.srcAccelerationStructure);
-        const auto dst_accel = Get<vvl::AccelerationStructureKHR>(info.dstAccelerationStructure);
-
-        // Record source acceleration structure access (READ).
-        // If the source is the same as the destination then no need to record READ
-        // (destination update will replace access with WRITE anyway).
-        if (src_accel && src_accel != dst_accel) {
-            if (const vvl::BufferAndOffset src_as_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
-                const AccessRange range = MakeRange(src_as_buffer.offset, src_accel->GetSize());
-                const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, src_as_buffer.state->Handle());
-                context.UpdateAccessState(*src_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_READ,
-                                          range, tag_ex);
-            }
-        }
-        // Record destination acceleration structure access (WRITE)
-        if (dst_accel) {
-            if (const vvl::BufferAndOffset dst_as_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
-                const AccessRange dst_range = MakeRange(dst_as_buffer.offset, dst_accel->GetSize());
-                const ResourceUsageTagEx dst_tag_ex = cb_context.AddCommandHandle(tag, dst_as_buffer.state->Handle());
-                context.UpdateAccessState(*dst_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_WRITE,
-                                          dst_range, dst_tag_ex);
-            }
-        }
-        // Record geometry buffer acceses (READ)
-        const VkAccelerationStructureBuildRangeInfoKHR* p_range_infos = ppBuildRangeInfos[i];
-        if (!p_range_infos) {
-            continue;  // [core validation check]: range pointers should be valid
-        }
-        for (uint32_t k = 0; k < info.geometryCount; k++) {
-            const auto* p_geometry = info.pGeometries ? &info.pGeometries[k] : info.ppGeometries[k];
-            if (!p_geometry) {
-                continue;  // [core validation check]: null pointer in ppGeometries
-            }
-            const auto geometry_info = GetValidGeometryInfo(*device_state, *p_geometry, p_range_infos[k]);
-            if (!geometry_info.has_value()) {
-                continue;
-            }
-            if (geometry_info->vertex_data) {
-                const ResourceUsageTagEx vertex_tag_ex = cb_context.AddCommandHandle(tag, geometry_info->vertex_data->Handle());
-                context.UpdateAccessState(*geometry_info->vertex_data, SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ,
-                                          geometry_info->vertex_range, vertex_tag_ex);
-            }
-            if (geometry_info->index_data) {
-                const ResourceUsageTagEx index_tag_ex = cb_context.AddCommandHandle(tag, geometry_info->index_data->Handle());
-                context.UpdateAccessState(*geometry_info->index_data, SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ,
-                                          geometry_info->index_range, index_tag_ex);
-            }
-            if (geometry_info->transform_data) {
-                const ResourceUsageTagEx transform_tag_ex =
-                    cb_context.AddCommandHandle(tag, geometry_info->transform_data->Handle());
-                context.UpdateAccessState(*geometry_info->transform_data, SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ,
-                                          geometry_info->transform_range, transform_tag_ex);
-            }
-            if (geometry_info->aabb_data) {
-                const ResourceUsageTagEx aabb_tag_ex = cb_context.AddCommandHandle(tag, geometry_info->aabb_data->Handle());
-                context.UpdateAccessState(*geometry_info->aabb_data, SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ,
-                                          geometry_info->aabb_range, aabb_tag_ex);
-            }
-            if (geometry_info->instance_data) {
-                const ResourceUsageTagEx instance_tag_ex = cb_context.AddCommandHandle(tag, geometry_info->instance_data->Handle());
-                context.UpdateAccessState(*geometry_info->instance_data, SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_READ,
-                                          geometry_info->instance_range, instance_tag_ex);
-            }
-        }
+    auto accesses = CollectAccelerationStructureBuildAccesses(infoCount, pInfos, ppBuildRangeInfos);
+    for (auto& access : accesses) {
+        access.handle_index = cb_context.AddCommandHandle(tag, access.buffer->Handle()).handle_index;
     }
+
+    const BuildAccelerationStructuresCommand command{vvl::make_span(std::as_const(accesses))};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
+}
+
+AccelerationStructureCopyCommand SyncValidator::MakeAccelerationStructureCopyCommand(VkAccelerationStructureKHR src,
+                                                                                     VkAccelerationStructureKHR dst) const {
+    auto get_access = [this](VkAccelerationStructureKHR handle) -> AccelerationStructureCopyCommand::Access {
+        const auto accel = Get<vvl::AccelerationStructureKHR>(handle);
+        if (!accel) {
+            return {};
+        }
+        const vvl::BufferAndOffset buffer = accel->GetFirstValidBuffer(*device_state);
+        if (!buffer) {
+            return {};
+        }
+        return {buffer.state, MakeRange(buffer.offset, accel->GetSize()), handle};
+    };
+    return {get_access(src), get_access(dst)};
+}
+
+bool SyncValidator::ValidateCopyAccelerationStructure(VkCommandBuffer command_buffer, VkAccelerationStructureKHR src,
+                                                      VkAccelerationStructureKHR dst, const Location& loc) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(command_buffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const auto command = MakeAccelerationStructureCopyCommand(src, dst);
+    return command.Validate(cb_context, loc);
+}
+
+void SyncValidator::RecordCopyAccelerationStructure(VkCommandBuffer command_buffer, VkAccelerationStructureKHR src,
+                                                    VkAccelerationStructureKHR dst, const Location& loc) {
+    const auto cb_state = Get<vvl::CommandBuffer>(command_buffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+
+    auto command = MakeAccelerationStructureCopyCommand(src, dst);
+    if (command.src.buffer) {
+        command.src.handle_index = cb_context.AddCommandHandle(tag, command.src.buffer->Handle()).handle_index;
+    }
+    if (command.dst.buffer) {
+        command.dst.handle_index = cb_context.AddCommandHandle(tag, command.dst.buffer->Handle()).handle_index;
+    }
+
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyAccelerationStructureKHR(VkCommandBuffer commandBuffer,
                                                                    const VkCopyAccelerationStructureInfoKHR* pInfo,
                                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    const AccessContext& context = cb_context.GetCurrentAccessContext();
-
-    const Location info_loc = error_obj.location.dot(Field::pInfo);
-
-    if (const auto src_accel = Get<vvl::AccelerationStructureKHR>(pInfo->src)) {
-        if (const vvl::BufferAndOffset src_as_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(src_as_buffer.offset, src_accel->GetSize());
-            auto hazard =
-                context.DetectHazard(*src_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_READ, range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(cb_state->Handle(), src_as_buffer.state->Handle(), src_accel->Handle());
-                const std::string resource_description = FormatHandle(src_as_buffer.state->VkHandle());
-                const std::string error =
-                    error_messages_.AccelerationStructureError(hazard, cb_context, error_obj.location.function,
-                                                               resource_description, range, pInfo->src, info_loc.dot(Field::src));
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-    }
-    if (const auto dst_accel = Get<vvl::AccelerationStructureKHR>(pInfo->dst)) {
-        if (const vvl::BufferAndOffset dst_as_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(dst_as_buffer.offset, dst_accel->GetSize());
-            auto hazard =
-                context.DetectHazard(*dst_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_WRITE, range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(cb_state->Handle(), dst_as_buffer.state->Handle(), dst_accel->Handle());
-                const std::string resource_description = FormatHandle(dst_as_buffer.state->VkHandle());
-                const std::string error =
-                    error_messages_.AccelerationStructureError(hazard, cb_context, error_obj.location.function,
-                                                               resource_description, range, pInfo->dst, info_loc.dot(Field::dst));
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-    }
-    return skip;
+    return ValidateCopyAccelerationStructure(commandBuffer, pInfo->src, pInfo->dst, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdCopyAccelerationStructureKHR(VkCommandBuffer commandBuffer,
                                                                   const VkCopyAccelerationStructureInfoKHR* pInfo,
                                                                   const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    AccessContext& context = cb_context.GetCurrentAccessContext();
-
-    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
-
-    if (const auto src_accel = Get<vvl::AccelerationStructureKHR>(pInfo->src)) {
-        if (const vvl::BufferAndOffset src_as_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(src_as_buffer.offset, src_accel->GetSize());
-            const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, src_as_buffer.state->Handle());
-            context.UpdateAccessState(*src_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_READ, range,
-                                      tag_ex);
-        }
-    }
-    if (const auto dst_accel = Get<vvl::AccelerationStructureKHR>(pInfo->dst)) {
-        if (const vvl::BufferAndOffset dst_as_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(dst_as_buffer.offset, dst_accel->GetSize());
-            const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, dst_as_buffer.state->Handle());
-            context.UpdateAccessState(*dst_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_WRITE, range,
-                                      tag_ex);
-        }
-    }
+    RecordCopyAccelerationStructure(commandBuffer, pInfo->src, pInfo->dst, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyAccelerationStructureToMemoryKHR(VkCommandBuffer commandBuffer,
                                                                            const VkCopyAccelerationStructureToMemoryInfoKHR* pInfo,
                                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    const AccessContext& context = cb_context.GetCurrentAccessContext();
-
-    const Location info_loc = error_obj.location.dot(Field::pInfo);
-
-    if (const auto src_accel = Get<vvl::AccelerationStructureKHR>(pInfo->src)) {
-        if (const vvl::BufferAndOffset src_as_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(src_as_buffer.offset, src_accel->GetSize());
-            auto hazard =
-                context.DetectHazard(*src_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_READ, range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(cb_state->Handle(), src_as_buffer.state->Handle(), src_accel->Handle());
-                const std::string resource_description = FormatHandle(src_as_buffer.state->VkHandle());
-                const std::string error =
-                    error_messages_.AccelerationStructureError(hazard, cb_context, error_obj.location.function,
-                                                               resource_description, range, pInfo->src, info_loc.dot(Field::src));
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-    }
-
-    // NOTE: do not validate src_buffer. This requires recording query and then waiting for it after submit.
-    // Currently syncval does not support this but even if support is available this affects application:
-    // it flushes entire GPU frame and it also affects app scheduling behavior (CPU and GPU frames do not overlap
-    // anymore, and this can hide resource scheduling issues). Such submit-wait-validation can be an optional feature.
-
-    return skip;
+    // Destination accesses are not tracked because the serialized size is unknown.
+    // vkCmdWriteAccelerationStructuresPropertiesKHR can query it using
+    // VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR, but waiting
+    // for the result would stall execution
+    return ValidateCopyAccelerationStructure(commandBuffer, pInfo->src, VK_NULL_HANDLE, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdCopyAccelerationStructureToMemoryKHR(VkCommandBuffer commandBuffer,
                                                                           const VkCopyAccelerationStructureToMemoryInfoKHR* pInfo,
                                                                           const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    AccessContext& context = cb_context.GetCurrentAccessContext();
-
-    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
-
-    if (const auto src_accel = Get<vvl::AccelerationStructureKHR>(pInfo->src)) {
-        if (const vvl::BufferAndOffset src_as_buffer = src_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(src_as_buffer.offset, src_accel->GetSize());
-            const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, src_as_buffer.state->Handle());
-            context.UpdateAccessState(*src_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_READ, range,
-                                      tag_ex);
-        }
-    }
+    RecordCopyAccelerationStructure(commandBuffer, pInfo->src, VK_NULL_HANDLE, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyMemoryToAccelerationStructureKHR(VkCommandBuffer commandBuffer,
                                                                            const VkCopyMemoryToAccelerationStructureInfoKHR* pInfo,
                                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    const AccessContext& context = cb_context.GetCurrentAccessContext();
-
-    const Location info_loc = error_obj.location.dot(Field::pInfo);
-
-    if (const auto dst_accel = Get<vvl::AccelerationStructureKHR>(pInfo->dst)) {
-        if (const vvl::BufferAndOffset dst_as_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(dst_as_buffer.offset, dst_accel->GetSize());
-            auto hazard =
-                context.DetectHazard(*dst_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_WRITE, range);
-            if (hazard.IsHazard()) {
-                const LogObjectList objlist(cb_state->Handle(), dst_as_buffer.state->Handle(), dst_accel->Handle());
-                const std::string resource_description = FormatHandle(dst_as_buffer.state->VkHandle());
-                const std::string error =
-                    error_messages_.AccelerationStructureError(hazard, cb_context, error_obj.location.function,
-                                                               resource_description, range, pInfo->dst, info_loc.dot(Field::dst));
-                skip |= SyncError(hazard.Hazard(), objlist, error_obj.location, error);
-            }
-        }
-    }
-
-    // NOTE: do not validate src_buffer. This requires recording query and then waiting for it after submit.
-    // Currently syncval does not support this but even if support is available this affects application:
-    // it flushes entire GPU frame and it also affects app scheduling behavior (CPU and GPU frames do not overlap
-    // anymore, and this can hide resource scheduling issues). Such submit-wait-validation can be an optional feature.
-
-    return skip;
+    // Source buffer accesses are not tracked because the API provides an address but no size.
+    // The size is stored in the header at pInfo->src.deviceAddress.
+    // Reading it may require waiting for the GPU to finish execution.
+    return ValidateCopyAccelerationStructure(commandBuffer, VK_NULL_HANDLE, pInfo->dst, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdCopyMemoryToAccelerationStructureKHR(VkCommandBuffer commandBuffer,
                                                                           const VkCopyMemoryToAccelerationStructureInfoKHR* pInfo,
                                                                           const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    AccessContext& context = cb_context.GetCurrentAccessContext();
+    RecordCopyAccelerationStructure(commandBuffer, VK_NULL_HANDLE, pInfo->dst, record_obj.location);
+}
 
-    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
+small_vector<BufferAccessCommand, SyncValidator::kMaxTraceRaysBufferAccesses> SyncValidator::CollectTraceRaysBufferAccesses(
+    const vvl::span<const VkStridedDeviceAddressRegionKHR* const> shader_binding_tables, VkDeviceAddress indirect_address,
+    VkDeviceSize indirect_size) const {
+    const BufferName buffer_names[] = {BufferName::kRaygenShaderBindingTable, BufferName::kMissShaderBindingTable,
+                                       BufferName::kHitShaderBindingTable, BufferName::kCallableShaderBindingTable};
+    assert(shader_binding_tables.size() <= kMaxSbtCount);
 
-    if (const auto dst_accel = Get<vvl::AccelerationStructureKHR>(pInfo->dst)) {
-        if (const vvl::BufferAndOffset dst_as_buffer = dst_accel->GetFirstValidBuffer(*device_state)) {
-            const AccessRange range = MakeRange(dst_as_buffer.offset, dst_accel->GetSize());
-            const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, dst_as_buffer.state->Handle());
-            context.UpdateAccessState(*dst_as_buffer.state, SYNC_ACCELERATION_STRUCTURE_COPY_ACCELERATION_STRUCTURE_WRITE, range,
-                                      tag_ex);
+    small_vector<BufferAccessCommand, kMaxTraceRaysBufferAccesses> accesses;
+
+    for (const auto [index, sbt_region] : vvl::enumerate(shader_binding_tables)) {
+        if (!sbt_region) {
+            continue;
+        }
+        const vvl::Buffer* sbt_buffer = GetSingleBufferFromDeviceAddress(*device_state, sbt_region->deviceAddress);
+        if (!sbt_buffer) {
+            continue;
+        }
+        const VkDeviceSize offset = sbt_region->deviceAddress - sbt_buffer->deviceAddress;
+        const AccessRange range = MakeRange(*sbt_buffer, offset, sbt_region->size);
+        accesses.emplace_back(BufferAccessCommand{*sbt_buffer, range, SYNC_RAY_TRACING_SHADER_SHADER_BINDING_TABLE_READ,
+                                                  vvl::kNoIndex32, 0, buffer_names[index]});
+    }
+    if (indirect_size) {
+        if (const vvl::Buffer* indirect_buffer = GetSingleBufferFromDeviceAddress(*device_state, indirect_address)) {
+            const VkDeviceSize offset = indirect_address - indirect_buffer->deviceAddress;
+            const AccessRange range = MakeRange(offset, indirect_size);
+            accesses.emplace_back(BufferAccessCommand{*indirect_buffer, range, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ,
+                                                      vvl::kNoIndex32, 0, BufferName::kIndirect});
         }
     }
+    return accesses;
+}
+
+bool SyncValidator::ValidateTraceRays(VkCommandBuffer command_buffer,
+                                      vvl::span<const VkStridedDeviceAddressRegionKHR* const> shader_binding_tables,
+                                      VkDeviceAddress indirect_address, VkDeviceSize indirect_size, const Location& loc) const {
+    if (!syncval_settings.record_time_validation) {
+        return false;
+    }
+    const auto cb_state = Get<vvl::CommandBuffer>(command_buffer);
+    const CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+
+    const DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR);
+    const auto buffer_accesses = CollectTraceRaysBufferAccesses(shader_binding_tables, indirect_address, indirect_size);
+
+    const TraceRaysCommand command{descriptor_accesses.MakeCommand(), buffer_accesses};
+    return command.Validate(cb_context, loc);
+}
+
+void SyncValidator::RecordTraceRays(VkCommandBuffer command_buffer,
+                                    vvl::span<const VkStridedDeviceAddressRegionKHR* const> shader_binding_tables,
+                                    VkDeviceAddress indirect_address, VkDeviceSize indirect_size, const Location& loc) {
+    auto cb_state = Get<vvl::CommandBuffer>(command_buffer);
+    CommandBufferContext& cb_context = GetCommandBufferContext(*cb_state);
+    const ResourceUsageTag tag = cb_context.NextCommandTag(loc.function);
+
+    DescriptorAccesses descriptor_accesses = cb_context.CollectDescriptorAccesses(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR);
+    descriptor_accesses.RegisterResources(cb_context, tag);
+
+    auto buffer_accesses = CollectTraceRaysBufferAccesses(shader_binding_tables, indirect_address, indirect_size);
+    for (BufferAccessCommand& access : buffer_accesses) {
+        access.handle_index = cb_context.AddCommandHandle(tag, access.buffer.Handle()).handle_index;
+    }
+
+    const TraceRaysCommand command{descriptor_accesses.MakeCommand(), buffer_accesses};
+    if (syncval_settings.record_time_validation) {
+        command.Apply(cb_context.GetSyncEnvironment(), tag, cb_context.GetCbAccessContext());
+    }
+    cb_context.StoreCommand(tag, command);
 }
 
 bool SyncValidator::PreCallValidateCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
@@ -3247,12 +2899,9 @@ bool SyncValidator::PreCallValidateCmdTraceRaysKHR(VkCommandBuffer commandBuffer
                                                    const VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable,
                                                    uint32_t width, uint32_t height, uint32_t depth,
                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-
-    skip |= cb_context.ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, error_obj.location);
-    return skip;
+    const std::array shader_binding_tables = {pRaygenShaderBindingTable, pMissShaderBindingTable, pHitShaderBindingTable,
+                                              pCallableShaderBindingTable};
+    return ValidateTraceRays(commandBuffer, shader_binding_tables, 0, 0, error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
@@ -3261,11 +2910,9 @@ void SyncValidator::PostCallRecordCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
                                                   const VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable,
                                                   const VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable,
                                                   uint32_t width, uint32_t height, uint32_t depth, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-
-    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
-    cb_context.RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, tag);
+    const std::array shader_binding_tables = {pRaygenShaderBindingTable, pMissShaderBindingTable, pHitShaderBindingTable,
+                                              pCallableShaderBindingTable};
+    RecordTraceRays(commandBuffer, shader_binding_tables, 0, 0, record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdTraceRaysIndirectKHR(VkCommandBuffer commandBuffer,
@@ -3275,18 +2922,10 @@ bool SyncValidator::PreCallValidateCmdTraceRaysIndirectKHR(VkCommandBuffer comma
                                                            const VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable,
                                                            VkDeviceAddress indirectDeviceAddress,
                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    const AccessContext& access_context = cb_context.GetCurrentAccessContext();
-
-    skip |= cb_context.ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, error_obj.location);
-
-    if (const vvl::Buffer* indirect_buffer = GetSingleBufferFromDeviceAddress(*device_state, indirectDeviceAddress)) {
-        skip |= ValidateIndirectBuffer(cb_context, access_context, sizeof(VkTraceRaysIndirectCommandKHR),
-                                       indirect_buffer->VkHandle(), 0, 1, 0, error_obj.location);
-    }
-    return skip;
+    const std::array shader_binding_tables = {pRaygenShaderBindingTable, pMissShaderBindingTable, pHitShaderBindingTable,
+                                              pCallableShaderBindingTable};
+    return ValidateTraceRays(commandBuffer, shader_binding_tables, indirectDeviceAddress, sizeof(VkTraceRaysIndirectCommandKHR),
+                             error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdTraceRaysIndirectKHR(VkCommandBuffer commandBuffer,
@@ -3295,44 +2934,21 @@ void SyncValidator::PostCallRecordCmdTraceRaysIndirectKHR(VkCommandBuffer comman
                                                           const VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable,
                                                           const VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable,
                                                           VkDeviceAddress indirectDeviceAddress, const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-
-    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
-    cb_context.RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, tag);
-
-    if (const vvl::Buffer* indirect_buffer = GetSingleBufferFromDeviceAddress(*device_state, indirectDeviceAddress)) {
-        RecordIndirectBuffer(cb_context, tag, sizeof(VkTraceRaysIndirectCommandKHR), indirect_buffer->VkHandle(), 0, 1, 0);
-    }
+    const std::array shader_binding_tables = {pRaygenShaderBindingTable, pMissShaderBindingTable, pHitShaderBindingTable,
+                                              pCallableShaderBindingTable};
+    RecordTraceRays(commandBuffer, shader_binding_tables, indirectDeviceAddress, sizeof(VkTraceRaysIndirectCommandKHR),
+                    record_obj.location);
 }
 
 bool SyncValidator::PreCallValidateCmdTraceRaysIndirect2KHR(VkCommandBuffer commandBuffer, VkDeviceAddress indirectDeviceAddress,
                                                             const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-    const AccessContext& access_context = cb_context.GetCurrentAccessContext();
-
-    skip |= cb_context.ValidateDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, error_obj.location);
-
-    if (const vvl::Buffer* indirect_buffer = GetSingleBufferFromDeviceAddress(*device_state, indirectDeviceAddress)) {
-        skip |= ValidateIndirectBuffer(cb_context, access_context, sizeof(VkTraceRaysIndirectCommand2KHR),
-                                       indirect_buffer->VkHandle(), 0, 1, 0, error_obj.location);
-    }
-    return skip;
+    // Shader binding table addresses are in the indirect buffer and cannot be resolved on the CPU
+    return ValidateTraceRays(commandBuffer, {}, indirectDeviceAddress, sizeof(VkTraceRaysIndirectCommand2KHR), error_obj.location);
 }
 
 void SyncValidator::PostCallRecordCmdTraceRaysIndirect2KHR(VkCommandBuffer commandBuffer, VkDeviceAddress indirectDeviceAddress,
                                                            const RecordObject& record_obj) {
-    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-    auto& cb_context = *GetAccessContext(*cb_state);
-
-    const ResourceUsageTag tag = cb_context.NextCommandTag(record_obj.location.function);
-    cb_context.RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, tag);
-
-    if (const vvl::Buffer* indirect_buffer = GetSingleBufferFromDeviceAddress(*device_state, indirectDeviceAddress)) {
-        RecordIndirectBuffer(cb_context, tag, sizeof(VkTraceRaysIndirectCommand2KHR), indirect_buffer->VkHandle(), 0, 1, 0);
-    }
+    RecordTraceRays(commandBuffer, {}, indirectDeviceAddress, sizeof(VkTraceRaysIndirectCommand2KHR), record_obj.location);
 }
 
 }  // namespace syncval

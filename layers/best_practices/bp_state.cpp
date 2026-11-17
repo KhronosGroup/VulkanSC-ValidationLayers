@@ -17,10 +17,7 @@
 
 #include "best_practices/bp_state.h"
 #include <vulkan/utility/vk_format_utils.h>
-#include <vulkan/vulkan_core.h>
 #include "best_practices/best_practices_validation.h"
-#include "containers/container_utils.h"
-#include "generated/error_location_helper.h"
 #include "state_tracker/queue_state.h"
 #include "state_tracker/render_pass_state.h"
 #include "state_tracker/pipeline_state.h"
@@ -165,7 +162,8 @@ void CommandBufferSubState::RecordBeginRenderingCommon(const VkRenderPassBeginIn
                         }
                     }
                 }
-                for (uint32_t i = 0; i < pRenderPassBegin->clearValueCount; ++i) {
+                const uint32_t clear_count = std::min(pRenderPassBegin->clearValueCount, rp_state->create_info.attachmentCount);
+                for (uint32_t i = 0; i < clear_count; ++i) {
                     const auto& attachment = rp_state->create_info.pAttachments[i];
                     if (attachment.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
                         const auto& clear_color = pRenderPassBegin->pClearValues[i].color;
@@ -598,8 +596,10 @@ void CommandBufferSubState::Reset(const Location&) { ResetCBState(); }
 void CommandBufferSubState::ResetCBState() {
     num_submits = 0;
     small_indexed_draw_call_count = 0;
+    bound_graphics_pipelines.clear();
     queue_submit_functions.clear();
     queue_submit_functions_after_render_pass.clear();
+    event_signaling_state.clear();
     ClearPushConstants();
 }
 
@@ -792,8 +792,9 @@ void CommandBufferSubState::RecordSetDepthTestEnable(VkBool32 depth_test_enable)
 
 void CommandBufferSubState::RecordBindPipeline(VkPipelineBindPoint bind_point, vvl::Pipeline& pipeline) {
     if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-        // AMD best practice
-        validator.PipelineUsedInFrame(pipeline.VkHandle());
+        if (validator.VendorCheckEnabled(kBPVendorAMD) || validator.VendorCheckEnabled(kBPVendorNVIDIA)) {
+            bound_graphics_pipelines.insert(pipeline.VkHandle());
+        }
 
         render_pass_state.nextDrawTouchesAttachments = GetAttachmentAccess(pipeline);
         render_pass_state.drawTouchAttachments = true;
@@ -866,7 +867,7 @@ void CommandBufferSubState::RecordBindPipeline(VkPipelineBindPoint bind_point, v
     }
 }
 
-void CommandBufferSubState::Submit(vvl::Queue& queue_state, uint32_t perf_submit_pass, const Location& loc) {
+void CommandBufferSubState::Submit(vvl::Queue& queue_state, const vvl::QueueSubmission&, uint32_t) {
     for (auto& func : queue_submit_functions) {
         func(queue_state, base);
     }

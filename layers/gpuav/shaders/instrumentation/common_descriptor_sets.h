@@ -25,6 +25,7 @@
 
 layout(set = kInstDefaultDescriptorSet, binding = kBindingInstErrorBuffer, scalar) buffer OutputBuffer {
     uint flags;
+    uint error_buffer_u32_count;
     uint written_count;
     // Use SpecConstantInstErrorBufferLengthId instead of data.length()
     // This allows us to use VK_DESCRIPTOR_MAPPING_SOURCE_INDIRECT_ADDRESS_EXT for heaps
@@ -48,3 +49,4 @@ inst_cmd_errors_count_buffer;
 // (The constant_id doesn't matter, it easier to just hot swap the known default constant value)
 layout(constant_id = 0) const uint SpecConstantLinkShaderId = kLinkShaderId;
 layout(constant_id = 1) const uint SpecConstantInstErrorBufferLengthId = kInstErrorBufferLengthId;
+layout(constant_id = 2) const uint SpecConstantDescriptorHashingCapacity = kDescriptorHashingCapacity;

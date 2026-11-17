@@ -23,7 +23,6 @@
 #endif
 #include "chassis/dispatch_object.h"
 #include "gpuav/core/gpuav.h"
-#include "gpuav/core/gpuav_constants.h"
 #include "gpuav/instrumentation/descriptor_checks_classic.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "gpuav/shaders/gpuav_error_header.h"
@@ -66,10 +65,6 @@ void Validator::Created(vvl::Sampler& obj) {
     DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
     obj.SetSubState(container_type, std::make_unique<SamplerSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::AccelerationStructureNV& obj) {
-    DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
-    obj.SetSubState(container_type, std::make_unique<AccelerationStructureNVSubState>(obj, desc_id_pool));
-}
 void Validator::Created(vvl::AccelerationStructureKHR& obj) {
     DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
     obj.SetSubState(container_type, std::make_unique<AccelerationStructureKHRSubState>(*this, obj, desc_id_pool));
@@ -82,7 +77,9 @@ void Validator::Created(vvl::TensorView& obj) {
     DescriptorIdPool& desc_id_pool = shared_resources_cache.Get<DescriptorIdPool>();
     obj.SetSubState(container_type, std::make_unique<TensorViewSubState>(obj, desc_id_pool));
 }
-void Validator::Created(vvl::ShaderObject& obj) { obj.SetSubState(container_type, std::make_unique<ShaderObjectSubState>(obj)); }
+void Validator::Created(vvl::ShaderObject& obj) {
+    obj.SetSubState(container_type, std::make_unique<ShaderObjectSubState>(*this, obj));
+}
 
 void Validator::Created(vvl::Pipeline& obj) { obj.SetSubState(container_type, std::make_unique<PipelineSubState>(*this, obj)); }
 
@@ -219,9 +216,11 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const L
         {glsl::kBindingInstErrorBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // Buffer holding output from GPU to do processing on the CPU
         {glsl::kBindingInstPostProcess, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        // Buffer holding input from CPU into the shader for descriptor indexing
+        // Buffer holding input from CPU into the shader for descriptor indexing (classic)
         {glsl::kBindingInstDescriptorIndexingOOB, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-        // Buffer holding input from CPU into the shader for descriptor heap
+        // Buffer holding input from CPU into the shader for VK_EXT_descriptor_buffer
+        {glsl::kBindingInstDescriptorBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+        // Buffer holding input from CPU into the shader for VK_EXT_descriptor_heap
         {glsl::kBindingInstDescriptorHeap, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         // Buffer holding buffer device addresses
         {glsl::kBindingInstBufferDeviceAddress, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -304,55 +303,6 @@ void Validator::FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const L
             indices_ptr[offset] = i;
         }
     }
-
-    if (set_null_descriptors_) {
-        // Find the first possible queue to do internal transfer on
-        for (uint32_t i = 0; i < physical_device_state->queue_family_properties.size(); i++) {
-            const VkQueueFamilyProperties& props = physical_device_state->queue_family_properties[i];
-            if (props.queueFlags & VK_QUEUE_TRANSFER_BIT) {
-                internal_transfer_queue_family_index_ = i;
-                DispatchGetDeviceQueue(device, i, 0, &internal_transfer_queue_handle_);
-                if (internal_transfer_queue_handle_ != VK_NULL_HANDLE) {
-                    break;
-                }
-            }
-        }
-    }
-}
-
-vko::Buffer& Validator::GetGlobalDescriptorBuffer() {
-    if (global_resource_descriptor_buffer_.IsDestroyed()) {
-        VkBufferCreateInfo buffer_info = vku::InitStructHelper();
-        buffer_info.size = phys_dev_ext_props.descriptor_buffer_props.storageBufferDescriptorSize * cst::total_internal_descriptors;
-        buffer_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        VmaAllocationCreateInfo alloc_info = {};
-        alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        alloc_info.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        const VkResult result = global_resource_descriptor_buffer_.Create(&buffer_info, &alloc_info);
-        if (result != VK_SUCCESS) {
-            InternalVmaError(device, result, "Failed to create an internal resource Descriptor Buffer.");
-        }
-    }
-    return global_resource_descriptor_buffer_;
-}
-
-// This buffer is going to be the indirect buffer for a VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_INDIRECT_INDEX_EXT mapping.
-vko::Buffer& Validator::GetGlobalDescriptorHeap() {
-    if (global_resource_descriptor_heap_.IsDestroyed()) {
-        VkBufferCreateInfo buffer_info = vku::InitStructHelper();
-        buffer_info.size = heap_indirect_buffer_stride_ * gpuav_settings.indices_buffer_count;
-        // Note that maxUniformBufferRange is smaller likely to what we need here, but this buffer doesn't need to worry because we
-        // are not "binding" this, so we can use maxBufferSize instead
-        buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        VmaAllocationCreateInfo alloc_info = {};
-        alloc_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        alloc_info.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        const VkResult result = global_resource_descriptor_heap_.Create(&buffer_info, &alloc_info);
-        if (result != VK_SUCCESS) {
-            InternalVmaError(device, result, "Failed to create an internal resource Descriptor Heap.");
-        }
-    }
-    return global_resource_descriptor_heap_;
 }
 
 namespace setting {
@@ -535,9 +485,10 @@ bool Validator::IsAllDeviceLocalMappable() const {
 // resources we need to track. One issue is on vkDestroyDevice we need to teardown the GPU-AV class, then after we try and destroy
 // leaked state objects (ex. user forgot to call vkDestroySampler).
 void Validator::DestroySubstate() {
-    if (!dispatch_device_ || aborted_) {
+    if (!dispatch_device_ || aborted_ || substates_destroyed_) {
         return;
     }
+    substates_destroyed_ = true;
 
     // While this is not ideal, it is more important to keep normal code fast and do extra cleanup on teardown
     for (auto object_it = dispatch_device_->object_dispatch.begin(); object_it != dispatch_device_->object_dispatch.end();
@@ -547,6 +498,17 @@ void Validator::DestroySubstate() {
             state_tracker.RemoveSubState(LayerObjectTypeGpuAssisted);
         }
     }
+}
+
+// In normal operation, the substate are already removed from tracked objects by the time
+// we get here, because Validator::DestroySubstate() is called during DestroyDevice().
+// However, if the DeviceDispatch is destroyed during exit, by FreeAllDispatchObjects(), then DestroyDevice()
+// is never called.
+// We end up in a situation where GPUAV substates would survive the Validator, only to be later freed as
+// the states themselves are destroyed.
+// We can't let it happen in this order since some substates keep a reference to the validator to run cleanup code,
+Validator::~Validator() {
+    DestroySubstate();
 }
 
 }  // namespace gpuav

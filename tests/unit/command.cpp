@@ -147,6 +147,31 @@ TEST_F(NegativeCommand, IndexBufferSizeOffset) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeCommand, IndexBufferSizeOverflow) {
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+    vkt::Buffer index_buffer(*m_device, 64, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
+    vk::CmdDrawIndexed(m_command_buffer, 32, 1, 0xFFFFFFF0, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
+    vk::CmdDrawIndexed(m_command_buffer, 4, 1, 0x40000000, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeCommand, MissingClearAttachment) {
     TEST_DESCRIPTION("Points to a wrong colorAttachment index in a VkClearAttachment structure passed to vkCmdClearAttachments");
     RETURN_IF_SKIP(Init());
@@ -240,13 +265,11 @@ TEST_F(NegativeCommand, CommandBufferTwoSubmits) {
     m_command_buffer.End();
 
     // Bypass framework since it does the waits automatically
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     // Cause validation error by re-submitting cmd buffer that should only be
     // submitted once
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 
     m_errorMonitor->VerifyFound();
 }
@@ -324,7 +347,7 @@ TEST_F(NegativeCommand, PushConstants) {
     pc_range.offset = 0;
     pc_range.size = 16;
     pc_range.stageFlags = 0;
-    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-stageFlags-requiredbitmask");
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantRange-stageFlags-parameter");
     vk::CreatePipelineLayout(device(), &pipeline_layout_ci, NULL, &pipeline_layout);
     m_errorMonitor->VerifyFound();
 
@@ -398,7 +421,7 @@ TEST_F(NegativeCommand, PushConstants) {
 
     // Check for invalid stage flag
     // Note that VU 07790 isn't reached due to parameter validation
-    m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants-stageFlags-requiredbitmask");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants-stageFlags-parameter");
     vk::CmdPushConstants(m_command_buffer, pipeline_layout_obj, 0, 0, 16, dummy_values);
     m_errorMonitor->VerifyFound();
 
@@ -482,14 +505,11 @@ TEST_F(NegativeCommand, NoBeginCommandBuffer) {
 }
 
 TEST_F(NegativeCommand, CommandBufferReset) {
-    // Cause error due to Begin while recording CB
-    // Then cause 2 errors for attempting to reset CB w/o having
-    // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT set for the pool from
-    // which CBs were allocated. Note that this bit is off by default.
-    m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBuffer-00049");
+    RETURN_IF_SKIP(Init());
 
-    RETURN_IF_SKIP(InitFramework());
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, 0));
+    // no VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+    vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_, 0);
+    vkt::CommandBuffer cb(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
     // Force the failure by setting the Renderpass and Framebuffer fields with (fake) data
     VkCommandBufferInheritanceInfo cmd_buf_hinfo = vku::InitStructHelper();
@@ -498,22 +518,23 @@ TEST_F(NegativeCommand, CommandBufferReset) {
     cmd_buf_info.pInheritanceInfo = &cmd_buf_hinfo;
 
     // Begin CB to transition to recording state
-    vk::BeginCommandBuffer(m_command_buffer, &cmd_buf_info);
+    vk::BeginCommandBuffer(cb, &cmd_buf_info);
     // Can't re-begin. This should trigger error
-    vk::BeginCommandBuffer(m_command_buffer, &cmd_buf_info);
+    m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBuffer-00050");
+    vk::BeginCommandBuffer(cb, &cmd_buf_info);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkResetCommandBuffer-commandBuffer-00046");
     VkCommandBufferResetFlags flags = 0;  // Don't care about flags for this test
     // Reset attempt will trigger error due to incorrect CommandPool state
-    vk::ResetCommandBuffer(m_command_buffer, flags);
+    vk::ResetCommandBuffer(cb, flags);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBuffer-00050");
     // Transition CB to RECORDED state
-    vk::EndCommandBuffer(m_command_buffer);
+    vk::EndCommandBuffer(cb);
     // Now attempting to Begin will implicitly reset, which triggers error
-    vk::BeginCommandBuffer(m_command_buffer, &cmd_buf_info);
+    vk::BeginCommandBuffer(cb, &cmd_buf_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -670,7 +691,7 @@ TEST_F(NegativeCommand, ClearAttachmentsImplicitCheck) {
     clear_rect.layerCount = 1;
 
     color_attachment.aspectMask = 0;
-    m_errorMonitor->SetDesiredError("VUID-VkClearAttachment-aspectMask-requiredbitmask");
+    m_errorMonitor->SetDesiredError("VUID-VkClearAttachment-aspectMask-parameter");
     vk::CmdClearAttachments(m_command_buffer, 1, &color_attachment, 1, &clear_rect);
     m_errorMonitor->VerifyFound();
 
@@ -774,6 +795,30 @@ TEST_F(NegativeCommand, DrawOutsideRenderPass) {
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-renderpass");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCommand, DrawOutsideRenderPassDebugLabels) {
+    TEST_DESCRIPTION("call vkCmdDraw without renderpass - make sure debug labels appear in message");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    VkDebugUtilsLabelEXT label = vku::InitStructHelper();
+    label.pLabelName = "RegionA";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    label.pLabelName = "RegionB";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    label.pLabelName = "RegionC";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    m_errorMonitor->SetDesiredError("RegionA::RegionB");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 }
@@ -1112,6 +1157,68 @@ TEST_F(NegativeCommand, ResolveImageHighSampleCount) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeCommand, ResolveImageDepthComponentMismatch) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_10_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_12_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance10);
+    AddRequiredFeature(vkt::Feature::maintenance12);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceDepthStencilResolveProperties depth_stencil_resolve_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(depth_stencil_resolve_props);
+    if ((depth_stencil_resolve_props.supportedDepthResolveModes & VK_RESOLVE_MODE_SAMPLE_ZERO_BIT) == 0) {
+        GTEST_SKIP() << "supportedDepthResolveModes does not include VK_RESOLVE_MODE_SAMPLE_ZERO_BIT";
+    }
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_D16_UNORM;
+    image_ci.extent = {16u, 16u, 1u};
+    image_ci.mipLevels = 1u;
+    image_ci.arrayLayers = 1u;
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)) {
+        GTEST_SKIP() << "Multisample depth images not supported";
+    }
+    vkt::Image src_image(*m_device, image_ci, vkt::set_layout);
+
+    image_ci.format = VK_FORMAT_D32_SFLOAT;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if (!IsImageFormatSupported(Gpu(), image_ci, VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
+        GTEST_SKIP() << "Depth image format not supported";
+    }
+    vkt::Image dst_image(*m_device, image_ci, vkt::set_layout);
+
+    VkImageResolve2 resolve_region = vku::InitStructHelper();
+    resolve_region.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    resolve_region.srcOffset = {0, 0, 0};
+    resolve_region.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    resolve_region.dstOffset = {0, 0, 0};
+    resolve_region.extent = {1, 1, 1};
+
+    VkResolveImageModeInfoKHR resolve_mode = vku::InitStructHelper();
+    resolve_mode.resolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+    resolve_mode.stencilResolveMode = VK_RESOLVE_MODE_NONE;
+    VkResolveImageInfo2 resolve_info = vku::InitStructHelper(&resolve_mode);
+    resolve_info.srcImage = src_image;
+    resolve_info.srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    resolve_info.dstImage = dst_image;
+    resolve_info.dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    resolve_info.regionCount = 1;
+    resolve_info.pRegions = &resolve_region;
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkResolveImageInfo2-srcImage-12545");
+    vk::CmdResolveImage2KHR(m_command_buffer, &resolve_info);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeCommand, ResolveImageFormatMismatch) {
     RETURN_IF_SKIP(Init());
 
@@ -1152,7 +1259,7 @@ TEST_F(NegativeCommand, ResolveImageFormatMismatch) {
     resolve_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     resolve_region.dstOffset = {0, 0, 0};
     resolve_region.extent = {1, 1, 1};
-    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-srcImage-01386");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-srcImage-12546");
     vk::CmdResolveImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image, VK_IMAGE_LAYOUT_GENERAL, 1,
                         &resolve_region);
     m_errorMonitor->VerifyFound();
@@ -1942,9 +2049,8 @@ TEST_F(NegativeCommand, StrideMultiDrawIndirect) {
 
     auto buf_memory_barrier = buffer.BufferMemoryBarrier(
         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT, 0, VK_WHOLE_SIZE);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1,
-                           &buf_memory_barrier, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, buf_memory_barrier);
 
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
@@ -2033,6 +2139,7 @@ TEST_F(NegativeCommand, DrawIndirectCountKHR) {
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-offset-02710");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDrawIndirectCount-maxDrawCount-03111");
     vk::CmdDrawIndirectCountKHR(m_command_buffer, draw_buffer, 1, count_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     m_errorMonitor->VerifyFound();
 
@@ -2047,6 +2154,10 @@ TEST_F(NegativeCommand, DrawIndirectCountKHR) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-stride-03110");
     vk::CmdDrawIndirectCountKHR(m_command_buffer, draw_buffer, 0, count_buffer, 0, 1, 1);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-maxDrawCount-03111");
+    vk::CmdDrawIndirectCountKHR(m_command_buffer, draw_buffer, 4, count_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -2115,6 +2226,7 @@ TEST_F(NegativeCommand, DrawIndexedIndirectCountKHR) {
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirectCount-offset-02710");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDrawIndexedIndirectCount-maxDrawCount-03143");
     vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, draw_buffer, 1, count_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
     m_errorMonitor->VerifyFound();
 
@@ -2129,6 +2241,10 @@ TEST_F(NegativeCommand, DrawIndexedIndirectCountKHR) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirectCount-stride-03142");
     vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, draw_buffer, 0, count_buffer, 0, 1, 1);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirectCount-maxDrawCount-03143");
+    vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, draw_buffer, 4, count_buffer, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -2208,6 +2324,8 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
             std::vector<std::string> vuids;
         };
 
+        // 02029 only requires exclusiveScissorCount to be 0 or at least viewportCount, so an exclusiveScissorCount
+        // larger than viewportCount does not violate it.
         std::vector<TestCase> test_cases = {
             {1,
              viewports,
@@ -2215,8 +2333,7 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
              scissors,
              2,
              scissors,
-             {"VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02027",
-              "VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02029"}},
+             {"VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02027"}},
             {1,
              viewports,
              1,
@@ -2224,8 +2341,7 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
              100,
              scissors,
              {"VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02027",
-              "VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02028",
-              "VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02029"}},
+              "VUID-VkPipelineViewportExclusiveScissorStateCreateInfoNV-exclusiveScissorCount-02028"}},
             {1, viewports, 1, scissors, 1, nullptr, {"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-04056"}},
         };
 
@@ -2700,26 +2816,15 @@ TEST_F(NegativeCommand, DrawBlendEnabledFormatFeatures) {
     AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEnable);
     RETURN_IF_SKIP(Init());
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
+    // Best guess format
+    m_render_target_fmt = VK_FORMAT_B8G8R8A8_USCALED;
+    const VkFormatFeatureFlags2 linear = m_device->FormatFeaturesLinear(m_render_target_fmt);
+    const VkFormatFeatureFlags2 optimal = m_device->FormatFeaturesOptimal(m_render_target_fmt);
+    if (!(linear & VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT) || (linear & VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT) ||
+        !(optimal & VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT)) {
+        GTEST_SKIP() << "Need " << string_VkFormat(m_render_target_fmt)
+                     << " to support blending in optimal tiling, but not in linear tiling";
     }
-
-    const VkFormat render_format = GetRenderTargetFormat();
-
-    // Set format features from being found
-    VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), render_format, &formatProps);
-    if ((formatProps.linearTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == 0) {
-        GTEST_SKIP() << "Required linear tiling features not supported";
-    }
-    // Gets pass pipeline creation but not the actual tiling used
-    formatProps.optimalTilingFeatures |= VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT;
-    // will be caught at draw time that feature for optimal image is not set
-    // InitRenderTarget() should be setting color attachment as VK_IMAGE_TILING_LINEAR
-    formatProps.linearTilingFeatures &= ~VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), render_format, formatProps);
 
     InitRenderTarget();
 
@@ -2846,22 +2951,28 @@ TEST_F(NegativeCommand, ResolveUsage) {
         GTEST_SKIP() << "Required VkSampleCountFlagBits are not supported; skipping";
     }
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
+    // Best guess format
+    const VkFormat src_format = VK_FORMAT_A8B8G8R8_USCALED_PACK32;
+    const VkFormat dst_format = VK_FORMAT_A8B8G8R8_SSCALED_PACK32;
+    const VkFormatFeatureFlags2 src_features = m_device->FormatFeaturesOptimal(src_format);
+    const VkFormatFeatureFlags2 dst_features = m_device->FormatFeaturesOptimal(dst_format);
+    if ((src_features & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT) || !(src_features & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) ||
+        (dst_features & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) || !(dst_features & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)) {
+        GTEST_SKIP() << "Need " << string_VkFormat(src_format) << " to only be a transfer dst and " << string_VkFormat(dst_format)
+                     << " to only be a transfer src";
     }
-
-    VkFormat src_format = VK_FORMAT_R8_UNORM;
-    VkFormat dst_format = VK_FORMAT_R8_SNORM;
-
-    VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), src_format, &formatProps);
-    formatProps.optimalTilingFeatures &= ~VK_FORMAT_FEATURE_TRANSFER_SRC_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), src_format, formatProps);
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), dst_format, &formatProps);
-    formatProps.optimalTilingFeatures &= ~VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), dst_format, formatProps);
+    // The formats also need to actually be usable for the multisampled images below
+    auto multisampled_image_supported = [this](VkFormat format, VkImageUsageFlags usage) {
+        VkImageCreateInfo ci = vkt::Image::ImageCreateInfo2D(32, 1, 1, 1, format, usage);
+        ci.samples = VK_SAMPLE_COUNT_2_BIT;
+        VkImageFormatProperties props;
+        return GetImageFormatProps(Gpu(), ci, props) == VK_SUCCESS && (props.sampleCounts & VK_SAMPLE_COUNT_2_BIT) != 0;
+    };
+    if (!multisampled_image_supported(src_format, VK_IMAGE_USAGE_TRANSFER_SRC_BIT) ||
+        !multisampled_image_supported(dst_format, VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+        GTEST_SKIP() << "Need " << string_VkFormat(src_format) << " and " << string_VkFormat(dst_format)
+                     << " to support multisampled images";
+    }
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -3212,8 +3323,6 @@ TEST_F(NegativeCommand, ClearDepthStencilWithAspect) {
     // Element of pRanges.aspect includes VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_USAGE_TRANSFER_DST_BIT not included in the
     // VkImageCreateInfo::usage used to create image
     m_errorMonitor->SetDesiredError("VUID-vkCmdClearDepthStencilImage-pRanges-02660");
-    // ... since VK_IMAGE_USAGE_TRANSFER_DST_BIT not included in the VkImageCreateInfo::usage used to create image
-    m_errorMonitor->SetDesiredError("VUID-vkCmdClearDepthStencilImage-pRanges-02659");
     vk::CmdClearDepthStencilImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &range);
     m_errorMonitor->VerifyFound();
 
@@ -3252,8 +3361,6 @@ TEST_F(NegativeCommand, ClearDepthStencilWithAspectSeparate) {
     // Element of pRanges.aspect includes VK_IMAGE_ASPECT_STENCIL_BIT, and image was created with separate stencil usage,
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT not included in the VkImageStencilUsageCreateInfo::stencilUsage used to create image
     m_errorMonitor->SetDesiredError("VUID-vkCmdClearDepthStencilImage-pRanges-02658");
-    // ... since VK_IMAGE_USAGE_TRANSFER_DST_BIT not included in the VkImageCreateInfo::usage used to create image
-    m_errorMonitor->SetDesiredError("VUID-vkCmdClearDepthStencilImage-pRanges-02659");
     vk::CmdClearDepthStencilImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &range);
     m_errorMonitor->VerifyFound();
 
@@ -3389,7 +3496,6 @@ TEST_F(NegativeCommand, ClearDepthStencilImage) {
     // need to handle since an element of pRanges includes VK_IMAGE_ASPECT_DEPTH_BIT without VkImageCreateInfo::usage having
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT being set
     m_errorMonitor->SetDesiredError("VUID-vkCmdClearDepthStencilImage-pRanges-02660");
-    m_errorMonitor->SetDesiredError("VUID-vkCmdClearDepthStencilImage-pRanges-02659");
     vk::CmdClearDepthStencilImage(m_command_buffer, dst_image_bad_usage, VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &range);
     m_errorMonitor->VerifyFound();
 
@@ -3582,6 +3688,12 @@ TEST_F(NegativeCommand, CmdClearAttachmentTests) {
         clear_rect.layerCount = 4;
         m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-pRects-06937");
         vk::CmdClearAttachments(cmd_buffer, 1, &color_attachment, 1, &clear_rect);
+
+        // baseLayer + layerCount overflows 32-bit,
+        clear_rect.baseArrayLayer = 2;
+        clear_rect.layerCount = std::numeric_limits<uint32_t>::max() - 1;
+        m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-pRects-06937");
+        vk::CmdClearAttachments(cmd_buffer, 1, &color_attachment, 1, &clear_rect);
     };
 
     // Register clear commands to secondary command buffer
@@ -3700,25 +3812,20 @@ TEST_F(NegativeCommand, ClearDepthStencilImageWithInvalidAspect) {
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
-
 TEST_F(NegativeCommand, ClearColorImageWithMissingFeature) {
     TEST_DESCRIPTION("Use vkCmdClearColorImage with image format that doesnt have VK_FORMAT_FEATURE_TRANSFER_DST_BIT.");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE1_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
+    // Best guess format
+    const VkFormat format = VK_FORMAT_A8B8G8R8_SSCALED_PACK32;
+    const VkImageCreateInfo image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    VkImageFormatProperties image_format_props;
+    if ((m_device->FormatFeaturesOptimal(format) & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) ||
+        GetImageFormatProps(Gpu(), image_ci, image_format_props) != VK_SUCCESS) {
+        GTEST_SKIP() << "Need " << string_VkFormat(format) << " to be usable as an image, but not as a transfer dst";
     }
-
-    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-
-    VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), format, &formatProps);
-    formatProps.optimalTilingFeatures &= ~VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), format, formatProps);
 
     vkt::Image image(*m_device, 32, 32, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
@@ -3737,7 +3844,6 @@ TEST_F(NegativeCommand, ClearColorImageWithMissingFeature) {
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
-
 TEST_F(NegativeCommand, ClearDsImageWithInvalidAspect) {
     TEST_DESCRIPTION("Attempt to clear color aspect of depth/stencil image.");
 
@@ -4027,8 +4133,7 @@ TEST_F(NegativeCommand, CommandBufferRecording) {
         VkImageMemoryBarrier image_barrier =
             image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
         m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-commandBuffer-recording");
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
+        m_command_buffer.Barrier(image_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
         m_errorMonitor->VerifyFound();
     }
 
@@ -4476,8 +4581,8 @@ TEST_F(NegativeCommand, ResolveImage2DepthImageAspectMask) {
     resolve_info.regionCount = 1;
     resolve_info.pRegions = &resolve_region;
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-srcSubresource-11800");
-    m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-dstSubresource-11801");
+    m_errorMonitor->SetDesiredError("VUID-VkResolveImageInfo2-srcSubresource-11800");
+    m_errorMonitor->SetDesiredError("VUID-VkResolveImageInfo2-dstSubresource-11801");
     resolve_info.srcImage = src_depth_image;
     vk::CmdResolveImage2KHR(m_command_buffer, &resolve_info);
     m_errorMonitor->VerifyFound();
@@ -5252,4 +5357,93 @@ TEST_F(NegativeCommand, DeviceLostInUse) {
     m_errorMonitor->SetDesiredError("VUID-vkResetCommandPool-commandPool-00040");
     vk::ResetCommandPool(*m_device, m_command_pool, 0);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCommand, ArmSchedulingControlsDispatchParameters) {
+    TEST_DESCRIPTION("Validate VK_ARM_scheduling_controls dispatch parameter limits.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME);
+
+    RETURN_IF_SKIP(Init());
+    if (!DeviceExtensionSupported(Gpu(), nullptr, VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME, 2)) {
+        GTEST_SKIP() << VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME << " spec version 2 not supported";
+    }
+
+    VkPhysicalDeviceSchedulingControlsDispatchParametersPropertiesARM dispatch_props = vku::InitStructHelper();
+    VkPhysicalDeviceSchedulingControlsPropertiesARM scheduling_props = vku::InitStructHelper(&dispatch_props);
+    VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&scheduling_props);
+    vk::GetPhysicalDeviceProperties2(Gpu(), &props2);
+
+    VkDispatchParametersARM dispatch_parameters = vku::InitStructHelper();
+
+    m_command_buffer.Begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetDispatchParametersARM-pDispatchParameters-parameter");
+    vk::CmdSetDispatchParametersARM(m_command_buffer.handle(), nullptr);
+    m_errorMonitor->VerifyFound();
+
+    if ((scheduling_props.schedulingControlsFlags & VK_PHYSICAL_DEVICE_SCHEDULING_CONTROLS_DISPATCH_PARAMETERS_ARM) == 0) {
+        m_errorMonitor->SetDesiredError("VUID-vkCmdSetDispatchParametersARM-schedulingControlsFlags-12391");
+        vk::CmdSetDispatchParametersARM(m_command_buffer.handle(), &dispatch_parameters);
+        m_errorMonitor->VerifyFound();
+        return;
+    }
+
+    dispatch_parameters.maxWarpsPerShaderCore = dispatch_props.schedulingControlsMaxWarpsCount;
+    if (dispatch_parameters.maxWarpsPerShaderCore != 0xffffffffu) {
+        dispatch_parameters.maxWarpsPerShaderCore++;
+        m_errorMonitor->SetDesiredError("VUID-VkDispatchParametersARM-maxWarpsPerShaderCore-12392");
+        vk::CmdSetDispatchParametersARM(m_command_buffer.handle(), &dispatch_parameters);
+        m_errorMonitor->VerifyFound();
+        dispatch_parameters.maxWarpsPerShaderCore = 0;
+    }
+
+    dispatch_parameters.maxQueuedWorkGroupBatches = dispatch_props.schedulingControlsMaxQueuedBatchesCount;
+    if (dispatch_parameters.maxQueuedWorkGroupBatches != 0xffffffffu) {
+        dispatch_parameters.maxQueuedWorkGroupBatches++;
+        m_errorMonitor->SetDesiredError("VUID-VkDispatchParametersARM-maxQueuedWorkGroupBatches-12393");
+        vk::CmdSetDispatchParametersARM(m_command_buffer.handle(), &dispatch_parameters);
+        m_errorMonitor->VerifyFound();
+        dispatch_parameters.maxQueuedWorkGroupBatches = 0;
+    }
+
+    dispatch_parameters.workGroupBatchSize = dispatch_props.schedulingControlsMaxWorkGroupBatchSize;
+    if (dispatch_parameters.workGroupBatchSize != 0xffffffffu) {
+        dispatch_parameters.workGroupBatchSize++;
+        m_errorMonitor->SetDesiredError("VUID-VkDispatchParametersARM-workGroupBatchSize-12394");
+        vk::CmdSetDispatchParametersARM(m_command_buffer.handle(), &dispatch_parameters);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeCommand, BindDescriptorSets2NullDynamicOffsets) {
+    TEST_DESCRIPTION("vkCmdBindDescriptorSets2 with a dynamicOffsetCount but no pDynamicOffsets array");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_6_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance6);
+    RETURN_IF_SKIP(Init());
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, 1024, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+    descriptor_set.UpdateDescriptorSets();
+
+    VkBindDescriptorSetsInfo bind_ds_info = vku::InitStructHelper();
+    bind_ds_info.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
+    bind_ds_info.layout = pipeline_layout;
+    bind_ds_info.firstSet = 0;
+    bind_ds_info.descriptorSetCount = 1;
+    bind_ds_info.pDescriptorSets = &descriptor_set.set_;
+    bind_ds_info.dynamicOffsetCount = 1;
+    bind_ds_info.pDynamicOffsets = nullptr;
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkBindDescriptorSetsInfo-pDynamicOffsets-parameter");
+    vk::CmdBindDescriptorSets2KHR(m_command_buffer, &bind_ds_info);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }

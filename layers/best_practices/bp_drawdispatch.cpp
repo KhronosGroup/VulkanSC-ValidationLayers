@@ -20,10 +20,7 @@
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/buffer_state.h"
-#include "state_tracker/last_bound_state.h"
-#include "state_tracker/render_pass_state.h"
-#include "state_tracker/pipeline_state.h"
-#include <bitset>
+#include "utils/vk_api_utils.h"
 
 // Generic function to handle validation for all CmdDraw* type functions
 bool BestPractices::ValidateCmdDrawType(const bp_state::CommandBufferSubState& cb_state, const Location& loc) const {
@@ -128,11 +125,11 @@ bool BestPractices::PreCallValidateCmdDrawIndexed(VkCommandBuffer commandBuffer,
         (sub_state.small_indexed_draw_call_count == kMaxSmallIndexedDrawcalls - 1) &&
         (VendorCheckEnabled(kBPVendorArm) || VendorCheckEnabled(kBPVendorIMG))) {
         skip |= LogPerformanceWarning("BestPractices-vkCmdDrawIndexed-many-small-indexed-drawcalls", device, error_obj.location,
-                                      "%s %s: The command buffer contains many small indexed drawcalls "
+                                      "%s: The command buffer contains many small indexed drawcalls "
                                       "(at least %" PRIu32 " drawcalls with less than %" PRIu32
                                       " indices each). This may cause pipeline bubbles. "
                                       "You can try batching drawcalls or instancing when applicable.",
-                                      VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), kMaxSmallIndexedDrawcalls,
+                                      VendorSpecificTag(kBPVendorArm | kBPVendorIMG).c_str(), kMaxSmallIndexedDrawcalls,
                                       kSmallIndexedDrawcallIndices);
     }
 
@@ -195,12 +192,19 @@ bool BestPractices::ValidateIndexBufferArm(const bp_state::CommandBufferSubState
     // no point checking index buffer if the memory is nonexistant/unmapped, or if there is no graphics pipeline bound to this CB
     if (ib_mem) {
         const uint32_t scan_stride = IndexTypeByteSize(ib_type);
-        // Check if all indices are within the memory allocation size, if robustness is enabled they might not be
-        if ((firstIndex + indexCount) * scan_stride > ib_memory_state->allocate_info.allocationSize) {
+        // ib_mem points at the start of the mapped range, not at the buffer.
+        // Only scan if all the indices are mapped, which they might not be with robustness.
+        const VkDeviceSize memory_offset = ib_state->Binding()->memory_offset + cb_state.base.index_buffer_binding.BufferOffset() +
+                                           static_cast<VkDeviceSize>(firstIndex) * scan_stride;
+        const VkDeviceSize scan_size = static_cast<VkDeviceSize>(indexCount) * scan_stride;
+        const vvl::MemRange& mapped_range = ib_memory_state->mapped_range;
+        const VkDeviceSize mapped_end = (mapped_range.size == VK_WHOLE_SIZE) ? ib_memory_state->allocate_info.allocationSize
+                                                                             : mapped_range.offset + mapped_range.size;
+        if (memory_offset < mapped_range.offset || memory_offset + scan_size > mapped_end) {
             return skip;
         }
-        const uint8_t* scan_begin = static_cast<const uint8_t*>(ib_mem) + firstIndex * scan_stride;
-        const uint8_t* scan_end = scan_begin + indexCount * scan_stride;
+        const uint8_t* scan_begin = static_cast<const uint8_t*>(ib_mem) + (memory_offset - mapped_range.offset);
+        const uint8_t* scan_end = scan_begin + scan_size;
 
         // Min and max are important to track for some Mali architectures. In older Mali devices without IDVS, all
         // vertices corresponding to indices between the minimum and maximum may be loaded, and possibly shaded,

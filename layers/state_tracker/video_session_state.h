@@ -18,6 +18,7 @@
 
 #include "state_tracker/state_object.h"
 #include "utils/hash_util.h"
+#include "utils/math_utils.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
 #include <cmath>
 #include <memory>
@@ -69,6 +70,7 @@ class VideoProfileDesc : public std::enable_shared_from_this<VideoProfileDesc> {
             VkVideoDecodeUsageInfoKHR decode_usage;
             VkVideoEncodeUsageInfoKHR encode_usage;
         };
+        VkVideoEncodeProfileRgbConversionInfoVALVE encode_rgb_conversion;
         union {
             VkVideoDecodeH264ProfileInfoKHR decode_h264;
             VkVideoDecodeH265ProfileInfoKHR decode_h265;
@@ -103,6 +105,7 @@ class VideoProfileDesc : public std::enable_shared_from_this<VideoProfileDesc> {
                 VkVideoEncodeQuantizationMapCapabilitiesKHR quantization_map;
                 VkVideoEncodeIntraRefreshCapabilitiesKHR intra_refresh;
                 VkVideoEncodeFeedback2CapabilitiesKHR feedback2;
+                VkVideoEncodeRgbConversionCapabilitiesVALVE rgb_conversion;
             } encode_ext;
         };
     };
@@ -130,12 +133,14 @@ class VideoProfileDesc : public std::enable_shared_from_this<VideoProfileDesc> {
             }
 
             case VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR: {
-                uint32_t max_ctb_size = 16 * static_cast<uint32_t>(log2(capabilities_.encode_h265.ctbSizes));
+                // VK_VIDEO_ENCODE_H265_CTB_SIZE_16_BIT_KHR is bit 0, each next bit doubles the size
+                const uint32_t max_ctb_size = 16u << MostSignificantBit(capabilities_.encode_h265.ctbSizes);
                 return {max_ctb_size, max_ctb_size};
             }
 
             case VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR: {
-                uint32_t max_sb_size = 128 * static_cast<uint32_t>(log2(capabilities_.encode_av1.superblockSizes));
+                // VK_VIDEO_ENCODE_AV1_SUPERBLOCK_SIZE_64_BIT_KHR is bit 0, each next bit doubles the size
+                const uint32_t max_sb_size = 64u << MostSignificantBit(capabilities_.encode_av1.superblockSizes);
                 return {max_sb_size, max_sb_size};
             }
 
@@ -160,7 +165,9 @@ class VideoProfileDesc : public std::enable_shared_from_this<VideoProfileDesc> {
             if (match && lhs->profile_.is_encode) {
                 match = match && lhs->profile_.encode_usage.videoUsageHints == rhs->profile_.encode_usage.videoUsageHints &&
                         lhs->profile_.encode_usage.videoContentHints == rhs->profile_.encode_usage.videoContentHints &&
-                        lhs->profile_.encode_usage.tuningMode == rhs->profile_.encode_usage.tuningMode;
+                        lhs->profile_.encode_usage.tuningMode == rhs->profile_.encode_usage.tuningMode &&
+                        lhs->profile_.encode_rgb_conversion.performEncodeRgbConversion ==
+                            rhs->profile_.encode_rgb_conversion.performEncodeRgbConversion;
             }
 
             if (match) {
@@ -217,7 +224,7 @@ class VideoProfileDesc : public std::enable_shared_from_this<VideoProfileDesc> {
 
             if (desc->profile_.is_encode) {
                 hc << desc->profile_.encode_usage.videoUsageHints << desc->profile_.encode_usage.videoContentHints
-                   << desc->profile_.encode_usage.tuningMode;
+                   << desc->profile_.encode_usage.tuningMode << desc->profile_.encode_rgb_conversion.performEncodeRgbConversion;
             }
 
             switch (desc->profile_.base.videoCodecOperation) {

@@ -800,6 +800,12 @@ TEST_F(NegativeMemory, MapMemoryFlush) {
     vk::FlushMappedMemoryRanges(device(), 1, &mem_range);
     m_errorMonitor->VerifyFound();
 
+    // VK_WHOLE_SIZE with an offset at the end of the mapped range
+    mem_range.offset = 6 * atom_size;
+    m_errorMonitor->SetDesiredError("VUID-VkMappedMemoryRange-size-00686");
+    vk::FlushMappedMemoryRanges(device(), 1, &mem_range);
+    m_errorMonitor->VerifyFound();
+
     // Try flushing and invalidating host memory not mapped
     vk::UnmapMemory(device(), mem);
     mem_range.offset = 0;
@@ -1912,8 +1918,7 @@ TEST_F(NegativeMemory, AllocationCount) {
         GTEST_SKIP() << "maxMemoryAllocationCount is too high";
     }
 
-    std::vector<VkDeviceMemory> mems;
-    mems.reserve(max_mems + 1);
+    std::vector<VkDeviceMemory> mems(max_mems + 1);
 
     m_errorMonitor->SetDesiredError("VUID-vkAllocateMemory-maxMemoryAllocationCount-04101");
 
@@ -2319,6 +2324,54 @@ TEST_F(NegativeMemory, BufferDeviceAddressKHRDisabled) {
     m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-flags-03331");
     vk::AllocateMemory(device(), &buffer_alloc_info, NULL, &buffer_mem);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeMemory, BufferDeviceAddressAllocationAlignment) {
+    AddRequiredExtensions(VK_VALVE_BUFFER_DEVICE_ADDRESS_ALLOCATION_ALIGNMENT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddressAllocationAlignment);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddressCaptureReplay);
+    RETURN_IF_SKIP(Init());
+
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+    buffer_create_info.size = 4096;
+    buffer_create_info.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
+
+    VkMemoryRequirements buffer_mem_reqs = {};
+    vk::GetBufferMemoryRequirements(device(), buffer, &buffer_mem_reqs);
+
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    {
+        VkBufferDeviceAddressAlignmentAllocateInfoVALVE alignment_info = vku::InitStructHelper();
+        alignment_info.alignment = 4;
+
+        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alignment_info);
+        alloc_info.allocationSize = buffer_mem_reqs.size;
+        m_device->Physical().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &alloc_info, 0);
+
+        m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-flags-12510");
+        vk::AllocateMemory(device(), &alloc_info, NULL, &memory);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT | VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT;
+
+        VkMemoryOpaqueCaptureAddressAllocateInfo opaque_addr_info = vku::InitStructHelper(&alloc_flags);
+        opaque_addr_info.opaqueCaptureAddress = 1024;
+
+        VkBufferDeviceAddressAlignmentAllocateInfoVALVE alignment_info = vku::InitStructHelper(&opaque_addr_info);
+        alignment_info.alignment = 4;
+
+        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alignment_info);
+        alloc_info.allocationSize = buffer_mem_reqs.size;
+        m_device->Physical().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &alloc_info, 0);
+
+        m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-alignment-12511");
+        vk::AllocateMemory(device(), &alloc_info, NULL, &memory);
+        m_errorMonitor->VerifyFound();
+    }
 }
 
 TEST_F(NegativeMemory, MemoryType) {

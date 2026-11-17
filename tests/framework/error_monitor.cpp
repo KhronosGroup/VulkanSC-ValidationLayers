@@ -17,7 +17,6 @@
  */
 #include "error_monitor.h"
 #include "test_common.h"
-#include "error_message/log_message_type.h"
 #include "generated/vk_function_pointers.h"
 #include "generated/vk_object_types.h"
 
@@ -82,21 +81,33 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
             oss << "Verbose Information: ";
         }
 
-        oss << "[ " << callback_data->pMessageIdName << " ] | MessageID = 0x" << std::hex << callback_data->messageIdNumber << '\n';
+        oss << "[ " << callback_data->pMessageIdName << " ] | MessageID = 0x" << std::hex << callback_data->messageIdNumber
+            << std::dec << '\n';
+
         oss << callback_data->pMessage << '\n';
 
         if (callback_data->objectCount > 0) {
             oss << "Objects: " << callback_data->objectCount << '\n';
-            for (uint32_t i = 0; i < callback_data->objectCount; i++) {
-                const auto& debug_object = callback_data->pObjects[i];
-                oss << "    [" << i << "] " << string_VkObjectTypeHandleName(debug_object.objectType);
+            for (uint32_t obj_i = 0; obj_i < callback_data->objectCount; obj_i++) {
+                const auto& debug_object = callback_data->pObjects[obj_i];
+                oss << "    [" << obj_i << "] " << string_VkObjectTypeHandleName(debug_object.objectType);
                 if (debug_object.objectHandle) {
-                    oss << " 0x" << std::hex << debug_object.objectHandle;
+                    oss << " 0x" << std::hex << debug_object.objectHandle << std::dec;
                 } else {
                     oss << " VK_NULL_HANDLE";
                 }
                 if (debug_object.pObjectName) {
                     oss << "[" << debug_object.pObjectName << "]";
+                }
+                if (debug_object.objectType == VK_OBJECT_TYPE_COMMAND_BUFFER && callback_data->cmdBufLabelCount > 0) {
+                    oss << " [ Active debug region: ";
+                    for (uint32_t label_i = 0; label_i < callback_data->cmdBufLabelCount; ++label_i) {
+                        if (label_i > 0) {
+                            oss << "::";
+                        }
+                        oss << callback_data->pCmdBufLabels[(callback_data->cmdBufLabelCount - 1) - label_i].pLabelName;
+                    }
+                    oss << " ]";
                 }
                 oss << '\n';
             }

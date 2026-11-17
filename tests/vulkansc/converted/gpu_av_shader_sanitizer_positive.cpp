@@ -55,7 +55,7 @@ void GpuAVGpuAVShaderSanitizer::CoopMatAlignmentTest(const char* cs_source, cons
     CreateComputePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
-    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
     pipe.CreateComputePipeline();
 
     vkt::Buffer payload_buffer(*m_device, 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
@@ -511,6 +511,28 @@ TEST_F(PositiveGpuAVShaderSanitizer, CoopMatAlignedStride) {
     CoopMatAlignmentTest(cs_source, {8, 8}, false);
 }
 
+TEST_F(PositiveGpuAVShaderSanitizer, CoopMatAlignedVectorElement) {
+    TEST_DESCRIPTION("Stride and element index are in units of the Pointer type (uvec4), not the matrix component type");
+    RETURN_IF_SKIP(InitCoopMatFp16());
+    const char* cs_source = R"glsl(
+         #version 450 core
+         #pragma use_vulkan_memory_model
+         #extension GL_KHR_memory_scope_semantics : enable
+         #extension GL_KHR_cooperative_matrix : enable
+         #extension GL_EXT_shader_explicit_arithmetic_types : enable
+         layout(local_size_x = 64) in;
+         layout(set=0, binding=0) coherent buffer SSBO { uvec4 payload[]; };
+         layout(set=0, binding=1) buffer ParamSSBO { uint stride_val; uint offset_val; };
+         void main() {
+            coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> matA;
+            coopMatLoad(matA, payload, offset_val, stride_val, gl_CooperativeMatrixLayoutRowMajor);
+            coopMatStore(matA, payload, offset_val, stride_val, gl_CooperativeMatrixLayoutRowMajor);
+         }
+    )glsl";
+    // A 32 byte stride and a 16 byte offset
+    CoopMatAlignmentTest(cs_source, {2, 1}, false);
+}
+
 TEST_F(PositiveGpuAVShaderSanitizer, CoopMatAlignedPointerBDA) {
     TEST_DESCRIPTION("OpCooperativeMatrixLoadKHR with a BDA pointer that is properly aligned");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -537,7 +559,7 @@ TEST_F(PositiveGpuAVShaderSanitizer, CoopMatAlignedPointerBDA) {
 
     CreateComputePipelineHelper pipe(*this);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
-    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_3);
     pipe.CreateComputePipeline();
 
     vkt::Buffer payload_buffer(*m_device, 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);

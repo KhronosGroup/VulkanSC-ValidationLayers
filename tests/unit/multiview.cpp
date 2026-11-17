@@ -78,7 +78,7 @@ TEST_F(NegativeMultiview, MaxInstanceIndex) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maxMultiviewInstanceIndex-02688");
-    vk::CmdDraw(m_command_buffer, 1, multiview_props.maxMultiviewInstanceIndex + 1, 0, 0);
+    vk::CmdDraw(m_command_buffer, 1, 2, 0, multiview_props.maxMultiviewInstanceIndex);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
@@ -470,10 +470,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
 
         CreatePipelineHelper pipe(*this);
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-        pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-        pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
-        pipe.vi_ci_.pVertexAttributeDescriptions = &input_attribs;
+        pipe.SetVertexInput(input_binding, input_attribs);
         pipe.CreateGraphicsPipeline();
 
         // Pipelines for all other subpasses
@@ -545,10 +542,7 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
 
         CreatePipelineHelper pipe(*this);
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-        pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-        pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
-        pipe.vi_ci_.pVertexAttributeDescriptions = &input_attribs;
+        pipe.SetVertexInput(input_binding, input_attribs);
         pipe.CreateGraphicsPipeline();
 
         // Pipelines for all other subpasses
@@ -1165,17 +1159,17 @@ TEST_F(NegativeMultiview, DynamicRenderingMaxMultiviewInstanceIndex) {
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-    VkRenderingInfo renderingInfo = vku::InitStructHelper();
-    renderingInfo.renderArea = {{0, 0}, {100u, 100u}};
-    renderingInfo.layerCount = 1u;
-    renderingInfo.colorAttachmentCount = 1u;
-    renderingInfo.pColorAttachments = &color_attachment;
-    renderingInfo.viewMask = 0x1;
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {100u, 100u}};
+    rendering_info.layerCount = 1u;
+    rendering_info.colorAttachmentCount = 1u;
+    rendering_info.pColorAttachments = &color_attachment;
+    rendering_info.viewMask = 0x1;
 
     m_command_buffer.Begin();
-    m_command_buffer.BeginRendering(renderingInfo);
+    m_command_buffer.BeginRendering(rendering_info);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
-    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, multiview_properties.maxMultiviewInstanceIndex);
+    vk::CmdDraw(m_command_buffer, 3u, 2u, 0u, multiview_properties.maxMultiviewInstanceIndex);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
 
@@ -1206,31 +1200,21 @@ TEST_F(NegativeMultiview, ShaderLayerBuiltInRenderPass) {
     VkShaderObj vs(*m_device, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj gs(*m_device, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
-    VkAttachmentReference color_att = {};
-    color_att.layout = VK_IMAGE_LAYOUT_GENERAL;
-
     VkAttachmentDescription attach = {};
     attach.samples = VK_SAMPLE_COUNT_1_BIT;
     attach.format = VK_FORMAT_R8G8B8A8_UNORM;
     attach.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
     attach.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_att;
-
     uint32_t view_masks[] = {0x3u};
     VkRenderPassMultiviewCreateInfo rpmvci = vku::InitStructHelper();
     rpmvci.subpassCount = 1;
     rpmvci.pViewMasks = view_masks;
 
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper(&rpmvci);
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &attach;
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-    vkt::RenderPass render_pass(*m_device, rpci);
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.AddAttachmentDescription(attach);
+    render_pass.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    render_pass.CreateRenderPass(&rpmvci);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -1396,30 +1380,21 @@ TEST_F(NegativeMultiview, MeshShader) {
     VkShaderObj ms(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
     VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2);
 
-    VkAttachmentReference color_attachment = {0, VK_IMAGE_LAYOUT_GENERAL};
-
     VkAttachmentDescription attach_desc = {};
     attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
     attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
     attach_desc.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
     attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment;
-
     uint32_t view_masks[] = {0x3u};
     VkRenderPassMultiviewCreateInfo rp_multiview_ci = vku::InitStructHelper();
     rp_multiview_ci.subpassCount = 1;
     rp_multiview_ci.pViewMasks = view_masks;
 
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper(&rp_multiview_ci);
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &attach_desc;
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-    vkt::RenderPass render_pass(*m_device, rpci);
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.AddAttachmentDescription(attach_desc);
+    render_pass.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    render_pass.CreateRenderPass(&rp_multiview_ci);
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};

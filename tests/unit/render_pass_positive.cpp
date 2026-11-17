@@ -638,8 +638,8 @@ TEST_F(PositiveRenderPass, FramebufferCreateDepthStencilLayoutTransitionForDepth
     imb.subresourceRange.baseArrayLayer = 0;
     imb.subresourceRange.layerCount = 0x1;
 
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &imb);
+    m_command_buffer.Barrier(imb, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT);
 
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -907,10 +907,8 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
             image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth_range);
         auto stencil_barrier =
             image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, stencil_range);
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &depth_barrier);
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &stencil_barrier);
+        m_command_buffer.Barrier(depth_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+        m_command_buffer.Barrier(stencil_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
         m_command_buffer.End();
         m_default_queue->SubmitAndWait(m_command_buffer);
         m_command_buffer.Reset();
@@ -988,8 +986,7 @@ TEST_F(PositiveRenderPass, SeparateDepthStencilSubresourceLayout) {
     vkt::Framebuffer framebuffer_combined(*m_device, render_pass_combined, 1, &view.handle(), 1, 1);
 
     for (auto& barrier : barriers) {
-        vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &barrier);
+        m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     }
 
     m_command_buffer.BeginRenderPass(render_pass_separate, framebuffer_separate);
@@ -1029,18 +1026,17 @@ TEST_F(PositiveRenderPass, TestDepthStencilRenderPassTransition) {
         "pass. Then create a barrier on both aspect, for this to be valid *both* aspects must have been correctly tracked as "
         "transitioned to the new layout.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(Init());
     if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
         GTEST_SKIP() << "At least Vulkan version 1.1 is required";
     }
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     const VkFormat ds_format = FindSupportedDepthStencilFormat(m_device->Physical());
-    vkt::Image depthImage(*m_device, 32, 32, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    vkt::Image depth_image(*m_device, 32, 32, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
     for (size_t i = 0; i < 2; i++) {
         const vkt::ImageView depth_or_stencil_view(
-            *m_device, depthImage.BasicViewCreatInfo(i == 0 ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_STENCIL_BIT));
+            *m_device, depth_image.BasicViewCreatInfo(i == 0 ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_STENCIL_BIT));
 
         RenderPassSingleSubpass rp(*this);
         rp.AddAttachmentDescription(ds_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
@@ -1059,14 +1055,14 @@ TEST_F(PositiveRenderPass, TestDepthStencilRenderPassTransition) {
         img_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         img_barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        img_barrier.image = depthImage;
+        img_barrier.image = depth_image;
         img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         img_barrier.subresourceRange.layerCount = 1;
         img_barrier.subresourceRange.levelCount = 1;
 
-        vk::CmdPipelineBarrier(m_command_buffer,
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &img_barrier);
+        m_command_buffer.Barrier(img_barrier,
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT);
         m_command_buffer.End();
 
         m_default_queue->SubmitAndWait(m_command_buffer);
@@ -1176,19 +1172,10 @@ TEST_F(PositiveRenderPass, RenderPassSampleLocationsBeginInfo) {
     attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkAttachmentReference attach = {};
-    attach.layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription subpass = {};
-    subpass.pColorAttachments = &attach;
-    subpass.colorAttachmentCount = 1;
-
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &attach_desc;
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-    vkt::RenderPass render_pass(*m_device, rpci);
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.AddAttachmentDescription(attach_desc);
+    render_pass.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+    render_pass.CreateRenderPass();
 
     vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
@@ -1257,6 +1244,51 @@ TEST_F(PositiveRenderPass, RenderPassSampleLocationsBeginInfo) {
 
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveRenderPass, MultisampledRenderToSingleSampledResolveModeNone) {
+    TEST_DESCRIPTION("resolveImageView is ignored when resolveMode is VK_RESOLVE_MODE_NONE");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::multisampledRenderToSingleSampled);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
+    VkImageCreateInfo image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image_ci.flags = VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT;
+    VkImageFormatProperties format_props;
+    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, image_ci.usage,
+                                                   image_ci.flags, &format_props) != VK_SUCCESS ||
+        (format_props.sampleCounts & VK_SAMPLE_COUNT_4_BIT) == 0) {
+        GTEST_SKIP() << "4x sample count not supported";
+    }
+    vkt::Image image(*m_device, image_ci);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Image resolve_image(*m_device, 32, 32, format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView resolve_view = resolve_image.CreateView();
+
+    VkMultisampledRenderToSingleSampledInfoEXT ms_render_to_ss = vku::InitStructHelper();
+    ms_render_to_ss.multisampledRenderToSingleSampledEnable = VK_TRUE;
+    ms_render_to_ss.rasterizationSamples = VK_SAMPLE_COUNT_4_BIT;
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
+    color_attachment.resolveImageView = resolve_view;  // ignored
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    VkRenderingInfo rendering_info = vku::InitStructHelper(&ms_render_to_ss);
+    rendering_info.renderArea = {{0, 0}, {32, 32}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    m_command_buffer.EndRendering();
     m_command_buffer.End();
 }
 
@@ -1398,4 +1430,114 @@ TEST_F(PositiveRenderPass, MultisampledRenderToSingleSampled) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, test_pipe);
     vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
     m_command_buffer.EndRenderPass();
+}
+
+TEST_F(PositiveRenderPass, RenderPass2DependencyCompatibility) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    VkAttachmentReference2 ref = vku::InitStructHelper();
+    ref.attachment = 0u;
+    ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription2 subpass = vku::InitStructHelper();
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1u;
+    subpass.pColorAttachments = &ref;
+
+    VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
+    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attach_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attach_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attach_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
+    mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    mem_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkSubpassDependency2 dependency1 = vku::InitStructHelper(&mem_barrier);
+    dependency1.srcSubpass = 0u;
+    dependency1.dstSubpass = 0u;
+    dependency1.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency1.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency1.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency1.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency1.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    VkSubpassDependency2 dependency2 = vku::InitStructHelper(&mem_barrier);
+    dependency2.srcSubpass = 0u;
+    dependency2.dstSubpass = 0u;
+    dependency2.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    dependency2.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    dependency2.dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    dependency2.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    dependency2.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+
+    VkRenderPassCreateInfo2 rpci = vku::InitStructHelper();
+    rpci.attachmentCount = 1u;
+    rpci.pAttachments = &attach_desc;
+    rpci.subpassCount = 1u;
+    rpci.pSubpasses = &subpass;
+    rpci.dependencyCount = 1u;
+    rpci.pDependencies = &dependency1;
+    vkt::RenderPass render_pass1(*m_device, rpci);
+
+    rpci.pDependencies = &dependency2;
+    vkt::RenderPass render_pass2(*m_device, rpci);
+
+    vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView view = image.CreateView();
+    vkt::Framebuffer framebuffer(*m_device, render_pass1, 1u, &view.handle());
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(render_pass2, framebuffer, 32u, 32u);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveRenderPass, CompatibilityIgnoresResolveTransferFunctionFlags) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_10_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance10);
+    RETURN_IF_SKIP(Init());
+    VkPhysicalDeviceMaintenance10PropertiesKHR maintenance10_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(maintenance10_props);
+    if (!maintenance10_props.resolveSrgbFormatSupportsTransferFunctionControl) {
+        GTEST_SKIP() << "resolveSrgbFormatSupportsTransferFunctionControl not supported";
+    }
+
+    const VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
+    VkAttachmentDescription attachment = {0,
+                                          format,
+                                          VK_SAMPLE_COUNT_1_BIT,
+                                          VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                          VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                          VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                          VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                          VK_IMAGE_LAYOUT_UNDEFINED,
+                                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    RenderPassSingleSubpass rp_a(*this);
+    rp_a.AddAttachmentDescription(attachment);
+    rp_a.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp_a.CreateRenderPass();
+    attachment.flags = VK_ATTACHMENT_DESCRIPTION_RESOLVE_SKIP_TRANSFER_FUNCTION_BIT_KHR;
+    RenderPassSingleSubpass rp_b(*this);
+    rp_b.AddAttachmentDescription(attachment);
+    rp_b.AddColorAttachment(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp_b.CreateRenderPass();
+
+    vkt::Image image(*m_device, 32, 32, format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Framebuffer framebuffer(*m_device, rp_a, 1, &image_view.handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp_b, framebuffer, 32, 32);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

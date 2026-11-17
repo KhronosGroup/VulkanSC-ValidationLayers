@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2017, 2019-2025 The Khronos Group Inc.
- * Copyright (c) 2015-2017, 2019-2025 Valve Corporation
- * Copyright (c) 2015-2017, 2019-2025 LunarG, Inc.
+/* Copyright (c) 2015-2017, 2019-2026 The Khronos Group Inc.
+ * Copyright (c) 2015-2017, 2019-2026 Valve Corporation
+ * Copyright (c) 2015-2017, 2019-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@
 #include "state_tracker/pipeline_layout_state.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
 #include <vulkan/utility/vk_struct_helper.hpp>
-#include "utils/vk_api_utils.h"
+#include "utils/shader_utils.h"
 
 // Graphics pipeline library (GPL) state as defined by VK_KHR_graphics_pipeline_library
 //
-// We break up the pipeline into 4 seperate states (vertex input, pre-rast, frag shader, frag output)
+// We break up the pipeline into 4 separate states (vertex input, pre-rast, frag shader, frag output)
 
 namespace vvl {
 class DeviceState;
@@ -105,7 +105,7 @@ struct VertexInputState : public PipelineLibraryState {
 struct PreRasterState : public PipelineLibraryState {
     PreRasterState(const vvl::Pipeline &p, const vvl::DeviceState &dev_data,
                    const vku::safe_VkGraphicsPipelineCreateInfo &create_info, std::shared_ptr<const vvl::RenderPass> rp,
-                   spirv::StatelessData *stateless_data);
+                   std::vector<spirv::StatelessData> *stateless_data);
 
     static inline VkShaderStageFlags ValidShaderStages() {
         return VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
@@ -152,7 +152,7 @@ struct FragmentShaderState : public PipelineLibraryState {
 
     template <typename CreateInfo>
     FragmentShaderState(const vvl::Pipeline &pipeline_state, const vvl::DeviceState &dev_data, const CreateInfo &create_info,
-                        std::shared_ptr<const vvl::RenderPass> rp, spirv::StatelessData *stateless_data)
+                        std::shared_ptr<const vvl::RenderPass> rp, std::vector<spirv::StatelessData> *stateless_data)
         : FragmentShaderState(pipeline_state, dev_data, rp, create_info.subpass, create_info.layout) {
         if (create_info.pMultisampleState) {
             ms_state = ToSafeMultisampleState(*create_info.pMultisampleState);
@@ -180,10 +180,10 @@ struct FragmentShaderState : public PipelineLibraryState {
   private:
     static void SetFragmentShaderInfo(const vvl::Pipeline &pipeline_state, FragmentShaderState &fs_state,
                                       const vvl::DeviceState &state_data, const VkGraphicsPipelineCreateInfo &create_info,
-                                      spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]);
+                                      std::vector<spirv::StatelessData> *stateless_data);
     static void SetFragmentShaderInfo(const vvl::Pipeline &pipeline_state, FragmentShaderState &fs_state,
                                       const vvl::DeviceState &state_data, const vku::safe_VkGraphicsPipelineCreateInfo &create_info,
-                                      spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]);
+                                      std::vector<spirv::StatelessData> *stateless_data);
 };
 
 struct FragmentOutputState : public PipelineLibraryState {

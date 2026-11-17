@@ -59,8 +59,8 @@ TEST_F(PositiveSecondaryCommandBuffer, Barrier) {
     VkMemoryBarrier mem_barrier = vku::InitStructHelper();
     mem_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     mem_barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    vk::CmdPipelineBarrier(secondary, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 1, &mem_barrier, 0, nullptr, 0, nullptr);
+    secondary.Barrier(VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, mem_barrier,
+                      VK_DEPENDENCY_BY_REGION_BIT);
 
     VkImageMemoryBarrier barrier = vku::InitStructHelper();
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -383,8 +383,7 @@ TEST_F(PositiveSecondaryCommandBuffer, EventStageMask) {
                       0, nullptr, 0, nullptr, 0, nullptr);
     commandBuffer.End();
 
-    m_default_queue->Submit(commandBuffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(commandBuffer);
 }
 
 TEST_F(PositiveSecondaryCommandBuffer, EventsIn) {
@@ -529,11 +528,8 @@ TEST_F(PositiveSecondaryCommandBuffer, NestedDrawWithoutInline) {
     RETURN_IF_SKIP(Init());
 
     VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({color_format});
     pipe.CreateGraphicsPipeline();
 
     VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info = vku::InitStructHelper();
@@ -552,6 +548,97 @@ TEST_F(PositiveSecondaryCommandBuffer, NestedDrawWithoutInline) {
     vk::CmdBindPipeline(secondary, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdDraw(secondary, 3, 1, 0, 0);
     secondary.End();
+}
+
+TEST_F(PositiveSecondaryCommandBuffer, NestedInheritedFramebuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddRequiredFeature(vkt::Feature::nestedCommandBufferRendering);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkCommandBufferInheritanceInfo inner_inheritance_info = vku::InitStructHelper();
+    inner_inheritance_info.renderPass = RenderPass();
+    inner_inheritance_info.subpass = 0;
+    inner_inheritance_info.framebuffer = Framebuffer();
+    VkCommandBufferBeginInfo inner_begin_info = vku::InitStructHelper();
+    inner_begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    inner_begin_info.pInheritanceInfo = &inner_inheritance_info;
+
+    VkCommandBufferInheritanceInfo outer_inheritance_info = inner_inheritance_info;
+    outer_inheritance_info.framebuffer = VK_NULL_HANDLE;
+    VkCommandBufferBeginInfo outer_begin_info = vku::InitStructHelper();
+    outer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    outer_begin_info.pInheritanceInfo = &outer_inheritance_info;
+
+    vkt::CommandBuffer inner(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    inner.Begin(&inner_begin_info);
+    inner.End();
+    vkt::CommandBuffer outer(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    outer.Begin(&outer_begin_info);
+    vk::CmdExecuteCommands(outer, 1u, &inner.handle());
+    outer.End();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    vk::CmdExecuteCommands(m_command_buffer, 1u, &outer.handle());
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveSecondaryCommandBuffer, NestedClearAttachmentsDynamicRendering) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddRequiredFeature(vkt::Feature::nestedCommandBufferRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
+    vkt::Image image(*m_device, 32, 32, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info = vku::InitStructHelper();
+    inheritance_rendering_info.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+    inheritance_rendering_info.colorAttachmentCount = 1;
+    inheritance_rendering_info.pColorAttachmentFormats = &color_format;
+    inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper(&inheritance_rendering_info);
+    VkCommandBufferBeginInfo secondary_begin_info = vku::InitStructHelper();
+    secondary_begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    secondary_begin_info.pInheritanceInfo = &inheritance_info;
+
+    vkt::CommandBuffer inner_secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer outer_secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    inner_secondary.Begin(&secondary_begin_info);
+    VkClearAttachment clear_attachment = {VK_IMAGE_ASPECT_COLOR_BIT, 0, {}};
+    VkClearRect clear_rect = {{{4, 4}, {16, 16}}, 0, 1};
+    vk::CmdClearAttachments(inner_secondary, 1, &clear_attachment, 1, &clear_rect);
+    inner_secondary.End();
+    outer_secondary.Begin(&secondary_begin_info);
+    vk::CmdExecuteCommands(outer_secondary, 1, &inner_secondary.handle());
+    outer_secondary.End();
+
+    VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = image_view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+    rendering_info.renderArea = {{0, 0}, {32, 32}};
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    m_command_buffer.Begin();
+    image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdExecuteCommands(m_command_buffer, 1, &outer_secondary.handle());
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveSecondaryCommandBuffer, CustomResolveDynamicRendering) {
@@ -657,13 +744,8 @@ TEST_F(PositiveSecondaryCommandBuffer, CustomResolveDynamicRenderingInputAttachm
     input_info.pDepthInputAttachmentIndex = &zero;
     input_info.pStencilInputAttachmentIndex = nullptr;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper(&input_info);
-    pipeline_rendering_info.colorAttachmentCount = 0;
-    pipeline_rendering_info.pColorAttachmentFormats = nullptr;
-    pipeline_rendering_info.depthAttachmentFormat = depth_format;
-    pipeline_rendering_info.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this, &input_info);
+    pipe.SetDynamicRendering({}, depth_format, VK_FORMAT_UNDEFINED);
     pipe.ds_ci_ = vku::InitStructHelper();
     pipe.CreateGraphicsPipeline();
 

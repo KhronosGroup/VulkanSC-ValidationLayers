@@ -176,8 +176,8 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisableShaderObject) {
                                                  });
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-NonWritable-06341");
-    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source),
-                                  &descriptor_set.layout_.handle());
+    const vkt::ShaderEXT vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source),
+                                     &descriptor_set.layout_.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -771,82 +771,84 @@ TEST_F(NegativeAtomic, Float) {
     }
 
     // shaderBufferFloat64Atomics (requires shaderFloat64)
-    {{m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-    VkShaderObj cs(*m_device, cs_buffer_float_64_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-    VkShaderObj cs(*m_device, cs_buffer_float_64_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-    VkShaderObj cs(*m_device, cs_buffer_float_64_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
+    {
+        {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+            VkShaderObj cs(*m_device, cs_buffer_float_64_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
+        {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+            VkShaderObj cs(*m_device, cs_buffer_float_64_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
+        {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+            VkShaderObj cs(*m_device, cs_buffer_float_64_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
 
-// shaderBufferFloat64AtomicAdd
-{
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-    VkShaderObj cs(*m_device, cs_buffer_float_64_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
+        // shaderBufferFloat64AtomicAdd
+        {
+            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+            VkShaderObj cs(*m_device, cs_buffer_float_64_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
 
-// shaderSharedFloat64Atomics
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-    VkShaderObj cs(*m_device, cs_shared_float_64_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-    VkShaderObj cs(*m_device, cs_shared_float_64_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-    VkShaderObj cs(*m_device, cs_shared_float_64_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
+        // shaderSharedFloat64Atomics
+        {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+            VkShaderObj cs(*m_device, cs_shared_float_64_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
+        {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+            VkShaderObj cs(*m_device, cs_shared_float_64_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
+        {
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+            VkShaderObj cs(*m_device, cs_shared_float_64_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
 
-// shaderSharedFloat64AtomicAdd
-{
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-    VkShaderObj cs(*m_device, cs_shared_float_64_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-}
+        // shaderSharedFloat64AtomicAdd
+        {
+            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+            VkShaderObj cs(*m_device, cs_shared_float_64_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+            m_errorMonitor->VerifyFound();
+        }
+    }
 
-// shaderImageFloat32Atomics
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
-    VkShaderObj cs(*m_device, cs_image_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
-    VkShaderObj cs(*m_device, cs_image_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
-{
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
-    VkShaderObj cs(*m_device, cs_image_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
+    // shaderImageFloat32Atomics
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
+        VkShaderObj cs(*m_device, cs_image_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
+        VkShaderObj cs(*m_device, cs_image_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
+        VkShaderObj cs(*m_device, cs_image_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
 
-// shaderImageFloat32AtomicAdd
-{
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
-    VkShaderObj cs(*m_device, cs_image_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-    m_errorMonitor->VerifyFound();
-}
+    // shaderImageFloat32AtomicAdd
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
+        VkShaderObj cs(*m_device, cs_image_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
 }
 
 // Not supported in Vulkan SC: VK_EXT_shader_atomic_float2

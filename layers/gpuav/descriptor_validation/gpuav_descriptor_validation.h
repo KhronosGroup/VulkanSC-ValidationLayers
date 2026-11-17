@@ -28,9 +28,10 @@ class CommandBufferSubState;
 class Validator;
 
 namespace descriptor {
+// Classic descriptors
 void UpdateBoundDescriptors(Validator& gpuav, CommandBufferSubState& cb_state, VkPipelineBindPoint pipeline_bind_point,
                             const Location& loc);
-
+// VK_EXT_descriptor_heap
 void UpdateBoundDescriptorHeap(Validator& gpuav, CommandBufferSubState& cb_state, bool is_sampler);
 }  // namespace descriptor
 }  // namespace gpuav

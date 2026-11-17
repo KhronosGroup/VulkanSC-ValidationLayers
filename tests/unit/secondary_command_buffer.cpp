@@ -84,8 +84,8 @@ TEST_F(NegativeSecondaryCommandBuffer, Barrier) {
     img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk::CmdPipelineBarrier(secondary, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    secondary.Barrier(img_barrier, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                      VK_DEPENDENCY_BY_REGION_BIT);
     secondary.End();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-04073");
@@ -886,11 +886,8 @@ TEST_F(NegativeSecondaryCommandBuffer, NestedDrawWithoutInline) {
     RETURN_IF_SKIP(Init());
 
     VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({color_format});
     pipe.CreateGraphicsPipeline();
 
     const VkCommandBufferInheritanceInfo cmdbuff_ii = vku::InitStructHelper();
@@ -1047,13 +1044,8 @@ TEST_F(NegativeSecondaryCommandBuffer, MissingPipelineFormatCount) {
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
 
-    VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
-
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1u;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({VK_FORMAT_R8G8B8A8_UNORM});
     pipe.CreateGraphicsPipeline();
 
     VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info = vku::InitStructHelper();
@@ -1373,11 +1365,8 @@ TEST_F(NegativeSecondaryCommandBuffer, CustomResolveDynamicRendering) {
     custom_resolve_info.colorAttachmentCount = 1;
     custom_resolve_info.pColorAttachmentFormats = &color_format;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper(&custom_resolve_info);
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this, &custom_resolve_info);
+    pipe.SetDynamicRendering({color_format});
     pipe.CreateGraphicsPipeline();
 
     VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info = vku::InitStructHelper(&custom_resolve_info);
@@ -1445,11 +1434,8 @@ TEST_F(NegativeSecondaryCommandBuffer, CustomResolveDraw) {
     custom_resolve_info.colorAttachmentCount = 1;
     custom_resolve_info.pColorAttachmentFormats = &color_format;
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper(&custom_resolve_info);
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this, &custom_resolve_info);
+    pipe.SetDynamicRendering({color_format});
     pipe.CreateGraphicsPipeline();
 
     custom_resolve_info.customResolve = VK_FALSE;
@@ -1506,9 +1492,21 @@ TEST_F(NegativeSecondaryCommandBuffer, CustomResolveDynamicRenderingInputAttachm
     pipeline_rendering_info.depthAttachmentFormat = depth_format;
     pipeline_rendering_info.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
+    VkShaderObj fs(*m_device, kFragmentSubpassLoadGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+
     CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.ds_ci_ = vku::InitStructHelper();
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
     pipe.CreateGraphicsPipeline();
+
+    vkt::Image input_image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::ImageView input_view = input_image.CreateView();
+
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, input_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                                                   VK_IMAGE_LAYOUT_GENERAL);
+    pipe.descriptor_set_->UpdateDescriptorSets();
 
     input_info.pDepthInputAttachmentIndex = nullptr;
 
@@ -1528,6 +1526,8 @@ TEST_F(NegativeSecondaryCommandBuffer, CustomResolveDynamicRenderingInputAttachm
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     secondary.Begin(&cmdbuff_bi);
     vk::CmdBindPipeline(secondary, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(secondary, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 0, 1, &pipe.descriptor_set_->set_,
+                              0, nullptr);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-10927");
     vk::CmdDraw(secondary, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -1628,5 +1628,131 @@ TEST_F(NegativeSecondaryCommandBuffer, InheritanceDescriptorHeapInfo_1_4) {
     vk::CmdBindDescriptorSets2(secondary.handle(), &bind_ds_info);
     m_errorMonitor->VerifyFound();
 
+    secondary.End();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, InputAttachmentColorMapping) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13095");
+    RETURN_IF_SKIP(Init());
+
+    VkAttachmentDescription attach[] = {
+        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_UNDEFINED,
+         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_UNDEFINED,
+         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_UNDEFINED,
+         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+    };
+
+    VkAttachmentReference input_ref = {1, VK_IMAGE_LAYOUT_GENERAL};
+
+    VkAttachmentReference rp1_color_refs[] = {
+        {1, VK_IMAGE_LAYOUT_GENERAL},
+        {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+    };
+    VkSubpassDescription rp1_subpass = {
+        0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &input_ref, 3, rp1_color_refs, nullptr, nullptr, 0, nullptr};
+    VkRenderPassCreateInfo rp1_ci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 3, attach, 1, &rp1_subpass, 0, nullptr};
+    vkt::RenderPass render_pass_1(*m_device, rp1_ci);
+
+    // same input attachment (a1), but a1 is now color slot 1 instead of slot 0
+    VkAttachmentReference rp2_color_refs[] = {
+        {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {1, VK_IMAGE_LAYOUT_GENERAL},
+        {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+    };
+    VkSubpassDescription rp2_subpass = {
+        0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &input_ref, 3, rp2_color_refs, nullptr, nullptr, 0, nullptr};
+    VkRenderPassCreateInfo rp2_ci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 3, attach, 1, &rp2_subpass, 0, nullptr};
+    vkt::RenderPass render_pass_2(*m_device, rp2_ci);
+
+    vkt::Image image_a0(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image_a1(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::Image image_a2(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView view_a0 = image_a0.CreateView();
+    vkt::ImageView view_a1 = image_a1.CreateView();
+    vkt::ImageView view_a2 = image_a2.CreateView();
+    VkImageView fb_attachments[] = {view_a0, view_a1, view_a2};
+
+    VkFramebufferCreateInfo fb_ci = vku::InitStructHelper();
+    fb_ci.renderPass = render_pass_1;
+    fb_ci.attachmentCount = 3;
+    fb_ci.pAttachments = fb_attachments;
+    fb_ci.width = 32;
+    fb_ci.height = 32;
+    fb_ci.layers = 1;
+    vkt::Framebuffer framebuffer(*m_device, fb_ci);
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    VkCommandBufferInheritanceInfo cmdbuff_ii = vku::InitStructHelper();
+    cmdbuff_ii.renderPass = render_pass_2;
+    cmdbuff_ii.subpass = 0;
+
+    VkCommandBufferBeginInfo cmdbuff_bi = vku::InitStructHelper();
+    cmdbuff_bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    cmdbuff_bi.pInheritanceInfo = &cmdbuff_ii;
+    secondary.Begin(&cmdbuff_bi);
+    secondary.End();
+
+    VkRenderPassBeginInfo rp_bi = vku::InitStructHelper();
+    rp_bi.renderPass = render_pass_1;
+    rp_bi.framebuffer = framebuffer;
+    rp_bi.renderArea = VkRect2D{{0, 0}, {32u, 32u}};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pBeginInfo-06020");
+    vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, InheritanceDescriptorHeapInfoPushConstants2KHR) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_6_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::maintenance6);
+    AddRequiredFeature(vkt::Feature::inheritedQueries);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(heap_props);
+    vkt::Buffer heap_buffer(*m_device, heap_props.bufferDescriptorSize, VK_BUFFER_USAGE_DESCRIPTOR_HEAP_BIT_EXT,
+                            vkt::device_address);
+    VkPushConstantRange range = {VK_SHADER_STAGE_COMPUTE_BIT, 0u, 4u};
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {range});
+
+    VkBindHeapInfoEXT bind_info = vku::InitStructHelper();
+    bind_info.heapRange = heap_buffer.AddressRange();
+    VkCommandBufferInheritanceDescriptorHeapInfoEXT inheritance_heap_info = vku::InitStructHelper();
+    inheritance_heap_info.pResourceHeapBindInfo = &bind_info;
+    inheritance_heap_info.pSamplerHeapBindInfo = &bind_info;
+    VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper(&inheritance_heap_info);
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    begin_info.pInheritanceInfo = &inheritance_info;
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin(&begin_info);
+    const uint32_t data = 0u;
+    VkPushConstantsInfo push_info = vku::InitStructHelper();
+    push_info.layout = pipeline_layout;
+    push_info.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    push_info.size = 4u;
+    push_info.pValues = &data;
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants2-commandBuffer-11295");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPushConstants2-commandBuffer-11296");
+    vk::CmdPushConstants2KHR(secondary, &push_info);
+    m_errorMonitor->VerifyFound();
     secondary.End();
 }

@@ -1964,11 +1964,11 @@ TEST_F(NegativeTileShading, TileShadingDrawButHasActiveGeometryShaderObject) {
     const auto geom_spv = GLSLToSPV(VK_SHADER_STAGE_GEOMETRY_BIT, kGeometryMinimalGlsl);
     const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
 
-    auto vert_ci = ShaderCreateInfo(vert_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    auto vert_ci = ShaderCreateInfoEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT);
     vert_ci.nextStage = VK_SHADER_STAGE_GEOMETRY_BIT;
-    vkt::Shader vert_shader{*m_device, vert_ci};
-    vkt::Shader geom_shader{*m_device, ShaderCreateInfo(geom_spv, VK_SHADER_STAGE_GEOMETRY_BIT)};
-    vkt::Shader frag_shader{*m_device, ShaderCreateInfoNoNextStage(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT)};
+    vkt::ShaderEXT vert_shader{*m_device, vert_ci};
+    vkt::ShaderEXT geom_shader{*m_device, ShaderCreateInfoEXT(geom_spv, VK_SHADER_STAGE_GEOMETRY_BIT)};
+    vkt::ShaderEXT frag_shader{*m_device, ShaderCreateInfoNoNextStageEXT(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT)};
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
     color_attachment.imageView = m_color_view;
@@ -1989,8 +1989,8 @@ TEST_F(NegativeTileShading, TileShadingDrawButHasActiveGeometryShaderObject) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRendering(rendering_info);
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vert_shader, geom_shader, frag_shader);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vert_shader, geom_shader, frag_shader);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-10678");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -2355,10 +2355,10 @@ TEST_F(NegativeTileShading, CapabilityInComputeShaderObjectOutsideTileShadingRen
 
     std::vector<uint32_t> cs_spv{};
     ASMtoSPV(SPV_ENV_VULKAN_1_3, 0, cs_source, cs_spv);
-    vkt::Shader cs{*m_device, ShaderCreateInfo(cs_spv, VK_SHADER_STAGE_COMPUTE_BIT)};
+    vkt::ShaderEXT cs{*m_device, ShaderCreateInfoEXT(cs_spv, VK_SHADER_STAGE_COMPUTE_BIT)};
 
     m_command_buffer.Begin();
-    m_command_buffer.BindCompShader(cs);
+    m_command_buffer.BindCompShaderEXT(cs);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-TileShadingQCOM-10700");
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-TileShadingQCOM-10701");
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -2472,13 +2472,13 @@ TEST_F(NegativeTileShading, CapabilityInFragmentShaderObjectOutsideTileShadingRe
     std::vector<uint32_t> fs_spv{};
     ASMtoSPV(SPV_ENV_VULKAN_1_3, 0, fs_source, fs_spv);
 
-    vkt::Shader vs{*m_device, ShaderCreateInfo(vs_spv, VK_SHADER_STAGE_VERTEX_BIT)};
-    vkt::Shader fs{*m_device, ShaderCreateInfoNoNextStage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT)};
+    vkt::ShaderEXT vs{*m_device, ShaderCreateInfoEXT(vs_spv, VK_SHADER_STAGE_VERTEX_BIT)};
+    vkt::ShaderEXT fs{*m_device, ShaderCreateInfoNoNextStageEXT(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT)};
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vs, fs);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vs, fs);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-TileShadingQCOM-10700");
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();

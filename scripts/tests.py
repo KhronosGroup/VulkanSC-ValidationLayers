@@ -18,6 +18,7 @@ import subprocess
 import sys
 import os
 import argparse
+import tempfile
 import common_ci
 
 # Where all artifacts will ultimately be placed under
@@ -47,10 +48,10 @@ def BuildVVL(config, cmake_args, build_tests, mock_android):
     cmake_cmd += ' -D CMAKE_INSTALL_LIBDIR=lib'
 
     if cmake_args:
-         cmake_cmd += f' {cmake_args}'
+        cmake_cmd += f' {cmake_args}'
 
     if mock_android:
-         cmake_cmd += ' -DVVL_MOCK_ANDROID=ON'
+        cmake_cmd += ' -DVVL_MOCK_ANDROID=ON'
 
     common_ci.RunShellCmd(cmake_cmd)
 
@@ -105,6 +106,7 @@ def BuildProfileLayer(mockAndroid):
     cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR}'
     cmake_cmd += ' -D CMAKE_BUILD_TYPE=Release'
     cmake_cmd += ' -D UPDATE_DEPS=ON'
+    cmake_cmd += ' -D BUILD_PROFILES_LIBRARY=OFF'
     cmake_cmd += ' -D CMAKE_INSTALL_LIBDIR=lib'
 
     if mockAndroid:
@@ -140,10 +142,55 @@ def Build(args):
         print('Command "%s" failed with return code %s' % (' '.join(proc_error.cmd), proc_error.returncode))
         sys.exit(proc_error.returncode)
     except Exception as unknown_error:
-        print('An unknown error occurred: %s', unknown_error)
+        print(f'An unknown error occurred: {unknown_error}')
         sys.exit(1)
 
     sys.exit(0)
+
+#
+# gtest filter format is "POSITIVE_PATTERNS-NEGATIVE_PATTERNS"
+def GTestFilter(positive, negative):
+    patterns = ':'.join(positive)
+    if negative:
+        patterns += '-' + ':'.join(negative)
+    return f'--gtest_filter={patterns}'
+
+#
+# gtest runs everything in a single process, one test at a time. The tests are independent of each other (each creates
+# its own instance/device on the Mock ICD), so we split them across processes using gtest's built in sharding.
+# Each shard's output is buffered and printed once it finishes so the CI log doesn't interleave.
+def RunGTest(cmd, env, shards):
+    if shards <= 1:
+        common_ci.RunShellCmd(cmd, env=env)
+        return
+
+    print(f'Running {cmd} in {shards} shards')
+    sys.stdout.flush()
+
+    procs = []
+    for index in range(shards):
+        shard_env = dict(env)
+        shard_env['GTEST_TOTAL_SHARDS'] = str(shards)
+        shard_env['GTEST_SHARD_INDEX'] = str(index)
+        output = tempfile.TemporaryFile(mode='w+', encoding='utf-8', errors='replace')
+        proc = subprocess.Popen(cmd.split(' '), cwd=common_ci.PROJECT_SRC_DIR, env=shard_env, stdout=output, stderr=subprocess.STDOUT)
+        procs.append((proc, output))
+
+    failed_code = 0
+    for index, (proc, output) in enumerate(procs):
+        proc.wait()
+        output.seek(0)
+        print(f'{"::group::" if common_ci.IsGHA() else ""}Shard {index + 1}/{shards} (exit code {proc.returncode})')
+        sys.stdout.write(output.read())
+        if common_ci.IsGHA():
+            print('::endgroup::')
+        output.close()
+        if proc.returncode != 0 and failed_code == 0:
+            failed_code = proc.returncode
+    sys.stdout.flush()
+
+    if failed_code != 0:
+        raise subprocess.CalledProcessError(failed_code, cmd.split(' '))
 
 #
 # Run the Layer Validation Tests
@@ -174,7 +221,10 @@ def RunVVLTests(args):
     # lvt_env['VK_LAYER_TESTS_PRINT_DRIVER'] = '1'
 
     lvt_env['VK_INSTANCE_LAYERS'] = 'VK_LAYER_KHRONOS_validation' + os.pathsep + 'VK_LAYER_KHRONOS_profiles'
-    lvt_env['VK_KHRONOS_PROFILES_SIMULATE_CAPABILITIES'] = 'SIMULATE_API_VERSION_BIT,SIMULATE_FEATURES_BIT,SIMULATE_PROPERTIES_BIT,SIMULATE_EXTENSIONS_BIT,SIMULATE_FORMATS_BIT,SIMULATE_QUEUE_FAMILY_PROPERTIES_BIT,SIMULATE_VIDEO_CAPABILITIES_BIT,SIMULATE_VIDEO_FORMATS_BIT'
+    # Simulating video profiles is a big part of the time to create a device, so only the Video tests use it (see below)
+    capabilities = 'SIMULATE_API_VERSION_BIT,SIMULATE_FEATURES_BIT,SIMULATE_PROPERTIES_BIT,SIMULATE_EXTENSIONS_BIT,SIMULATE_FORMATS_BIT,SIMULATE_QUEUE_FAMILY_PROPERTIES_BIT'
+    video_capabilities = capabilities + ',SIMULATE_VIDEO_CAPABILITIES_BIT,SIMULATE_VIDEO_FORMATS_BIT'
+    lvt_env['VK_KHRONOS_PROFILES_SIMULATE_CAPABILITIES'] = capabilities
 
     # By default use the max_profile.json
     if "VK_KHRONOS_PROFILES_PROFILE_FILE" not in os.environ:
@@ -189,44 +239,60 @@ def RunVVLTests(args):
 
     lvt_cmd = os.path.join(CI_INSTALL_DIR, 'bin', 'vk_layer_validation_tests')
 
+    positive = []
+    negative = []
+    cmd_prefix = ''
+    run_syncval_without_core = False
+    run_video = False
+
     if args.mockAndroid:
         # TODO - only reason running this subset, is mockAndoid fails any test that does
         # a manual vkCreateDevice call and need to investigate more why
-        common_ci.RunShellCmd(lvt_cmd + " --gtest_filter=*AndroidHardwareBuffer.*:*AndroidExternalResolve.*", env=lvt_env)
-        return
-    if args.tsan and args.wsi:
-        # Combo of both below
-        common_ci.RunShellCmd(f'xvfb-run --auto-servernum {lvt_cmd} --gtest_filter=*Wsi.*', env=lvt_env)
-        return
-    if args.tsan:
+        positive = ['*AndroidHardwareBuffer.*', '*AndroidExternalResolve.*']
+    elif args.wsi:
+        # Also covers tsan + wsi (same as the tsan and wsi runs combined)
+        # We need to use xvfb to get github action runners to be able to create a surface context
+        # Adding to other tests is a slow, unnecessary, overheader
+        positive = ['*Wsi.*']
+        cmd_prefix = 'xvfb-run --auto-servernum '
+    elif args.tsan:
         # These are tests we have decided are worth using Thread Sanitize as it will take about 9x longer to run a test
         # We have also seen TSAN turn bug out and make each test incrementally take longer
         # (https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8931)
-        common_ci.RunShellCmd(lvt_cmd + " --gtest_filter=*SyncVal.*:*Threading.*:*SyncObject.*:-*Video*", env=lvt_env)
-        return
-    if args.wsi:
-        # We need to use xvfb to get github action runners to be able to create a surface context
-        # Adding to other tests is a slow, unnecessary, overheader
-        common_ci.RunShellCmd(f'xvfb-run --auto-servernum {lvt_cmd} --gtest_filter=*Wsi.*', env=lvt_env)
-        return
+        positive = ['*SyncVal.*', '*Threading.*', '*SyncObject.*']
+        negative = ['*Video*']
+    else:
+        run_syncval_without_core = True
+        run_video = True
+        # these will 100% be skipped by default on CI machine, save time filtering them out first
+        negative = [
+            # AHB as it is ran separately
+            '*AndroidHardwareBuffer.*',
+            '*AndroidExternalResolve.*',
+            # WSI as it is ran separately
+            '*Wsi.*',
+            # GPU-AV and DebugPrintf tests are skipped on the Mock ICD
+            '*GpuAV*',
+            '*DebugPrintf*',
+            # Video is ran separately, with video profile simulation
+            '*Video*'
+        ]
 
-    # these will 100% be skipped by default on CI machine, save time filtering them out first
-    skip_list = [
-        # AHB as it is ran separately
-        '*AndroidHardwareBuffer.*',
-        '*AndroidExternalResolve.*',
-        # WSI as it is ran separately
-        '*Wsi.*'
-    ]
-    # The "default" run
-    common_ci.RunShellCmd(f'{lvt_cmd} --gtest_filter=-{":".join(skip_list)}', env=lvt_env)
+    # WSI needs xvfb and is tiny, and the Android subset is tiny too, so only shard the big runs
+    shards = 1 if (args.wsi or args.mockAndroid) else args.shards
 
-    print("Re-Running syncval tests with core validation disabled (--syncval-disable-core)")
-    common_ci.RunShellCmd(lvt_cmd + ' --gtest_filter=*SyncVal* --syncval-disable-core', env=lvt_env)
+    RunGTest(f'{cmd_prefix}{lvt_cmd} {GTestFilter(positive, negative)}', lvt_env, shards)
 
-    print("Re-Running multithreaded tests with VK_LAYER_FINE_GRAINED_LOCKING disabled")
-    lvt_env['VK_LAYER_FINE_GRAINED_LOCKING'] = '0'
-    common_ci.RunShellCmd(lvt_cmd + ' --gtest_filter=*Thread*', env=lvt_env)
+    if run_syncval_without_core:
+        print("Re-Running syncval tests with core validation disabled (--syncval-disable-core)")
+        RunGTest(f'{lvt_cmd} {GTestFilter(["*SyncVal*"], ["*Video*"])} --syncval-disable-core', lvt_env, shards)
+
+    if run_video:
+        print("Running Video tests with video profile simulation")
+        video_env = dict(lvt_env)
+        video_env['VK_KHRONOS_PROFILES_SIMULATE_CAPABILITIES'] = video_capabilities
+        RunGTest(f'{lvt_cmd} {GTestFilter(["*Video*"], [])}', video_env, shards)
+        RunGTest(f'{lvt_cmd} {GTestFilter(["*SyncValVideo*"], [])} --syncval-disable-core', video_env, shards)
 
 def Test(args):
     try:
@@ -236,7 +302,7 @@ def Test(args):
         print('Command "%s" failed with return code %s' % (' '.join(proc_error.cmd), proc_error.returncode))
         sys.exit(proc_error.returncode)
     except Exception as unknown_error:
-        print('An unknown error occurred: %s', unknown_error)
+        print(f'An unknown error occurred: {unknown_error}')
         sys.exit(1)
 
     sys.exit(0)
@@ -271,6 +337,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--wsi', dest='wsi',
         action='store_true', help='Filter out tests for WSI (which uses xvfb and will slow down other tests)')
+
+    parser.add_argument(
+        '--shards', dest='shards',
+        metavar='N', type=int, default=min(4, os.cpu_count() or 1),
+        help='Number of processes to split the Layer Validation Tests across (defaults to the CPU count, max 4). Use 1 to run in a single process')
 
     args = parser.parse_args()
 

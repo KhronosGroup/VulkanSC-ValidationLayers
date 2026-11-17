@@ -626,12 +626,9 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateBindVertexBuffers) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
     pipe.vp_state_ci_.viewportCount = 0;
     pipe.vp_state_ci_.scissorCount = 0;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription inputBinding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
-    pipe.vi_ci_.pVertexBindingDescriptions = &inputBinding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexAttributeDescriptions = &attribute;
+    pipe.SetVertexInput(inputBinding, attribute);
     pipe.CreateGraphicsPipeline();
 
     vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -791,12 +788,9 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateSetViewportScissor) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
     pipe.vp_state_ci_.viewportCount = 0;
     pipe.vp_state_ci_.scissorCount = 0;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription input_binding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexAttributeDescriptions = &attribute;
+    pipe.SetVertexInput(input_binding, attribute);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -814,7 +808,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicStateSetViewportScissor) {
 
     VkDeviceSize strides[] = {1};
     vk::CmdBindVertexBuffers2EXT(m_command_buffer, 0, 1, buffers.data(), offsets.data(), 0, strides);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02721");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-format-10390");
     vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1114,6 +1108,10 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState2PatchControlPointsEnabled) {
         // setting an invalid value for patchControlpoints is an error
         m_errorMonitor->SetDesiredError("VUID-vkCmdSetPatchControlPointsEXT-patchControlPoints-04874");
         vk::CmdSetPatchControlPointsEXT(command_buffer, 0x1000);
+        m_errorMonitor->VerifyFound();
+
+        m_errorMonitor->SetDesiredError("VUID-vkCmdSetPatchControlPointsEXT-patchControlPoints-04874");
+        vk::CmdSetPatchControlPointsEXT(command_buffer, 0);
         m_errorMonitor->VerifyFound();
         vk::CmdEndRenderPass(command_buffer);
         command_buffer.End();
@@ -1447,7 +1445,7 @@ TEST_F(NegativeDynamicState, ExtendedDynamicState3CmdSetFeatureDisabled) {
     }
     {
         m_errorMonitor->SetDesiredError("VUID-vkCmdSetColorBlendAdvancedEXT-None-09423");
-        VkColorBlendAdvancedEXT const advanced = {VK_BLEND_OP_BLUE_EXT, VK_FALSE, VK_FALSE, VK_BLEND_OVERLAP_UNCORRELATED_EXT,
+        VkColorBlendAdvancedEXT const advanced = {VK_BLEND_OP_BLUE_EXT, VK_TRUE, VK_TRUE, VK_BLEND_OVERLAP_UNCORRELATED_EXT,
                                                   VK_FALSE};
         vk::CmdSetColorBlendAdvancedEXT(command_buffer, 0U, 1U, &advanced);
         m_errorMonitor->VerifyFound();
@@ -2044,7 +2042,7 @@ TEST_F(NegativeDynamicState, DrawNotSetColorBlendAdvanced) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
 
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    VkColorBlendAdvancedEXT second = {VK_BLEND_OP_ADD, VK_FALSE, VK_FALSE, VK_BLEND_OVERLAP_UNCORRELATED_EXT, VK_FALSE};
+    VkColorBlendAdvancedEXT second = {VK_BLEND_OP_MULTIPLY_EXT, VK_TRUE, VK_TRUE, VK_BLEND_OVERLAP_UNCORRELATED_EXT, VK_FALSE};
     vk::CmdSetColorBlendAdvancedEXT(m_command_buffer, 1u, 1u, &second);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-rasterizerDiscardEnable-10863");
     vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
@@ -2058,11 +2056,26 @@ TEST_F(NegativeDynamicState, DrawNotSetColorBlendAdvanced) {
     if (!blend_operation_advanced.advancedBlendCorrelatedOverlap) {
         m_errorMonitor->SetDesiredError("VUID-VkColorBlendAdvancedEXT-blendOverlap-07507");
     }
-    VkColorBlendAdvancedEXT advanced = {VK_BLEND_OP_ZERO_EXT, VK_TRUE, VK_TRUE, VK_BLEND_OVERLAP_DISJOINT_EXT, VK_FALSE};
+    VkColorBlendAdvancedEXT advanced = {VK_BLEND_OP_ZERO_EXT, VK_FALSE, VK_FALSE, VK_BLEND_OVERLAP_DISJOINT_EXT, VK_FALSE};
     vk::CmdSetColorBlendAdvancedEXT(m_command_buffer, 0U, 1U, &advanced);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
 
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, ColorBlendAdvancedBasicBlendOp) {
+    TEST_DESCRIPTION("vkCmdSetColorBlendAdvancedEXT with a blend op that is not an advanced blend operation");
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendAdvanced);
+    RETURN_IF_SKIP(Init());
+
+    m_command_buffer.Begin();
+    const VkColorBlendAdvancedEXT advanced = {VK_BLEND_OP_ADD, VK_TRUE, VK_TRUE, VK_BLEND_OVERLAP_UNCORRELATED_EXT, VK_FALSE};
+    m_errorMonitor->SetDesiredError("VUID-VkColorBlendAdvancedEXT-advancedBlendOp-12536");
+    vk::CmdSetColorBlendAdvancedEXT(m_command_buffer, 0u, 1u, &advanced);
+    m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
 
@@ -2258,6 +2271,7 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
                                                                       attribute);
         for (uint32_t i = 0; i < attributes.size(); ++i) attributes[i].location = i;
         m_errorMonitor->SetDesiredError("VUID-vkCmdSetVertexInputEXT-vertexAttributeDescriptionCount-04792");
+        m_errorMonitor->SetDesiredError("VUID-VkVertexInputAttributeDescription2EXT-location-06228");
         vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, m_device->Physical().limits_.maxVertexInputAttributes + 1u,
                                  attributes.data());
         m_errorMonitor->VerifyFound();
@@ -2321,6 +2335,7 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
         VkVertexInputBindingDescription2EXT binding = {
             VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_INSTANCE, 0};
         m_errorMonitor->SetDesiredError("VUID-VkVertexInputBindingDescription2EXT-divisor-04798");
+        m_errorMonitor->SetDesiredError("VUID-VkVertexInputBindingDescription2EXT-divisor-04799");
         vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 0, nullptr);
         m_errorMonitor->VerifyFound();
     }
@@ -2353,6 +2368,35 @@ TEST_F(NegativeDynamicState, VertexInputDynamicStateEnabled) {
                                                            nullptr,
                                                            0,
                                                            m_device->Physical().limits_.maxVertexInputBindings + 1u,
+                                                           VK_FORMAT_R32G32B32A32_SFLOAT,
+                                                           0};
+        m_errorMonitor->SetDesiredError("VUID-VkVertexInputAttributeDescription2EXT-binding-06229");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdSetVertexInputEXT-binding-04793");
+        vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 1, &attribute);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        VkVertexInputBindingDescription2EXT binding = {
+            VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
+        VkVertexInputAttributeDescription2EXT attribute = {VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT,
+                                                           nullptr,
+                                                           m_device->Physical().limits_.maxVertexInputAttributes,
+                                                           0,
+                                                           VK_FORMAT_R32G32B32A32_SFLOAT,
+                                                           0};
+        m_errorMonitor->SetDesiredError("VUID-VkVertexInputAttributeDescription2EXT-location-06228");
+        vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 1, &attribute);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        VkVertexInputBindingDescription2EXT binding = {
+            VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_VERTEX, 1};
+        VkVertexInputAttributeDescription2EXT attribute = {VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT,
+                                                           nullptr,
+                                                           0,
+                                                           m_device->Physical().limits_.maxVertexInputBindings,
                                                            VK_FORMAT_R32G32B32A32_SFLOAT,
                                                            0};
         m_errorMonitor->SetDesiredError("VUID-VkVertexInputAttributeDescription2EXT-binding-06229");
@@ -2471,14 +2515,9 @@ TEST_F(NegativeDynamicState, RasterizationSamplesMismatch) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_ci = vku::InitStructHelper();
-    pipeline_rendering_ci.colorAttachmentCount = 1;
-    pipeline_rendering_ci.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_ci);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({VK_FORMAT_B8G8R8A8_UNORM});
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT);
-    pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
     pipe.CreateGraphicsPipeline();
 
     m_command_buffer.Begin();
@@ -5110,9 +5149,9 @@ TEST_F(NegativeDynamicState, AdvancedBlendMaxAttachments) {
         VkBool32 color_blend_enable = i == 0;
         vk::CmdSetColorBlendEnableEXT(m_command_buffer, i, 1u, &color_blend_enable);
         VkColorBlendAdvancedEXT color_blend_advanced;
-        color_blend_advanced.advancedBlendOp = VK_BLEND_OP_ADD;
-        color_blend_advanced.srcPremultiplied = VK_FALSE;
-        color_blend_advanced.dstPremultiplied = VK_FALSE;
+        color_blend_advanced.advancedBlendOp = VK_BLEND_OP_MULTIPLY_EXT;
+        color_blend_advanced.srcPremultiplied = VK_TRUE;
+        color_blend_advanced.dstPremultiplied = VK_TRUE;
         color_blend_advanced.blendOverlap = VK_BLEND_OVERLAP_UNCORRELATED_EXT;
         color_blend_advanced.clampResults = VK_FALSE;
         vk::CmdSetColorBlendAdvancedEXT(m_command_buffer, i, 1u, &color_blend_advanced);
@@ -5186,18 +5225,25 @@ TEST_F(NegativeDynamicState, SampleLocationsSamplesMismatch) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
     pipe.CreateGraphicsPipeline();
 
-    VkSampleLocationEXT sample_locations[2] = {{0.5f, 0.5f}, {0.5f, 0.5f}};
+    VkPhysicalDeviceSampleLocationsPropertiesEXT sample_locations_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(sample_locations_props);
+    const VkSampleCountFlags supported_counts = sample_locations_props.sampleLocationSampleCounts & ~VK_SAMPLE_COUNT_1_BIT;
+    if (supported_counts == 0) {
+        GTEST_SKIP() << "sampleLocationSampleCounts only supports VK_SAMPLE_COUNT_1_BIT";
+    }
+    const auto sample_count = static_cast<VkSampleCountFlagBits>(supported_counts & ~(supported_counts - 1));
+    const std::vector<VkSampleLocationEXT> sample_locations(sample_count, {0.5f, 0.5f});
 
-    VkSampleLocationsInfoEXT sapmle_locations_info = vku::InitStructHelper();
-    sapmle_locations_info.sampleLocationsPerPixel = VK_SAMPLE_COUNT_2_BIT;
-    sapmle_locations_info.sampleLocationGridSize = {1u, 1u};
-    sapmle_locations_info.sampleLocationsCount = 2u;
-    sapmle_locations_info.pSampleLocations = sample_locations;
+    VkSampleLocationsInfoEXT sample_locations_info = vku::InitStructHelper();
+    sample_locations_info.sampleLocationsPerPixel = sample_count;
+    sample_locations_info.sampleLocationGridSize = {1u, 1u};
+    sample_locations_info.sampleLocationsCount = sample_count;
+    sample_locations_info.pSampleLocations = sample_locations.data();
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdSetSampleLocationsEnableEXT(m_command_buffer, VK_TRUE);
-    vk::CmdSetSampleLocationsEXT(m_command_buffer, &sapmle_locations_info);
+    vk::CmdSetSampleLocationsEXT(m_command_buffer, &sample_locations_info);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-sampleLocationsPerPixel-07482");
     vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
@@ -5222,17 +5268,24 @@ TEST_F(NegativeDynamicState, DynamicSampleLocationsRasterizationSamplesMismatch)
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT);
     pipe.CreateGraphicsPipeline();
 
-    VkSampleLocationEXT sample_locations[2] = {{0.5f, 0.5f}, {0.5f, 0.5f}};
+    VkPhysicalDeviceSampleLocationsPropertiesEXT sample_locations_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(sample_locations_props);
+    const VkSampleCountFlags supported_counts = sample_locations_props.sampleLocationSampleCounts & ~VK_SAMPLE_COUNT_1_BIT;
+    if (supported_counts == 0) {
+        GTEST_SKIP() << "sampleLocationSampleCounts only supports VK_SAMPLE_COUNT_1_BIT";
+    }
+    const auto sample_count = static_cast<VkSampleCountFlagBits>(supported_counts & ~(supported_counts - 1));
+    const std::vector<VkSampleLocationEXT> sample_locations(sample_count, {0.5f, 0.5f});
 
-    VkSampleLocationsInfoEXT sapmle_locations_info = vku::InitStructHelper();
-    sapmle_locations_info.sampleLocationsPerPixel = VK_SAMPLE_COUNT_2_BIT;
-    sapmle_locations_info.sampleLocationGridSize = {1u, 1u};
-    sapmle_locations_info.sampleLocationsCount = 2u;
-    sapmle_locations_info.pSampleLocations = sample_locations;
+    VkSampleLocationsInfoEXT sample_locations_info = vku::InitStructHelper();
+    sample_locations_info.sampleLocationsPerPixel = sample_count;
+    sample_locations_info.sampleLocationGridSize = {1u, 1u};
+    sample_locations_info.sampleLocationsCount = sample_count;
+    sample_locations_info.pSampleLocations = sample_locations.data();
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdSetSampleLocationsEXT(m_command_buffer, &sapmle_locations_info);
+    vk::CmdSetSampleLocationsEXT(m_command_buffer, &sample_locations_info);
     vk::CmdSetSampleLocationsEnableEXT(m_command_buffer, VK_TRUE);
     vk::CmdSetRasterizationSamplesEXT(m_command_buffer, VK_SAMPLE_COUNT_1_BIT);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -5251,14 +5304,8 @@ TEST_F(NegativeDynamicState, DynamicRasterizationSamples) {
 
     RETURN_IF_SKIP(Init());
 
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-
-    VkRenderPassCreateInfo render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.subpassCount = 1u;
-    render_pass_ci.pSubpasses = &subpass;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.CreateRenderPass();
     vkt::Framebuffer framebuffer(*m_device, render_pass, 0, nullptr);
 
     CreatePipelineHelper pipe(*this);
@@ -5578,10 +5625,8 @@ TEST_F(NegativeDynamicState, DynamicRenderingDynamicSampleLocationsEnable) {
     VkClearValue clear_value;
     clear_value.depthStencil = {1.0f, 0u};
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.depthAttachmentFormat = format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({}, format);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_ENABLE_EXT);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
     pipe.ds_ci_ = vku::InitStructHelper();
@@ -6044,6 +6089,29 @@ TEST_F(NegativeDynamicState, SetColorBlendWriteMaskArrayLength) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeDynamicState, VertexInputDynamicStateZeroDivisor) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::vertexInputDynamicState);
+    AddRequiredFeature(vkt::Feature::vertexAttributeInstanceRateDivisor);
+    AddRequiredFeature(vkt::Feature::vertexAttributeInstanceRateZeroDivisor);
+    RETURN_IF_SKIP(Init());
+
+    m_command_buffer.Begin();
+
+    VkVertexInputBindingDescription2EXT binding = {
+        VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, nullptr, 0, 0, VK_VERTEX_INPUT_RATE_INSTANCE, 0};
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 0, nullptr);
+
+    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    m_errorMonitor->SetDesiredError("VUID-VkVertexInputBindingDescription2EXT-divisor-06227");
+    vk::CmdSetVertexInputEXT(m_command_buffer, 1, &binding, 0, nullptr);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeDynamicState, RasterizationSamplesDynamicRendering) {
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -6068,11 +6136,8 @@ TEST_F(NegativeDynamicState, RasterizationSamplesDynamicRendering) {
     vkt::Image resolve_image(*m_device, 32u, 32u, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView resolve_image_view = resolve_image.CreateView();
 
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({color_format});
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT);
     pipe.CreateGraphicsPipeline();
 
@@ -6328,10 +6393,140 @@ TEST_F(NegativeDynamicState, MultiviewInvalidate) {
     vk::CmdNextSubpass(m_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2);
     // VUID-vkCmdDraw-scissorCount-03418
-    m_errorMonitor->SetDesiredError("When multiview is enabled, vkCmdNextSubpass will invalidate all dynamic state");
+    m_errorMonitor->SetDesiredError("was invalidated by vkCmdNextSubpass");
     vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, ExecuteCommandsInvalidate) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12332");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR);
+    pipe.CreateGraphicsPipeline();
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin();
+    secondary.End();
+
+    const VkViewport viewport = {0.0f, 0.0f, 32.0f, 32.0f, 0.0f, 1.0f};
+    const VkRect2D scissor = {{0, 0}, {32u, 32u}};
+
+    m_command_buffer.Begin();
+    vk::CmdSetViewport(m_command_buffer, 0u, 1u, &viewport);
+    vk::CmdSetScissor(m_command_buffer, 0u, 1u, &scissor);
+    vk::CmdExecuteCommands(m_command_buffer, 1u, &secondary.handle());
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07831");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07832");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, ViewportScissorInvalidateStaticPipeline) {
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper static_pipe(*this);
+    static_pipe.CreateGraphicsPipeline();
+
+    CreatePipelineHelper dynamic_pipe(*this);
+    dynamic_pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
+    dynamic_pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR);
+    dynamic_pipe.CreateGraphicsPipeline();
+
+    const VkViewport viewport = {0.0f, 0.0f, 32.0f, 32.0f, 0.0f, 1.0f};
+    const VkRect2D scissor = {{0, 0}, {32u, 32u}};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdSetViewport(m_command_buffer, 0u, 1u, &viewport);
+    vk::CmdSetScissor(m_command_buffer, 0u, 1u, &scissor);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, static_pipe);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dynamic_pipe);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07831");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07832");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, ExecuteCommandsInvalidateInsideRenderPass) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance7);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR);
+    pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferInheritanceInfo inheritance_info = vku::InitStructHelper();
+    inheritance_info.renderPass = m_renderPass;
+    inheritance_info.subpass = 0u;
+    inheritance_info.framebuffer = Framebuffer();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    begin_info.pInheritanceInfo = &inheritance_info;
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin(&begin_info);
+    secondary.End();
+
+    const VkViewport viewport = {0.0f, 0.0f, 32.0f, 32.0f, 0.0f, 1.0f};
+    const VkRect2D scissor = {{0, 0}, {32u, 32u}};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_KHR);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdSetViewport(m_command_buffer, 0u, 1u, &viewport);
+    vk::CmdSetScissor(m_command_buffer, 0u, 1u, &scissor);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    vk::CmdExecuteCommands(m_command_buffer, 1u, &secondary.handle());
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07831");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07832");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, ExecuteCommandsInvalidateShaderObject) {
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    const vkt::ShaderEXT vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    const vkt::ShaderEXT frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin();
+    secondary.End();
+
+    m_command_buffer.Begin();
+    SetDefaultDynamicStatesExcludeEXT();
+    vk::CmdExecuteCommands(m_command_buffer, 1u, &secondary.handle());
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
+    m_errorMonitor->SetDesiredError("It was invalidated by vkCmdExecuteCommands");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDraw");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
     m_command_buffer.End();
 }
 
@@ -6366,5 +6561,300 @@ TEST_F(NegativeDynamicState, MeshPipelineInvalidtion) {
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, ColorWriteMaskUnusedAttachment) {
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorWriteMask);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRenderingUnusedAttachments);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
+    vkt::Image image1(*m_device, 32u, 32u, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image2(*m_device, 32u, 32u, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::ImageView image_view1 = image1.CreateView();
+    vkt::ImageView image_view2 = image2.CreateView();
+
+    VkFormat pipeline_color_formats[2] = {color_format, VK_FORMAT_UNDEFINED};
+    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 2u;
+    pipeline_rendering_info.pColorAttachmentFormats = pipeline_color_formats;
+
+    char const* fs_source = R"glsl(
+        #version 450
+        layout(location = 0) out vec4 color1;
+        layout(location = 1) out vec4 color2;
+        void main() {
+            color1 = vec4(1.0f);
+            color2 = vec4(1.0f);
+        }
+    )glsl";
+    VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkPipelineColorBlendAttachmentState color_blend_state[2];
+    color_blend_state[0] = DefaultColorBlendAttachmentState();
+    color_blend_state[1] = DefaultColorBlendAttachmentState();
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.cb_ci_.attachmentCount = 2u;
+    pipe.cb_ci_.pAttachments = color_blend_state;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT);
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderingAttachmentInfo color_attachments[2];
+    color_attachments[0] = vku::InitStructHelper();
+    color_attachments[0].imageView = image_view1;
+    color_attachments[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachments[1] = vku::InitStructHelper();
+    color_attachments[1].imageView = image_view2;
+    color_attachments[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.renderArea = {{0, 0}, {32u, 32u}};
+    rendering_info.layerCount = 1u;
+    rendering_info.colorAttachmentCount = 2u;
+    rendering_info.pColorAttachments = color_attachments;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    VkColorComponentFlags write_mask = 0u;
+    vk::CmdSetColorWriteMaskEXT(m_command_buffer, 0u, 1u, &write_mask);
+    write_mask = VK_COLOR_COMPONENT_R_BIT;
+    vk::CmdSetColorWriteMaskEXT(m_command_buffer, 1u, 1u, &write_mask);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pColorAttachments-08963");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, PipelineViewportSwizzleCountWithDynamicViewportCount) {
+    TEST_DESCRIPTION(
+        "Set more viewports with vkCmdSetViewportWithCount than the pipeline's VkPipelineViewportSwizzleStateCreateInfoNV holds.");
+
+    AddRequiredExtensions(VK_NV_VIEWPORT_SWIZZLE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiViewport);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const VkViewportSwizzleNV swizzle = {VK_VIEWPORT_COORDINATE_SWIZZLE_POSITIVE_X_NV, VK_VIEWPORT_COORDINATE_SWIZZLE_POSITIVE_Y_NV,
+                                         VK_VIEWPORT_COORDINATE_SWIZZLE_POSITIVE_Z_NV,
+                                         VK_VIEWPORT_COORDINATE_SWIZZLE_POSITIVE_W_NV};
+    VkPipelineViewportSwizzleStateCreateInfoNV swizzle_state = vku::InitStructHelper();
+    swizzle_state.viewportCount = 1;
+    swizzle_state.pViewportSwizzles = &swizzle;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
+    pipe.vp_state_ci_.viewportCount = 0;
+    pipe.vp_state_ci_.scissorCount = 0;
+    pipe.vp_state_ci_.pNext = &swizzle_state;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    // The pipeline only supplies a swizzle for a single viewport, but two are set here.
+    const VkViewport viewports[2] = {{0, 0, 16, 16, 0, 1}, {0, 0, 16, 16, 0, 1}};
+    const VkRect2D scissors[2] = {{{0, 0}, {16, 16}}, {{0, 0}, {16, 16}}};
+    vk::CmdSetViewportWithCountEXT(m_command_buffer, 2, viewports);
+    vk::CmdSetScissorWithCountEXT(m_command_buffer, 2, scissors);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-VkPipelineViewportCreateInfo-04141");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, PipelineViewportWScalingCountWithDynamicViewportCount) {
+    TEST_DESCRIPTION(
+        "Set more viewports with vkCmdSetViewportWithCount than the pipeline's VkPipelineViewportWScalingStateCreateInfoNV "
+        "holds.");
+
+    AddRequiredExtensions(VK_NV_CLIP_SPACE_W_SCALING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiViewport);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const VkViewportWScalingNV scaling = {1.0f, 1.0f};
+    VkPipelineViewportWScalingStateCreateInfoNV w_scaling_state = vku::InitStructHelper();
+    w_scaling_state.viewportWScalingEnable = VK_TRUE;
+    w_scaling_state.viewportCount = 1;
+    w_scaling_state.pViewportWScalings = &scaling;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
+    pipe.vp_state_ci_.viewportCount = 0;
+    pipe.vp_state_ci_.scissorCount = 0;
+    pipe.vp_state_ci_.pNext = &w_scaling_state;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    const VkViewport viewports[2] = {{0, 0, 16, 16, 0, 1}, {0, 0, 16, 16, 0, 1}};
+    const VkRect2D scissors[2] = {{{0, 0}, {16, 16}}, {{0, 0}, {16, 16}}};
+    vk::CmdSetViewportWithCountEXT(m_command_buffer, 2, viewports);
+    vk::CmdSetScissorWithCountEXT(m_command_buffer, 2, scissors);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-viewportCount-04137");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, PipelineShadingRatePaletteCountWithDynamicViewportCount) {
+    TEST_DESCRIPTION(
+        "Set more viewports with vkCmdSetViewportWithCount than the pipeline's "
+        "VkPipelineViewportShadingRateImageStateCreateInfoNV holds.");
+
+    AddRequiredExtensions(VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiViewport);
+    AddRequiredFeature(vkt::Feature::shadingRateImage);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const VkShadingRatePaletteEntryNV palette_entry = VK_SHADING_RATE_PALETTE_ENTRY_16_INVOCATIONS_PER_PIXEL_NV;
+    const VkShadingRatePaletteNV palette = {1, &palette_entry};
+    VkPipelineViewportShadingRateImageStateCreateInfoNV shading_rate_state = vku::InitStructHelper();
+    shading_rate_state.shadingRateImageEnable = VK_TRUE;
+    shading_rate_state.viewportCount = 1;
+    shading_rate_state.pShadingRatePalettes = &palette;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
+    pipe.vp_state_ci_.viewportCount = 0;
+    pipe.vp_state_ci_.scissorCount = 0;
+    pipe.vp_state_ci_.pNext = &shading_rate_state;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    const VkViewport viewports[2] = {{0, 0, 16, 16, 0, 1}, {0, 0, 16, 16, 0, 1}};
+    const VkRect2D scissors[2] = {{{0, 0}, {16, 16}}, {{0, 0}, {16, 16}}};
+    vk::CmdSetViewportWithCountEXT(m_command_buffer, 2, viewports);
+    vk::CmdSetScissorWithCountEXT(m_command_buffer, 2, scissors);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-viewportCount-04139");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, PipelineExclusiveScissorCountWithDynamicViewportCount) {
+    TEST_DESCRIPTION(
+        "Set more viewports with vkCmdSetViewportWithCount than the pipeline's "
+        "VkPipelineViewportExclusiveScissorStateCreateInfoNV holds.");
+
+    AddRequiredExtensions(VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiViewport);
+    AddRequiredFeature(vkt::Feature::exclusiveScissor);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const VkRect2D exclusive_scissor = {{0, 0}, {16, 16}};
+    VkPipelineViewportExclusiveScissorStateCreateInfoNV exclusive_scissor_state = vku::InitStructHelper();
+    exclusive_scissor_state.exclusiveScissorCount = 1;
+    exclusive_scissor_state.pExclusiveScissors = &exclusive_scissor;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
+    pipe.vp_state_ci_.viewportCount = 0;
+    pipe.vp_state_ci_.scissorCount = 0;
+    pipe.vp_state_ci_.pNext = &exclusive_scissor_state;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    const VkViewport viewports[2] = {{0, 0, 16, 16, 0, 1}, {0, 0, 16, 16, 0, 1}};
+    const VkRect2D scissors[2] = {{{0, 0}, {16, 16}}, {{0, 0}, {16, 16}}};
+    vk::CmdSetViewportWithCountEXT(m_command_buffer, 2, viewports);
+    vk::CmdSetScissorWithCountEXT(m_command_buffer, 2, scissors);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-VkPipelineViewportCreateInfo-04142");
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, InvalidLineRasterizationMode) {
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3LineRasterizationMode);
+    RETURN_IF_SKIP(Init());
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-parameter");
+    vk::CmdSetLineRasterizationModeEXT(m_command_buffer, VK_LINE_RASTERIZATION_MODE_MAX_ENUM);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDynamicState, Uint32Overflow) {
+    AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEnable);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEquation);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorWriteMask);
+    RETURN_IF_SKIP(Init());
+
+    m_command_buffer.Begin();
+
+    const VkRect2D rect = {{0, 0}, {16, 16}};
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetDiscardRectangleEXT-firstDiscardRectangle-00585");
+    vk::CmdSetDiscardRectangleEXT(m_command_buffer, 0xFFFFFFFFu, 1u, &rect);
+    m_errorMonitor->VerifyFound();
+
+    const VkBool32 enable = VK_TRUE;
+    const VkColorBlendEquationEXT equation = {VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+                                              VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD};
+    const VkColorComponentFlags write_mask = VK_COLOR_COMPONENT_R_BIT;
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetColorBlendEnableEXT-firstAttachment-12525");
+    vk::CmdSetColorBlendEnableEXT(m_command_buffer, 0xFFFFFFFFu, 1u, &enable);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetColorBlendEquationEXT-firstAttachment-12526");
+    vk::CmdSetColorBlendEquationEXT(m_command_buffer, 0xFFFFFFFFu, 1u, &equation);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetColorWriteMaskEXT-firstAttachment-12527");
+    vk::CmdSetColorWriteMaskEXT(m_command_buffer, 0xFFFFFFFFu, 1u, &write_mask);
+    m_errorMonitor->VerifyFound();
+
     m_command_buffer.End();
 }

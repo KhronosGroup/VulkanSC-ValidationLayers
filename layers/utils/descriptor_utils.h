@@ -70,8 +70,8 @@ static constexpr bool IsDescriptorHeapTensor(const VkDescriptorType type) { retu
 
 vvl::Field DescriptorBufferSizeField(bool robust, VkDescriptorType type);
 
-bool IsResourceVaribleInMapping(const VkDescriptorSetAndBindingMappingEXT& mapping,
-                                const spirv::ResourceInterfaceVariable& resource_variable);
+bool IsResourceVariableInMapping(const VkDescriptorSetAndBindingMappingEXT& mapping,
+                                 const spirv::ResourceInterfaceVariable& resource_variable);
 bool ResourceTypeMatchesBinding(VkSpirvResourceTypeFlagsEXT resource_type,
                                 const spirv::ResourceInterfaceVariable& resource_variable);
 std::string DescribeResourceTypeMismatch(VkSpirvResourceTypeFlagsEXT resource_type,
@@ -82,8 +82,6 @@ vvl::Field GetDescriptorHeapAlignmentField(VkDescriptorType type);
 
 bool HasCombinedImageSamplerIndex(const VkDescriptorSetAndBindingMappingEXT& mapping);
 
-uint32_t GetNullDescriptorDWord(const VkPhysicalDeviceProperties& phys_dev_props);
-
 // Way to cache vkGetPhysicalDeviceDescriptorSizeEXT as a flat array
 // This is a very quick way to use the VkDescriptorType enum and knowledge of the limited VkDescriptorType allowed to make this fast
 // and not making it impossible to update if a new VkDescriptorType is added later
@@ -91,13 +89,20 @@ struct DeviceExtensions;
 struct CachedDescriptorSize {
     void Init(const vvl::DeviceState& device_state);
     VkDeviceSize GetSize(VkDescriptorType type, bool use_heap = true) const;
+    VkDeviceSize GetConstantSizeOf(VkDescriptorType type) const;
     std::vector<VkDeviceSize> GetAllSizes(bool use_heap) const;
 
   private:
+    static uint32_t GetIndex(VkDescriptorType type);
+
     // The number of valid descriptors that can be queried is known in the spec
     // (see VU 11362)
     VkDeviceSize heap_size_[14];    // VK_EXT_descriptor_heap
     VkDeviceSize buffer_size_[14];  // VK_EXT_descriptor_buffer
+
+    VkDeviceSize sampler_size_of_ = 0;
+    VkDeviceSize image_size_of_ = 0;
+    VkDeviceSize buffer_size_of_ = 0;
 };
 
 // We need a way to compress the VkDescriptorType enum to cover all the "real" types
@@ -105,7 +110,7 @@ struct CachedDescriptorSize {
 //
 // This all should be capable of being packed in 4 bits as there are only 14 known types currently
 enum class vvlDescriptorType : uint8_t {
-    // Sampler is a speical case, it is never by itself and instead is is provided along with an image
+    // Sampler is a special case, it is never by itself and instead is is provided along with an image
     Sampler = 0x0,          // VK_DESCRIPTOR_TYPE_SAMPLER
     CombinedSampler = 0x1,  // VK_DESCRIPTOR_TYPE_SAMPLER part of a COMBINED_IMAGE_SAMPLER
 

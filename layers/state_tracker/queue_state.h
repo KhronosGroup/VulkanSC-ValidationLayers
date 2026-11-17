@@ -17,52 +17,48 @@
  * limitations under the License.
  */
 #pragma once
+
+#include "error_message/error_location.h"
+#include "gpuav/resources/gpuav_queue_state.h"
 #include "state_tracker/event_state.h"
-#include "state_tracker/state_object.h"
 #include "state_tracker/fence_state.h"
 #include "state_tracker/semaphore_state.h"
-#include "error_message/error_location.h"
-#include "chassis/dispatch_object.h"
+#include "state_tracker/state_object.h"
 #include "vk_layer_config.h"
+
 #include <condition_variable>
 #include <deque>
 #include <future>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
+
+namespace gpuav {
+struct QueueSubmission;
+}
 
 namespace vvl {
 
 class CommandBuffer;
 class DeviceState;
 class QueueSubState;
+struct QueueSubmission;
 
-struct CommandBufferSubmission {
+struct CommandBufferSubmitInfo {
     std::shared_ptr<vvl::CommandBuffer> cb;
-    // Specifically made for GPU-AV, for it has unique problems: Error reporting is done *after*
-    // command buffer submissions, not at Pre/PostCall time.
-    // Contrary to sync val, GPU-AV cannot just look at `GetQueueState()->cmdbuf_label_stack`
-    // to construct an initial label stack. sync-val can do that because validation and error reporting is done
-    // *before* a command buffer list is submitted: validation is performed one command buffer at a time,
-    // and `GetQueueState()->cmdbuf_label_stack` is updated between those validations.
-    // When GPU-AV starts doing error reporting, when command buffers have completed,
-    // the label stack info stored in Queue state is lost.
-    // => GPU-AV needs to track this initial label stack per command buffer submission.
-    std::vector<std::string> initial_label_stack;
 
-    CommandBufferSubmission(std::shared_ptr<vvl::CommandBuffer> cb, std::vector<std::string> initial_label_stack)
-        : cb(std::move(cb)), initial_label_stack(std::move(initial_label_stack)) {}
-    CommandBufferSubmission(CommandBufferSubmission &&other)
-        : cb(std::move(other.cb)), initial_label_stack(std::move(other.initial_label_stack)) {}
-    CommandBufferSubmission &operator=(const CommandBufferSubmission &other) = default;
-    CommandBufferSubmission(const CommandBufferSubmission &) = default;
+    // Snapshot of the queue's debug label stack at the start of this command buffer.
+    // Errors can be reported when Queue::cmdbuf_label_stack has already advanced
+    // (e.g. GPU-AV post-submit error reporting, deferred wait-before-signal batches in core checks).
+    std::vector<std::string> initial_label_stack;
 };
 
 struct QueueSubmission {
-    QueueSubmission(const Location &loc_) : loc(loc_), completed(), waiter(completed.get_future()) {}
+    QueueSubmission(const Location& loc_) : loc(loc_), completed(), waiter(completed.get_future()) {}
 
     bool is_last_submission{false};
-    std::vector<vvl::CommandBufferSubmission> cb_submissions{};
+    std::vector<vvl::CommandBufferSubmitInfo> cb_infos;
 
     std::vector<SemaphoreInfo> wait_semaphores;
     std::vector<SemaphoreInfo> signal_semaphores;
@@ -71,6 +67,9 @@ struct QueueSubmission {
 
     // Swapchain is not null if this submission represents QueuePresent request
     std::shared_ptr<Swapchain> swapchain;
+
+    // RetirePresentResources called EndUse before in-order retirement
+    bool present_use_released = false;
 
     // Pending event waits for host reset validation
     EventWaitCommandMap event_wait_commands;
@@ -81,8 +80,14 @@ struct QueueSubmission {
     std::promise<void> completed;
     std::shared_future<void> waiter;
 
-    void AddCommandBuffer(std::shared_ptr<vvl::CommandBuffer> cb_state, std::vector<std::string> initial_label_stack) {
-        cb_submissions.emplace_back(std::move(cb_state), std::move(initial_label_stack));
+    struct GpuAV {
+        gpuav::QueueSubmission queue;
+        std::vector<gpuav::CommandBufferSubmitInfo> cb_infos;
+    } gpuav;
+
+    void AddCommandBuffer(const std::shared_ptr<vvl::CommandBuffer>& cb_state,
+                          const std::vector<std::string>& initial_label_stack) {
+        cb_infos.push_back(CommandBufferSubmitInfo{cb_state, initial_label_stack});
     }
 
     void AddSignalSemaphore(std::shared_ptr<Semaphore> &&semaphore_state, uint64_t value) {
@@ -95,8 +100,8 @@ struct QueueSubmission {
 
     void AddFence(std::shared_ptr<Fence> &&fence_state) { fence = std::move(fence_state); }
 
-    void EndUse();
     void BeginUse();
+    void EndUse();
 };
 
 // This timeout is for all queue threads to update their state after we know
@@ -166,11 +171,19 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
     // Helper that combines Notify and Wait
     void NotifyAndWait(const Location &loc, uint64_t until_seq = kU64Max);
 
+    // Retire present semaphore waits on the calling thread.
+    // Ask the queue thread to retire presentation resources (but not the
+    // entire present batches) through until_seq and wait for completion.
+    // Presentation batches themselves are retired in order
+    void NotifyAndWaitForPresent(const Location& loc, uint64_t until_seq);
+
     // Find a timeline wait that does not have a resolving signal submitted yet.
     // Check submissions up to and including until_seq.
     std::optional<SemaphoreInfo> FindTimelineWaitWithoutResolvingSignal(uint64_t until_seq) const;
 
-    vvl::Func GetPendingEventWaitCommand(VkEvent event) const;
+    // Return a pair of a pending command buffer and the event wait command.
+    // The returned command is vvl::Func::Empty if there is no pending event wait
+    std::pair<VkCommandBuffer, vvl::Func> GetPendingEventWaitCommand(VkEvent event) const;
 
     // VVL needs helps to retire submsissions on present-only queue that does not use explicit host synchronization
     void UpdatePresentOnlyQueueProgress(const DeviceState &device_state);
@@ -183,7 +196,7 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
 
     const VkDeviceQueueCreateFlags create_flags;
 
-    // Track command buffer label stack accross all command buffers submitted to this queue.
+    // Track command buffer label stack across all command buffers submitted to this queue.
     // Access to this variable relies on external queue synchronization.
     std::vector<std::string> cmdbuf_label_stack;
 
@@ -204,24 +217,44 @@ class Queue : public StateObject, public SubStateManager<QueueSubState> {
 
     const std::deque<QueueSubmission> &Submissions() { return submissions_; }
 
-  protected:
-    // called when the worker thread decides a submissions has finished executing
-    void Retire(QueueSubmission &submission);
-
   private:
     DeviceState& device_state_;
     const VkQueueFamilyProperties queue_family_properties_;
 
+    struct RetirePresentResourcesRequest {
+        uint64_t until_seq;
+        std::promise<void> completed;
+    };
+
+    struct RetirementWork {
+        QueueSubmission* submission = nullptr;
+        std::optional<RetirePresentResourcesRequest> present_request;
+    };
+
+    std::optional<RetirementWork> NextWork();
+
+    // Called when the queue thread decides a submissions has finished executing.
+    // Removes the front submission and invalidates its reference
+    void Retire(QueueSubmission& submission);
+
+    // Called by the queue thread. Retires present resources up to and including until_seq,
+    // leaving submissions queued for in-order retirement
+    void RetirePresentResources(uint64_t until_seq);
+
     void ThreadFunc();
-    QueueSubmission *NextSubmission();
 
     // state related to submitting to the queue, all data members must
     // be accessed with lock_ held
     std::unique_ptr<std::thread> thread_;
     std::deque<QueueSubmission> submissions_;
+    std::deque<RetirePresentResourcesRequest> present_requests_;
     std::atomic<uint64_t> seq_{0};
     uint64_t request_seq_{0};
+    uint64_t first_seq_to_post_process_{0};
     bool exit_thread_{false};
+    // Keep the last removed submission waitable while its fence is retired outside lock_
+    uint64_t last_removed_seq_{0};
+    std::shared_future<void> last_removed_waiter_;
     mutable std::mutex lock_;
     // condition to wake up the queue's thread
     std::condition_variable cond_;
@@ -243,9 +276,12 @@ class QueueSubState {
     virtual ~QueueSubState() {}
     virtual void Destroy() {}
 
-    virtual void PreSubmit(std::vector<QueueSubmission> &submissions) {}
-    virtual void PostSubmit(std::deque<QueueSubmission> &submissions_) {}
-    virtual void Retire(QueueSubmission &submission) {}
+    virtual void PreSubmit(std::vector<QueueSubmission>& submissions) {}
+
+    // Return false in case of failure to stop processing the remaining batches from the same submit
+    virtual bool PostSubmit(QueueSubmission& submission) { return true; }
+
+    virtual void Retire(QueueSubmission& submission) {}
 
     VulkanTypedHandle Handle() const { return base.Handle(); }
     VkQueue VkHandle() const { return base.VkHandle(); }

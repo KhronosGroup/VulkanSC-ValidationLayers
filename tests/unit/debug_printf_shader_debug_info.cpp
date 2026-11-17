@@ -74,7 +74,7 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, ShaderObjectHandle) {
     )glsl";
 
     VkShaderStageFlagBits shader_stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    const vkt::Shader comp_shader(*m_device, shader_stages[0], GLSLToSPV(shader_stages[0], shader_source));
+    const vkt::ShaderEXT comp_shader(*m_device, shader_stages[0], GLSLToSPV(shader_stages[0], shader_source));
 
     const char* object_name = "bad_shader_object";
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
@@ -147,6 +147,52 @@ void main() {
 
     m_errorMonitor->SetDesiredFailureMsg(
         kInformationBit, "Debug shader printf message generated at a.comp:5\n\n5:     debugPrintfEXT(\"float == %f\", myfloat);");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintfShaderDebugInfo, OpSourceLastLine) {
+    TEST_DESCRIPTION("OpLine points at the last line of an OpSource that has no trailing newline");
+    RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
+    RETURN_IF_SKIP(InitState());
+
+    const char* shader_source = R"(
+               OpCapability Shader
+               OpExtension "SPV_KHR_non_semantic_info"
+          %2 = OpExtInstImport "GLSL.std.450"
+         %13 = OpExtInstImport "NonSemantic.DebugPrintf"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+          %1 = OpString "a.comp"
+         %11 = OpString "float == %f"
+               OpSource GLSL 450 %1 "#version 450
+#extension GL_EXT_debug_printf : enable
+void main() { debugPrintfEXT(\"float == %f\", 3.1415f); }"
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%float_3_1415 = OpConstant %float 3.1415
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpLine %1 3 0
+         %14 = OpExtInst %void %13 1 %11 %float_3_1415
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredFailureMsg(
+        kInformationBit,
+        "Debug shader printf message generated at a.comp:3\n\nvoid main() { debugPrintfEXT(\"float == %f\", 3.1415f); }");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

@@ -68,7 +68,7 @@ class FunctionPointersOutputGenerator(BaseGenerator):
 #ifdef _WIN32
 /* Windows-specific common code: */
 // WinBase.h defines CreateSemaphore and synchapi.h defines CreateEvent
-//  undefine them to avoid conflicts with VkLayerDispatchTable struct members.
+//  undefine them to avoid conflicts with the vk:: function pointers below.
 #ifdef CreateSemaphore
 #undef CreateSemaphore
 #endif
@@ -163,7 +163,7 @@ namespace vk {
         out.append('''
 void InitCore(const char *api_name) {
 
-#if defined(WIN32)
+#if defined(_WIN32)
     std::string filename = std::string(api_name) + "-1.dll";
     auto lib_handle = open_library(filename.c_str());
 #elif(__APPLE__)

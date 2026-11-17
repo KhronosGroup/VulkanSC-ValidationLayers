@@ -63,6 +63,11 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
                                                                 VkIndirectCommandsLayoutEXT* pIndirectCommandsLayout,
                                                                 const ErrorObject& error_obj) const {
     bool skip = false;
+    if (pCreateInfo->tokenCount == 0) {
+        // VUID-VkIndirectCommandsLayoutCreateInfoEXT-tokenCount-arraylength
+        // but will prevent underflow in |pCreateInfo->tokenCount - 1|
+        return skip;
+    }
 
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
 
@@ -83,7 +88,8 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
 
         // Validate contents of VkIndirectCommandsTokenDataEXT
         const Location data_loc = token_loc.dot(Field::data);
-        if (token.type == VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_CONSTANT_EXT) {
+        if (token.type == VK_INDIRECT_COMMANDS_TOKEN_TYPE_PUSH_CONSTANT_EXT ||
+            token.type == VK_INDIRECT_COMMANDS_TOKEN_TYPE_SEQUENCE_INDEX_EXT) {
             const VkIndirectCommandsPushConstantTokenEXT* push_constant_token = token.data.pPushConstant;
             const Location pc_token_loc = data_loc.dot(Field::pPushConstant);
             const Location update_range_loc = pc_token_loc.dot(Field::updateRange);
@@ -208,8 +214,8 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
                     } else if (!dynamic_layout_create) {
                         skip |=
                             LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11102", device, token_loc.dot(Field::type),
-                                     "is %s, pipelineLayout is VK_NULL_HANDLE, but no "
-                                     "there is no VkPipelineLayoutCreateInfo structure attached to the pNext chain.\n%s",
+                                     "is %s, pipelineLayout is VK_NULL_HANDLE, but there is no "
+                                     "VkPipelineLayoutCreateInfo structure attached to the pNext chain.\n%s",
                                      string_VkIndirectCommandsTokenTypeEXT(token.type),
                                      PrintPNextChain(Struct::VkIndirectCommandsLayoutCreateInfoEXT, pCreateInfo->pNext).c_str());
                     }
@@ -237,7 +243,7 @@ bool CoreChecks::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
     if (!IsActionCommand(final_token_type)) {
         skip |= LogError("VUID-VkIndirectCommandsLayoutCreateInfoEXT-pTokens-11100", device,
                          create_info_loc.dot(Field::pTokens, final_token_index).dot(Field::type),
-                         "is %s, but needs to be an action command (ex. Draw, Dispatch, Trace Rays, etc ).",
+                         "is %s, but needs to be an action command (ex. Draw, Dispatch, Trace Rays, etc).",
                          string_VkIndirectCommandsTokenTypeEXT(final_token_type));
     } else {
         if (!IsValueIn(final_token_type, {VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_INDEXED_EXT,
@@ -321,7 +327,7 @@ bool CoreChecks::ValidateIndirectExecutionSetPipelineInfo(const VkIndirectExecut
 
     auto pipeline_layout = initial_pipeline->PipelineLayoutState();
     if (!pipeline_layout) {
-        assert(initial_pipeline->descriptor_heap_mode);
+        assert(initial_pipeline->descriptor_heap_mode || initial_pipeline->IsGraphicsLibrary());
         return skip;
     }
     for (uint32_t i = 0; i < pipeline_layout->set_layouts.list.size(); i++) {
@@ -357,7 +363,7 @@ bool CoreChecks::ValidateIndirectExecutionSetShaderInfo(const VkIndirectExecutio
         const VkShaderEXT shader_handle = shader_info.pInitialShaders[i];
         const auto shader_object = Get<vvl::ShaderObject>(shader_handle);
         ASSERT_AND_CONTINUE(shader_object);
-        const VkShaderCreateFlagsEXT shader_flags = shader_object->create_info.flags;
+        const VkShaderCreateFlagsEXT shader_flags = shader_object->create_info_ext.flags;
         if ((shader_flags & VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT) == 0) {
             skip |= LogError("VUID-VkIndirectExecutionSetShaderInfoEXT-pInitialShaders-11154", shader_object->Handle(),
                              shader_info_loc.dot(Field::pInitialShaders, i),
@@ -365,7 +371,7 @@ bool CoreChecks::ValidateIndirectExecutionSetShaderInfo(const VkIndirectExecutio
                              string_VkShaderCreateFlagsEXT(shader_flags).c_str());
         }
 
-        const VkShaderStageFlagBits stage = shader_object->create_info.stage;
+        const VkShaderStageFlagBits stage = shader_object->GetStage();
         if ((stage & props.supportedIndirectCommandsShaderStagesShaderBinding) == 0) {
             skip |= LogError(
                 "VUID-VkIndirectExecutionSetShaderInfoEXT-pInitialShaders-11020", shader_handle,
@@ -401,7 +407,7 @@ bool CoreChecks::ValidateIndirectExecutionSetShaderInfo(const VkIndirectExecutio
             for (uint32_t layout_i = 0; layout_i < ies_shader_layout_info.setLayoutCount; layout_i++) {
                 const auto ies_dsl = Get<vvl::DescriptorSetLayout>(ies_shader_layout_info.pSetLayouts[layout_i]);
                 if (!ies_dsl) {
-                    assert(shader_object->descriptor_heap_mode);
+                    assert(shader_object->descriptor_heap_mode || shader_object->is_independent_set);
                     continue;
                 }
                 const auto& bindings = ies_dsl->GetBindings();
@@ -424,7 +430,7 @@ bool CoreChecks::ValidateIndirectExecutionSetShaderInfo(const VkIndirectExecutio
     if (descriptor_flag_same && descriptor_flag != 0 && shader_info.pSetLayoutInfos) {
         const LogObjectList objlist;
         skip |= LogError("VUID-VkIndirectExecutionSetShaderInfoEXT-pInitialShaders-11323", objlist,
-                         shader_info_loc.dot(Field::pSetLayoutInfos), "(0x%p) is not null", shader_info.pSetLayoutInfos);
+                         shader_info_loc.dot(Field::pSetLayoutInfos), "(%p) is not null", shader_info.pSetLayoutInfos);
     }
 
     return skip;
@@ -475,7 +481,7 @@ bool CoreChecks::ValidateGeneratedCommandsShaderInfo(const LogObjectList objlist
     for (uint32_t i = 0; i < command_shader_info.shaderCount; i++) {
         const auto shader_object = Get<vvl::ShaderObject>(command_shader_info.pShaders[i]);
         ASSERT_AND_CONTINUE(shader_object);
-        const VkShaderStageFlagBits current_stage = shader_object->create_info.stage;
+        const VkShaderStageFlagBits current_stage = shader_object->GetStage();
         const auto it = seen_stages.find(current_stage);
         if (it != seen_stages.end()) {
             const auto previous_shader_object = Get<vvl::ShaderObject>(command_shader_info.pShaders[it->second]);
@@ -491,7 +497,8 @@ bool CoreChecks::ValidateGeneratedCommandsShaderInfo(const LogObjectList objlist
     return skip;
 }
 
-bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_state,
+// |state_cb_state| is stateCommandBuffer for vkCmdPreprocessGeneratedCommandsEXT
+bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_state, const vvl::CommandBuffer& state_cb_state,
                                                const vvl::IndirectCommandsLayout& indirect_commands_layout,
                                                const VkGeneratedCommandsInfoEXT& generated_commands_info, bool preprocessed,
                                                const Location& info_loc) const {
@@ -499,9 +506,9 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
 
     if (indirect_commands_layout.has_vertex_buffer_token) {
         // If had vertex buffer token, it had to be graphic bind point (else would hit error earlier)
-        const auto pipeline = cb_state.GetLastBoundGraphics().pipeline_state;
+        const auto pipeline = state_cb_state.GetLastBoundGraphics().pipeline_state;
         if (pipeline && !pipeline->IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE)) {
-            const LogObjectList objlist(cb_state.Handle(), pipeline->Handle());
+            const LogObjectList objlist(cb_state.Handle(), state_cb_state.Handle(), pipeline->Handle());
             skip |= LogError("VUID-VkGeneratedCommandsInfoEXT-indirectCommandsLayout-11079", objlist,
                              info_loc.dot(Field::indirectCommandsLayout),
                              "contains a VK_INDIRECT_COMMANDS_TOKEN_TYPE_VERTEX_BUFFER_EXT token but the last bound graphics "
@@ -511,13 +518,13 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
 
     if (indirect_commands_layout.has_multi_draw_count_token) {
         // Use 64-bit to catch overflow
-        const uint64_t limit = 1 << 24;
+        const uint64_t limit = 1ULL << 24;
         const uint64_t count = (uint64_t)generated_commands_info.maxDrawCount * (uint64_t)generated_commands_info.maxSequenceCount;
         if (count >= limit) {
-            skip |= LogError(
-                "VUID-VkGeneratedCommandsInfoEXT-maxDrawCount-11078", cb_state.Handle(), info_loc.dot(Field::maxDrawCount),
-                "(%" PRIu32 ") time maxSequenceCount (%" PRIu32 ") is %" PRIu64 " which is over the limit of 2^24 (16777216)",
-                generated_commands_info.maxDrawCount, generated_commands_info.maxSequenceCount, count);
+            skip |=
+                LogError("VUID-VkGeneratedCommandsInfoEXT-maxDrawCount-11078", cb_state.Handle(), info_loc.dot(Field::maxDrawCount),
+                         "(%" PRIu32 ") times maxSequenceCount (%" PRIu32 ") is %" PRIu64 " which is not less than 2^24 (16777216)",
+                         generated_commands_info.maxDrawCount, generated_commands_info.maxSequenceCount, count);
         }
     }
 
@@ -544,7 +551,8 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
             }
         } else if (indirect_execution_set && indirect_execution_set->is_shader_objects) {
             if (indirect_commands_layout.create_info.pipelineLayout == VK_NULL_HANDLE && !pipeline_layout_ci) {
-                if ((indirect_execution_set->initial_shader_object->create_info.flags & VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT) ==
+                if ((indirect_execution_set->initial_shader_object->create_info_ext.flags &
+                     VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT) ==
                     0) {
                     skip |= LogError(
                         "VUID-VkGeneratedCommandsInfoEXT-indirectCommandsLayout-11330", cb_state.Handle(),
@@ -553,7 +561,8 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
                         "if the shader object was created with VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT.");
                 }
             } else {
-                if ((indirect_execution_set->initial_shader_object->create_info.flags & VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT) !=
+                if ((indirect_execution_set->initial_shader_object->create_info_ext.flags &
+                     VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT) !=
                     0) {
                     skip |= LogError("VUID-VkGeneratedCommandsInfoEXT-indirectCommandsLayout-11331", cb_state.Handle(),
                                      info_loc.dot(Field::indirectCommandsLayout),
@@ -610,15 +619,16 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
     }
 
     // Only dispatch if we know this is valid
+    VkMemoryRequirements2 mem_reqs = vku::InitStructHelper();
     if (valid_dispatch) {
         VkGeneratedCommandsMemoryRequirementsInfoEXT req_info = vku::InitStructHelper();
         req_info.maxSequenceCount = generated_commands_info.maxSequenceCount;
+        req_info.maxDrawCount = generated_commands_info.maxDrawCount;
         req_info.indirectCommandsLayout = generated_commands_info.indirectCommandsLayout;
         req_info.indirectExecutionSet = generated_commands_info.indirectExecutionSet;
         if (generated_commands_info.indirectExecutionSet == VK_NULL_HANDLE) {
             req_info.pNext = pipeline_info ? (void*)pipeline_info : (void*)shader_info;
         }
-        VkMemoryRequirements2 mem_reqs = vku::InitStructHelper();
         DispatchGetGeneratedCommandsMemoryRequirementsEXT(device, &req_info, &mem_reqs);
 
         if (generated_commands_info.preprocessAddress == 0 && mem_reqs.memoryRequirements.size != 0) {
@@ -643,13 +653,29 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
     }
 
     {
-        BufferAddressValidation<1> buffer_address_validator = {
+        // A size of zero means no preprocess memory is needed (and memoryTypeBits might not be filled in)
+        const uint32_t memory_type_bits =
+            (mem_reqs.memoryRequirements.size != 0) ? mem_reqs.memoryRequirements.memoryTypeBits : vvl::kU32Max;
+        BufferAddressValidation<2> buffer_address_validator = {
             {{{"VUID-VkGeneratedCommandsInfoEXT-preprocessAddress-11069",
                [](const vvl::Buffer& buffer_state) {
                    return (buffer_state.usage & VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT) == 0;
                },
                []() { return "The following buffers are missing VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT"; },
-               kUsageErrorMsgBuffer}}}};
+               ErrorMsgBuffer::Usage},
+              {"VUID-VkGeneratedCommandsInfoEXT-preprocessAddress-11064",
+               [memory_type_bits](const vvl::Buffer& buffer_state) {
+                   const auto memory_state = buffer_state.MemoryState();
+                   return memory_state && !memory_state->Destroyed() &&
+                          ((1u << memory_state->allocate_info.memoryTypeIndex) & memory_type_bits) == 0;
+               },
+               [memory_type_bits]() {
+                   std::stringstream ss;
+                   ss << "The following buffers are bound to memory with a memoryTypeIndex not allowed by the memoryTypeBits (0x"
+                      << std::hex << memory_type_bits << ") returned by vkGetGeneratedCommandsMemoryRequirementsEXT";
+                   return ss.str();
+               },
+               ErrorMsgBuffer::MemoryType}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(*this, info_loc.dot(Field::preprocessAddress),
                                                                LogObjectList(cb_state.Handle()),
@@ -660,7 +686,8 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
         BufferAddressValidation<1> buffer_address_validator = {
             {{{"VUID-VkGeneratedCommandsInfoEXT-sequenceCountAddress-11072",
                [](const vvl::Buffer& buffer_state) { return (buffer_state.usage & VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT) == 0; },
-               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; }, kUsageErrorMsgBuffer}}}};
+               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; },
+               ErrorMsgBuffer::Usage}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(*this, info_loc.dot(Field::sequenceCountAddress),
                                                                LogObjectList(cb_state.Handle()),
@@ -671,7 +698,8 @@ bool CoreChecks::ValidateGeneratedCommandsInfo(const vvl::CommandBuffer& cb_stat
         BufferAddressValidation<1> buffer_address_validator = {
             {{{"VUID-VkGeneratedCommandsInfoEXT-indirectAddress-12407",
                [](const vvl::Buffer& buffer_state) { return (buffer_state.usage & VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT) == 0; },
-               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; }, kUsageErrorMsgBuffer}}}};
+               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT"; },
+               ErrorMsgBuffer::Usage}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(
             *this, info_loc.dot(Field::indirectAddress), LogObjectList(cb_state.Handle()), generated_commands_info.indirectAddress);
@@ -760,9 +788,29 @@ bool CoreChecks::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer c
     if (indirect_commands_layout->has_draw_token) {
         skip |=
             OutsideRenderPass(cb_state, error_obj.location, "VUID-vkCmdExecuteGeneratedCommandsEXT-indirectCommandsLayout-10769");
+
+        if (bound_stages != 0) {
+            const VkShaderStageFlags mesh_stages = VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
+            if (indirect_commands_layout->has_mesh_draw_token && (bound_stages & VK_SHADER_STAGE_MESH_BIT_EXT) == 0) {
+                skip |=
+                    LogError("VUID-vkCmdExecuteGeneratedCommandsEXT-indirectCommandsLayout-12549",
+                             cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), info_loc.dot(Field::indirectCommandsLayout),
+                             "contains a VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_MESH_TASKS_* token, but no mesh shader is bound\n"
+                             "bound shader stages are: %s",
+                             string_VkShaderStageFlags(bound_stages).c_str());
+            } else if (!indirect_commands_layout->has_mesh_draw_token && (bound_stages & mesh_stages) != 0) {
+                skip |=
+                    LogError("VUID-vkCmdExecuteGeneratedCommandsEXT-indirectCommandsLayout-12550",
+                             cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), info_loc.dot(Field::indirectCommandsLayout),
+                             "contains a non-mesh draw token, but a task or mesh shader is bound (bound shader stages are "
+                             "%s).\nHint: Use a VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_MESH_TASKS_* token instead.",
+                             string_VkShaderStageFlags(bound_stages).c_str());
+            }
+        }
     }
 
-    skip |= ValidateGeneratedCommandsInfo(cb_state, *indirect_commands_layout, *pGeneratedCommandsInfo, isPreprocessed, info_loc);
+    skip |= ValidateGeneratedCommandsInfo(cb_state, cb_state, *indirect_commands_layout, *pGeneratedCommandsInfo, isPreprocessed,
+                                          info_loc);
 
     // You can only have 1 "action token" so we know there is only a draw or dispatch or traceRay
     // If a VkIndirectExecutionSetEXT is not used, we can guarantee the pipeline/shaderObject being used.
@@ -876,7 +924,8 @@ bool CoreChecks::PreCallValidateCmdPreprocessGeneratedCommandsEXT(VkCommandBuffe
     skip |= ValidatePreprocessGeneratedCommandsStateCommandBuffer(cb_state, *state_cb_state, *indirect_commands_layout,
                                                                   *pGeneratedCommandsInfo, error_obj.location);
 
-    skip |= ValidateGeneratedCommandsInfo(cb_state, *indirect_commands_layout, *pGeneratedCommandsInfo, false, info_loc);
+    skip |= ValidateGeneratedCommandsInfo(cb_state, *state_cb_state, *indirect_commands_layout, *pGeneratedCommandsInfo, false,
+                                          info_loc);
 
     return skip;
 }
@@ -900,12 +949,12 @@ bool CoreChecks::PreCallValidateGetGeneratedCommandsMemoryRequirementsEXT(VkDevi
 
     if (indirect_commands_layout->has_multi_draw_count_token) {
         // Use 64-bit to catch overflow
-        const uint64_t limit = 1 << 24;
+        const uint64_t limit = 1ULL << 24;
         const uint64_t count = (uint64_t)pInfo->maxDrawCount * (uint64_t)pInfo->maxSequenceCount;
         if (count >= limit) {
             skip |= LogError(
                 "VUID-VkGeneratedCommandsMemoryRequirementsInfoEXT-maxDrawCount-11146", device, info_loc.dot(Field::maxDrawCount),
-                "(%" PRIu32 ") time maxSequenceCount (%" PRIu32 ") is %" PRIu64 " which is over the limit of 2^24 (16777216)",
+                "(%" PRIu32 ") times maxSequenceCount (%" PRIu32 ") is %" PRIu64 " which is not less than 2^24 (16777216)",
                 pInfo->maxDrawCount, pInfo->maxSequenceCount, count);
         }
     }
@@ -1133,9 +1182,8 @@ bool CoreChecks::PreCallValidateUpdateIndirectExecutionSetPipelineEXT(
                             "%s was created with a layout %s which is not compatible with the initialPipeline "
                             "layout %s for set "
                             "%" PRIu32 ".\n%s",
-                            FormatHandle(update_pipeline->VkHandle()).c_str(),
-                            FormatHandle(update_pipeline_layout->VkHandle()).c_str(),
-                            FormatHandle(initial_pipeline_layout->VkHandle()).c_str(), set,
+                            FormatHandle(update_pipeline->Handle()).c_str(), FormatHandle(update_pipeline_layout->Handle()).c_str(),
+                            FormatHandle(initial_pipeline_layout->Handle()).c_str(), set,
                             DescribePipelineLayoutSetNonCompatible(set, initial_pipeline_layout.get(), update_pipeline_layout.get())
                                 .c_str());
                         break;
@@ -1190,32 +1238,31 @@ bool CoreChecks::PreCallValidateUpdateIndirectExecutionSetShaderEXT(VkDevice dev
 
         if (set_shader.index >= indirect_execution_set->max_shader_count) {
             skip |= LogError("VUID-VkWriteIndirectExecutionSetShaderEXT-index-11031", device, set_write_loc.dot(Field::index),
-                             "(%" PRIu32
-                             ") is not less than the sum of VkIndirectExecutionSetShaderInfoEXT::maxShaderCount (%" PRIu32 ").",
+                             "(%" PRIu32 ") is not less than VkIndirectExecutionSetShaderInfoEXT::maxShaderCount (%" PRIu32 ").",
                              set_shader.index, indirect_execution_set->max_shader_count);
         }
 
         auto update_shader_object = Get<vvl::ShaderObject>(set_shader.shader);
         ASSERT_AND_CONTINUE(update_shader_object);
-        if ((update_shader_object->create_info.flags & VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT) == 0) {
+        if ((update_shader_object->create_info_ext.flags & VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT) == 0) {
             // TODO - This seems to not be possible to hit without first hitting 11154
             skip |= LogError("VUID-VkWriteIndirectExecutionSetShaderEXT-shader-11032", update_shader_object->Handle(),
                              set_write_loc.dot(Field::shader),
                              "is missing VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT, was created with flags %s.",
-                             string_VkShaderCreateFlagsEXT(update_shader_object->create_info.flags).c_str());
+                             string_VkShaderCreateFlagsEXT(update_shader_object->create_info_ext.flags).c_str());
         }
 
-        if ((update_shader_object->create_info.stage & indirect_execution_set->shader_stage_flags) == 0) {
+        if ((update_shader_object->GetStage() & indirect_execution_set->shader_stage_flags) == 0) {
             skip |= LogError(
                 "VUID-VkWriteIndirectExecutionSetShaderEXT-pInitialShaders-11033", update_shader_object->Handle(),
                 set_write_loc.dot(Field::shader),
                 "was created with %s but none of the VkIndirectExecutionSetShaderInfoEXT::pShaderStages contained that stage (%s).",
-                string_VkShaderStageFlagBits(update_shader_object->create_info.stage),
+                string_VkShaderStageFlagBits(update_shader_object->GetStage()),
                 string_VkShaderStageFlags(indirect_execution_set->shader_stage_flags).c_str());
         }
 
         const auto initial_fragment_shader_object = indirect_execution_set->initial_fragment_shader_object;
-        if (initial_fragment_shader_object && update_shader_object->create_info.stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
+        if (initial_fragment_shader_object && update_shader_object->GetStage() == VK_SHADER_STAGE_FRAGMENT_BIT) {
             if (update_shader_object->stage.entrypoint && initial_fragment_shader_object->stage.entrypoint) {
                 // Ordered to provide a faster comparison and better error message, these should be small sets.
                 std::set<uint32_t> update_shader_output_locations;

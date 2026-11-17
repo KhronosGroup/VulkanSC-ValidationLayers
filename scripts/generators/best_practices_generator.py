@@ -50,7 +50,6 @@ class BestPracticesOutputGenerator(BaseGenerator):
         self.pipeline_parameter_map = {
             'vkCreateGraphicsPipelines' : ', chassis::CreateGraphicsPipelines& chassis_state',
             'vkCreateComputePipelines' : ', chassis::CreateComputePipelines& chassis_state',
-            'vkCreateRayTracingPipelinesNV' : '',
             'vkCreateRayTracingPipelinesKHR' : ', std::shared_ptr<chassis::CreateRayTracingPipelinesKHR> chassis_state',
             'vkCreateDataGraphPipelinesARM' : ', chassis::CreateDataGraphPipelinesARM& chassis_state',
         }
@@ -63,11 +62,8 @@ class BestPracticesOutputGenerator(BaseGenerator):
             'vkBindImageMemory2',
             # AMD tracked
             'vkCreateComputePipelines',
-            'vkCmdPipelineBarrier',
             'vkQueueSubmit',
         ]
-
-        self.extension_info = dict()
 
     def generate(self):
         self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***

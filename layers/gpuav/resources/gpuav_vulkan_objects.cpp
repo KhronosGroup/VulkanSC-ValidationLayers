@@ -20,6 +20,7 @@
 
 #include "gpuav/core/gpuav.h"
 #include "generated/dispatch_functions.h"
+#include "state_tracker/state_tracker.h"
 #include "utils/math_utils.h"
 #include <mutex>
 #include <vulkan/utility/vk_struct_helper.hpp>
@@ -278,7 +279,8 @@ GpuResourcesManager::GpuResourcesManager(Validator& gpuav, bool thread_safe_buff
         alloc_ci.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
         alloc_ci.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
         buffer_caches_.host_coherent.Create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                                                VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                                VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                             alloc_ci);
     }
 
@@ -576,6 +578,31 @@ void GpuResourcesManager::BufferCache::DestroyBuffers() {
         cached_buffer_block.buffer.Destroy();
     }
     cached_buffers_blocks_.clear();
+}
+
+GpuResourcesManagerCache::~GpuResourcesManagerCache() {
+    std::lock_guard<std::mutex> guard(lock_);
+    for (auto& manager : managers_) {
+        manager->DestroyResources();
+    }
+    managers_.clear();
+    available_managers_.clear();
+}
+
+GpuResourcesManager* GpuResourcesManagerCache::Get() {
+    std::lock_guard<std::mutex> guard(lock_);
+    if (available_managers_.empty()) {
+        return managers_.emplace_back(std::make_unique<GpuResourcesManager>(gpuav_, false)).get();
+    }
+    GpuResourcesManager* manager = available_managers_.back();
+    available_managers_.pop_back();
+    return manager;
+}
+
+void GpuResourcesManagerCache::Return(GpuResourcesManager* manager) {
+    manager->ReturnResources();
+    std::lock_guard<std::mutex> guard(lock_);
+    available_managers_.emplace_back(manager);
 }
 
 bool StagingBuffer::CanDeviceEverStage(Validator& gpuav) {

@@ -22,12 +22,14 @@
 
 #include "sync/sync_common.h"
 #include "sync/sync_access_state.h"
+#include "sync/sync_image_encoding.h"
 #include "containers/range.h"
 #include "containers/container_utils.h"
 
 #include <algorithm>
 #include <cassert>
 #include <map>
+#include <memory>
 #include <utility>
 
 namespace syncval {
@@ -45,12 +47,130 @@ namespace syncval {
 //      to be extended with additional check: (range_a.begin < range_b.begin). This correctly handles
 //      this special case and does not affect result of (range_a.end <= range_b.begin) in all other cases.
 struct AccessMapCompare {
-    bool operator()(const AccessRange &a, const AccessRange &b) const { return a.end <= b.begin && a.begin < b.begin; }
+    bool operator()(const AccessRange& a, const AccessRange& b) const { return a.end <= b.begin && a.begin < b.begin; }
+};
+
+// An AccessMap value describing accesses for the key's range.
+// In the common case, one access state covers the whole range.
+// Strided encoding represents accesses to multiple subranges
+struct AccessEntry {
+    struct StridedAccess {
+        StridedRange range;
+        AccessState access_state;  // State inside the strided segments
+        bool has_outside_state;
+
+        StridedAccess(const StridedRange& range, const AccessState& access_state, bool has_outside_state)
+            : range(range), access_state(access_state), has_outside_state(has_outside_state) {}
+    };
+
+    AccessState access_state;  // State for the whole key, or outside the strided segments
+    std::unique_ptr<StridedAccess> strided_access;
+
+    AccessEntry(const AccessState& access_state) : access_state(access_state) {}
+    AccessEntry(const AccessEntry& other);
+    AccessEntry(AccessEntry&& other) = default;
+
+    void Assign(const AccessState& access);
+
+    // Resolve other into this entry.
+    // Apply global barriers to this entry before merging.
+    // If both entries are strided, their strided ranges must match
+    void Resolve(const AccessEntry& other, const AccessStateFunction& apply_global_barriers, bool replace = false);
+
+    // Replace the strided access with a regular access if one of its states covers range.
+    // The entry must only be used within range afterwards
+    void TryCollapseStridedAccess(const AccessRange& range);
+
+    // Check whether this entry and the adjacent |other| entry can share one access state
+    bool CanMerge(const AccessEntry& other) const;
+
+    AccessState& GetInsideAccessState() { return strided_access ? strided_access->access_state : access_state; }
+    const AccessState& GetInsideAccessState() const { return strided_access ? strided_access->access_state : access_state; }
+    bool HasAbsentOutsideSpans() const { return strided_access && !strided_access->has_outside_state; }
+
+    bool IsStridedRangeCompatible(const StridedRange& range) const { return !strided_access || strided_access->range == range; }
+    bool IsStridedRangeCompatible(const AccessEntry& other) const {
+        return !other.strided_access || IsStridedRangeCompatible(other.strided_access->range);
+    }
+
+    // Visit each stored access state once. An absent outside state is skipped
+    template <typename Action>
+    void VisitStates(const Action& action) {
+        if (!strided_access || strided_access->has_outside_state) {
+            action(access_state);
+        }
+        if (strided_access) {
+            action(strided_access->access_state);
+        }
+    }
+    template <typename Action>
+    void VisitStates(const Action& action) const {
+        if (!strided_access || strided_access->has_outside_state) {
+            action(access_state);
+        }
+        if (strided_access) {
+            action(std::as_const(strided_access->access_state));
+        }
+    }
+
+    // Visit each access state within range once, in address order. The action receives
+    // the state's first span and a non-null state pointer. An absent outside state is skipped.
+    // |range| must be contained within the entry's key range
+    template <typename Action>
+    bool VisitStates(AccessRange range, const Action& action) const {
+        if (!strided_access) {
+            return action(range, &access_state);
+        }
+        if (range.empty()) {
+            return false;
+        }
+        const AccessState* outside_state = strided_access->has_outside_state ? &access_state : nullptr;
+        const AccessState* state;
+        bool inside;
+
+        // Spans alternate between inside and outside, so at most two spans need to be checked
+        const AccessRange first = strided_access->range.NextSpan(range, inside);
+        state = inside ? &strided_access->access_state : outside_state;
+        if (state && action(first, state)) {
+            return true;
+        }
+        const AccessRange second = strided_access->range.NextSpan({first.end, range.end}, inside);
+        state = inside ? &strided_access->access_state : outside_state;
+        if (state && second.non_empty() && action(second, state)) {
+            return true;
+        }
+        return false;
+    }
+
+    // Visit inside and outside spans of the strided range in address order,
+    // or |range| for a regular entry. An absent outside state is reported as null.
+    // |range| must be contained within the entry's key range
+    template <typename Action>
+    bool VisitSpans(AccessRange range, const Action& action) const {
+        if (!strided_access) {
+            return action(range, &access_state);
+        }
+        while (range.non_empty()) {
+            bool inside;
+            const AccessRange span = strided_access->range.NextSpan(range, inside);
+            const AccessState* span_access = nullptr;
+            if (inside) {
+                span_access = &strided_access->access_state;
+            } else if (strided_access->has_outside_state) {
+                span_access = &access_state;
+            }
+            if (action(span, span_access)) {
+                return true;
+            }
+            range.begin = span.end;
+        }
+        return false;
+    }
 };
 
 // Implements an ordered map of non-overlapping, non-empty ranges
 class AccessMap {
-    using ImplMap = std::map<AccessRange, AccessState, AccessMapCompare>;
+    using ImplMap = std::map<AccessRange, AccessEntry, AccessMapCompare>;
 
   public:
     using index_type = ResourceAddress;
@@ -60,9 +180,9 @@ class AccessMap {
 
   public:
     // Use explicit assignment to control all places where this happens
-    void Assign(const AccessMap &other);
-    AccessMap &operator=(const AccessMap &other) = delete;
-    AccessMap &operator=(AccessMap &&other) = delete;
+    void Assign(const AccessMap& other);
+    AccessMap& operator=(const AccessMap& other) = delete;
+    AccessMap& operator=(AccessMap&& other) = delete;
 
     iterator begin() { return impl_map_.begin(); }
     const_iterator begin() const { return impl_map_.begin(); }
@@ -74,112 +194,39 @@ class AccessMap {
     size_t Size() const { return impl_map_.size(); }
 
     void Clear() { impl_map_.clear(); }
-    iterator Erase(const iterator &pos);
+    iterator Erase(const iterator& pos);
     void Erase(iterator first, iterator last);
-    iterator Insert(const_iterator hint, const AccessRange &range, const AccessState &access_state);
-    iterator InfillGap(const_iterator range_lower_bound, const AccessRange &range, const AccessState &access_state);
-    void InfillGaps(const AccessRange &range, const AccessState &access_state);
-    iterator Split(const iterator split_it, const index_type &index);
+    // Merge at least two entries in [first, last), retaining the last entry's state.
+    // The caller must ensure the entries are adjacent and their states can be merged.
+    iterator Merge(iterator first, iterator last);
+    iterator Insert(const_iterator hint, const AccessRange& range, const AccessEntry& entry);
+    iterator InfillGap(const_iterator range_lower_bound, const AccessRange& range, const AccessState& access_state);
+    void InfillGaps(const AccessRange& range, const AccessState& access_state);
+    iterator Split(const iterator split_it, const index_type& index);
+    void ConvertToRegularEntries(AccessRange range);
 
     AccessMap() : impl_map_(AccessMapCompare()) {}
 
   private:
     // No replacement insert
-    std::pair<iterator, bool> Insert(const AccessRange &range, const AccessState &access_state);
+    std::pair<iterator, bool> Insert(const AccessRange& range, const AccessEntry& entry);
 
   private:
     ImplMap impl_map_;
 };
 
-// The locator tracks an index value and its corresponding lower bound in the access map.
-// Since the index may fall within a gap (no existing access map entry there),
-// an "inside_lower_bound_range" flag is used to detect this.
-// The locator must not be used after the underlying map is modified. Create a new locator instead.
-template <typename TAccessMap>
-class TAccessMapLocator {
-  public:
-    using index_type = AccessMap::index_type;
-    using iterator = decltype(TAccessMap().begin());
-
-    TAccessMapLocator(TAccessMap &map, index_type index);
-    TAccessMapLocator(TAccessMap &map, index_type index, const iterator &index_lower_bound);
-
-    // Set current location to provided value and update lower bound if necessary
-    void Seek(index_type seek_to);
-
-    // Distance from current location to the next change in access map.
-    // The next change is either the end of the current range or the beginning
-    // of the next range. Return 0 if lower_bound points to the end of access map.
-    index_type DistanceToEdge() const;
-
-  private:
-    iterator LowerBoundForIndex(index_type index) const { return map_->LowerBound(index); }
-    bool InsideLowerBoundRange() const { return lower_bound != map_->end() && lower_bound->first.includes(index); }
-    bool TrySeekLocal(index_type seek_to);
-
-  private:
-    TAccessMap *map_;
-
-  public:
-    // Current location in the access map address space
-    index_type index;
-
-    // Lower bound for the current index.
-    // That's either existing range in the access map or the end sentinel
-    iterator lower_bound;
-
-    // If the current location (index) is inside the lower bound range
-    bool inside_lower_bound_range;
-};
-
-using AccessMapLocator = TAccessMapLocator<AccessMap>;
-using ConstAccessMapLocator = TAccessMapLocator<const AccessMap>;
-
-// Traverse access maps over the same range in parallel.
-// NextRange advances to the next point where either map starts or finishes a range segment.
-// Returns a range over which the two maps do not transition ranges.
-class ParallelIterator {
-  public:
-    using index_type = AccessRange::index_type;
-    using iterator = AccessMap::iterator;
-
-    ParallelIterator(AccessMap &map_A, const AccessMap &map_B, index_type index)
-        : map_A_(map_A), pos_A(map_A, index), pos_B(map_B, index), range(index, index + ComputeDelta()) {}
-
-    // Must be called when destination map's current range is modified to update cached lower bound.
-    // The lower bound corresponds to range.begin position.
-    // No guarantee range.begin is on the edge boundary, but range.end is.
-    void OnCurrentRangeModified(const iterator &new_lower_bound);
-
-    // Seeks to a specific index in both maps after destination map was potentially modified.
-    // No guarantee range.begin is on the edge boundary, but range.end is.
-    void SeekAfterModification(index_type index);
-
-    // Advance to the next spot where one of the maps changes
-    void NextRange();
-
-  private:
-    AccessMap &map_A_;
-    index_type ComputeDelta();
-
-  public:
-    AccessMapLocator pos_A;
-    ConstAccessMapLocator pos_B;
-    AccessRange range;
-};
-
 // Split a range into pieces bound by the intersection of the iterator's range and the supplied range
-AccessMap::iterator Split(AccessMap::iterator in, AccessMap &map, const AccessRange &range);
+AccessMap::iterator Split(AccessMap::iterator pos, AccessMap& map, const AccessRange& range);
 
 // Combines directly adjacent ranges with equal AccessState
-void Consolidate(AccessMap &map);
+void Consolidate(AccessMap& map);
 
 // Apply an operation over a range map, infilling where content is absent, updating where content is present.
 // The passed pos must either be a lower bound (can be the end iterator) or be strictly less than the range.
 // Map entries that intersect range.begin or range.end are split at the intersection point.
 template <typename InfillUpdateOps>
-AccessMap::iterator InfillUpdateRange(AccessMap &map, AccessMap::iterator pos, const AccessRange &range,
-                                      const InfillUpdateOps &ops) {
+AccessMap::iterator InfillUpdateRange(AccessMap& map, AccessMap::iterator pos, const AccessRange& range,
+                                      const InfillUpdateOps& ops) {
     assert(range.non_empty());
 
     const auto end = map.end();

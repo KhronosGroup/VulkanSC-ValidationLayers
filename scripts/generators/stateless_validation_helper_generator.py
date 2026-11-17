@@ -90,7 +90,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCreatePipelineLayout',
             'vkCreateGraphicsPipelines',
             'vkCreateComputePipelines',
-            'vkCreateRayTracingPipelinesNV',
             'vkCreateRayTracingPipelinesKHR',
             'vkCreateDataGraphPipelinesARM',
             'vkCreateSampler',
@@ -100,6 +99,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCreateSemaphore',
             'vkCreateEvent',
             'vkCreateTensorARM',
+            'vkCreateCommandPool',
             'vkFreeDescriptorSets',
             'vkUpdateDescriptorSets',
             'vkBeginCommandBuffer',
@@ -135,15 +135,13 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdSetViewportShadingRatePaletteNV',
             'vkCmdSetCoarseSampleOrderNV',
             'vkCmdSetPrimitiveRestartIndexEXT',
+            'vkCmdSetDispatchParametersARM',
             'vkAllocateMemory',
-            'vkCreateAccelerationStructureNV',
             'vkCreateAccelerationStructureKHR',
             'vkDestroyAccelerationStructureKHR',
-            'vkGetAccelerationStructureHandleNV',
             'vkGetPhysicalDeviceImageFormatProperties',
             'vkGetPhysicalDeviceImageFormatProperties2',
             'vkGetPhysicalDeviceProperties2',
-            'vkCmdBuildAccelerationStructureNV',
             'vkCmdTraceRaysKHR',
             'vkCmdTraceRaysIndirectKHR',
             'vkCmdTraceRaysIndirect2KHR',
@@ -181,7 +179,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdWriteAccelerationStructuresPropertiesKHR',
             'vkWriteAccelerationStructuresPropertiesKHR',
             'vkGetRayTracingCaptureReplayShaderGroupHandlesKHR',
-            'vkCmdBuildAccelerationStructureIndirectKHR',
             'vkGetDeviceAccelerationStructureCompatibilityKHR',
             'vkCmdSetViewportWithCount',
             'vkCmdSetScissorWithCount',
@@ -194,7 +191,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdBuildAccelerationStructuresIndirectKHR',
             'vkBuildAccelerationStructuresKHR',
             'vkGetAccelerationStructureBuildSizesKHR',
-            'vkCmdWriteAccelerationStructuresPropertiesNV',
             'vkCreateDisplayModeKHR',
             'vkCmdSetVertexInputEXT',
             'vkCmdPushConstants',
@@ -206,7 +202,13 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdBeginRenderPass2',
             'vkCmdBeginRendering',
             'vkCmdSetDiscardRectangleEXT',
+            'vkCmdSetColorBlendEnableEXT',
+            'vkCmdSetColorBlendEquationEXT',
+            'vkCmdSetColorWriteMaskEXT',
+            'vkCmdSetColorBlendAdvancedEXT',
             'vkGetQueryPoolResults',
+            'vkResetQueryPool',
+            'vkCmdCopyQueryPoolResults',
             'vkCmdBeginConditionalRenderingEXT',
             'vkGetDeviceImageMemoryRequirements',
             'vkGetDeviceImageSparseMemoryRequirements',
@@ -255,8 +257,10 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdBuildPartitionedAccelerationStructuresNV',
             'vkCmdBuildClusterAccelerationStructureIndirectNV',
             'vkGetClusterAccelerationStructureBuildSizesNV',
+            'vkCreatePrivateDataSlot',
             'vkCmdResolveImage',
             'vkCmdResolveImage2',
+            'vkCmdBlitImage2',
             'vkGetCalibratedTimestampsEXT',
             'vkGetCalibratedTimestampsKHR',
             'vkGetDynamicRenderingTilePropertiesQCOM',
@@ -268,6 +272,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkRegisterCustomBorderColorEXT',
             'vkUnregisterCustomBorderColorEXT',
             'vkGetPhysicalDeviceDescriptorSizeEXT',
+            'vkGetPhysicalDeviceCooperativeMatrixProperties2EXT',
             'vkCmdBindSamplerHeapEXT',
             'vkCmdBindResourceHeapEXT',
             'vkCmdFillMemoryKHR',
@@ -291,7 +296,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             'vkCmdBindTransformFeedbackBuffers2EXT',
             'vkCmdBindIndexBuffer3KHR',
             'vkCreateAccelerationStructure2KHR',
-            'vkCmdBeginTransformFeedback2EXT',
             'vkCmdBeginPerTileExecutionQCOM',
             'vkCmdDispatchTileQCOM',
             'vkQueueSetPerfHintQCOM',
@@ -381,8 +385,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         # Map of structs type names to generated validation code for that struct type
         self.validatedStructs = dict()
 
-        self.stype_version_dict = dict()
-
         # Todo: move to vulkan object
         self.extended_structs = set()
 
@@ -414,6 +416,8 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             if member.extendedFlag:
                 self.extended_structs.add(member.extendedFlag.struct)
         self.extended_structs = sorted(self.extended_structs)
+
+        self.enumAliases = {alias: enum.name for enum in self.vk.enums.values() for alias in enum.aliases}
 
         if self.filename == 'stateless_instance_methods.h':
             self.generateInstanceHeader()
@@ -455,6 +459,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         self.write("".join(out))
 
     def generateSource(self):
+
         # Structure fields to ignore
         structMemberBlacklist = {
             'VkWriteDescriptorSet' : ['dstSet'],
@@ -466,50 +471,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         for struct in [x for x in self.vk.structs.values() if x.name in structMemberBlacklist]:
             for member in [x for x in struct.members if x.name in structMemberBlacklist[struct.name]]:
                 member.noAutoValidity = True
-
-        # TODO - We should not need this with VulkanObject, but the following are casuing issues
-        # being "promoted"
-        #  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT
-        #  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT
-        #  VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_2_NV
-        #  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT
-        #  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT
-        #  VK_STRUCTURE_TYPE_CHECKPOINT_DATA_2_NV
-        #  VK_STRUCTURE_TYPE_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_NVX
-        #  VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR
-        #  VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT
-        #  VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT
-        root = self.registry.reg
-
-        extToPromotedExtDict = dict()
-        for extensions in root.findall('extensions'):
-            for extension in extensions.findall('extension'):
-                extension_name = extension.get('name')
-                if extension_name not in extToPromotedExtDict.keys():
-                    extToPromotedExtDict[extension_name] = set()
-                promotedTo = extension.get('promotedto')
-                if promotedTo is not None:
-                    extToPromotedExtDict[extension_name] = promotedTo
-                else:
-                    extToPromotedExtDict[extension_name] = None
-
-        for extensions in root.findall('extensions'):
-            for extension in extensions.findall('extension'):
-                extension_name = extension.get('name')
-                promoted_ext = extToPromotedExtDict[extension_name]
-                while promoted_ext is not None and 'VK_VERSION' not in promoted_ext:
-                    promoted_ext = extToPromotedExtDict[promoted_ext]
-                # TODO Issue 5103 - this is being used to remove false positive currently
-                promoted_to_core = promoted_ext is not None and 'VK_VERSION' in promoted_ext
-
-                for entry in extension.iterfind('require/enum[@extends="VkStructureType"]'):
-                    if (entry.get('comment') is None or 'typo' not in entry.get('comment')):
-                        alias = entry.get('alias')
-                        if (alias is not None and promoted_to_core):
-                            if (alias not in self.stype_version_dict.keys()):
-                                self.stype_version_dict[alias] = set()
-                            self.stype_version_dict[alias].add(extension_name)
-                            self.stype_version_dict[alias].add(extension_name)
 
         # HACK: force VkDebugUtilsObjectNameInfoEXT to extends some structs
         # Remove after merging https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/8336
@@ -587,7 +548,8 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         # TODO: Remove all of this once this hack is no longer needed
         if self.targetApiName != 'vulkansc':
             for struct_name in hack:
-                self.vk.structs[struct_name].extendedBy.extend(['VkDebugUtilsObjectNameInfoEXT', 'VkDebugUtilsObjectTagInfoEXT'])
+                extendedBy = self.vk.structs[struct_name].extendedBy
+                extendedBy.extend([x for x in ['VkDebugUtilsObjectNameInfoEXT', 'VkDebugUtilsObjectTagInfoEXT'] if x not in extendedBy])
 
         # Generate the struct member checking code from the captured data
         for struct in self.vk.structs.values():
@@ -623,7 +585,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         # NOTE: property structs are no longer checked. Previously we only checked if the corresponding extension was supported
         # by the physical device. Implementations are supposed to ignore unknown pNext values and it is low consequence to query
         # for unknown properties. https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/9302
-        property_structs = [x for x in extended_structs if x.extends == ["VkPhysicalDeviceProperties2"]]
+        property_structs = [x for x in extended_structs if x.extends == ["VkPhysicalDeviceProperties2"] and x.returnedOnly]
         other_structs = [x for x in extended_structs if x not in feature_structs and x not in property_structs and x.name not in self.structsWithManualChecks]
 
         out.append('''
@@ -813,6 +775,11 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             return True
         return
 
+    def getEnumName(self, typeName: str) -> (str | None):
+        if typeName in self.vk.enums:
+            return typeName
+        return self.enumAliases.get(typeName, None)
+
     def isFlagReserved(self, flag) -> bool:
         bitmask = self.vk.flags[flag].bitmaskName
         # Check if doesn't have an associated bitmask type, or if the associated bitmask type is empty
@@ -874,9 +841,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                             # hardcoded only instance for now
                             if 'samples' in member.length: # "(samples + 31) / 32"
                                 count_loc = f'{errorLoc}.dot(Field::samples)'
-                            elif 'rasterizationSamples' in member.length: # "(rasterizationSamples + 31) / 32"
-                                count_loc = f'{errorLoc}.dot(Field::rasterizationSamples)'
-                                member.length = 'rasterizationSamples'
                         elif ' / ' in member.length:
                             count_loc = f'{errorLoc}.dot(Field::{member.length.split(" / ")[0]})'
                         checkExpr.append(f'skip |= {context}ValidateArray({count_loc}, {errorLoc}.dot(Field::{member.name}), {valuePrefix}{member.length}, &{valuePrefix}{member.name}, {counValueRequired}, {arrayRequired}, {countRequiredVuid}, {arrayRequiredVuid});\n')
@@ -958,7 +922,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         # TODO Using a regex in this context is not ideal. Would be nicer if usedLines were a list of objects with "settings"
         validatePNextRegex = re.compile(r'(.*ValidateStructPnext\(.*)(\).*\n*)', re.M)
 
-        # Special struct since lots of functions have this, but it can be all combined to the same call (since it is always from the top level of a funciton)
+        # Special struct since lots of functions have this, but it can be all combined to the same call (since it is always from the top level of a function)
         if structTypeName == 'VkAllocationCallbacks' :
             lines.append(f'skip |= {context}ValidateAllocationCallbacks(*pAllocator, pAllocator_loc);')
             return lines
@@ -1021,7 +985,8 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                             ]
                             if vuidName in arrayVuidExceptions:
                                 continue
-                            if lengthMember.optional:
+                            if lengthMember.optional or lengthMember.noAutoValidity:
+                                # VkPipelineBinaryKeyKHR::keySize is exception here
                                 counValueRequired = 'false'
                             elif member.noAutoValidity:
                                 # Handle edge case where XML expresses a non-optional non-pointer value length with noautovalidity
@@ -1064,7 +1029,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                         paramVuid = self.GetVuid(callerName, f"{member.name}-parameter")
                         if lengthMember:
                             countRequiredVuid = self.GetVuid(callerName, f"{member.length}-arraylength")
-                            # There is no way to test checking a non-null pointer to be valid, so don't falsly print the VUID out
+                            # There is no way to test checking a non-null pointer to be valid, so don't falsely print the VUID out
                             if paramVuid != 'kVUIDUndefined' and arrayRequired == 'false':
                                 paramVuid = 'kVUIDUndefined'
                             # This is an array of struct pointers
@@ -1105,17 +1070,23 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                         countRequiredVuid = self.GetVuid(callerName, f"{member.length}-arraylength")
                         arrayRequiredVuid = self.GetVuid(callerName, f"{member.name}-parameter")
                         usedLines.append(f'skip |= {context}ValidateBool32Array({errorLoc}.dot(Field::{member.length}), {errorLoc}.dot(Field::{member.name}), {valuePrefix}{member.length}, {valuePrefix}{member.name}, {counValueRequired}, {arrayRequired}, {countRequiredVuid}, {arrayRequiredVuid});\n')
-                    elif member.type in self.vk.enums and member.const:
+                    elif self.getEnumName(member.type) and member.const:
+                        enumName = self.getEnumName(member.type)
                         lenLoc = 'loc' if member.fixedSizeArray else f'{errorLoc}.dot(Field::{member.length})'
                         countRequiredVuid = self.GetVuid(callerName, f"{member.length}-arraylength")
                         arrayRequiredVuid = self.GetVuid(callerName, f"{member.name}-parameter")
-                        usedLines.append(f'skip |= {context}ValidateRangedEnumArray({lenLoc}, {errorLoc}.dot(Field::{member.name}), vvl::Enum::{member.type}, {valuePrefix}{member.length}, {valuePrefix}{member.name}, {counValueRequired}, {arrayRequired}, {countRequiredVuid}, {arrayRequiredVuid});\n')
+                        usedLines.append(f'skip |= {context}ValidateRangedEnumArray({lenLoc}, {errorLoc}.dot(Field::{member.name}), vvl::Enum::{enumName}, {valuePrefix}{member.length}, {valuePrefix}{member.name}, {counValueRequired}, {arrayRequired}, {countRequiredVuid}, {arrayRequiredVuid});\n')
                     elif member.name == 'pNext':
                         # Generate an array of acceptable VkStructureType values for pNext
                         allowedTypeCount = 0
                         allowedTypes = 'nullptr'
                         pNextVuid = self.GetVuid(structTypeName, "pNext-pNext")
                         sTypeVuid = self.GetVuid(structTypeName, "sType-unique")
+                        # These extend VkPipelineCreateInfoKHR (VUID-VkPipelineCreateInfoKHR-pNext-09604) so the spec does not generate
+                        # these implicit VUs, but when passed to vkCreate*Pipelines they still start their own pNext chain
+                        if 'VkPipelineCreateInfoKHR' in self.vk.structs[structTypeName].extends:
+                            pNextVuid = f'"VUID-{structTypeName}-pNext-pNext"'
+                            sTypeVuid = f'"VUID-{structTypeName}-sType-unique"'
                         # If no VUIDs we will only be potentially giving false positives
                         if pNextVuid != 'kVUIDUndefined' or sTypeVuid != 'kVUIDUndefined':
                             struct = self.vk.structs[structTypeName]
@@ -1213,15 +1184,11 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                         if member.type in self.vk.flags:
                             flagBitsName = self.vk.flags[member.type].bitmaskName
                             flagsType = 'kOptionalFlags' if member.optional else 'kRequiredFlags'
-                            invalidVuid = self.GetVuid(callerName, f"{member.name}-parameter")
-                            zeroVuid = self.GetVuid(callerName, f"{member.name}-requiredbitmask")
                         elif member.type in self.vk.bitmasks:
                             flagBitsName = member.type
                             flagsType = 'kOptionalSingleBit' if member.optional else 'kRequiredSingleBit'
-                            invalidVuid = self.GetVuid(callerName, f"{member.name}-parameter")
-                            zeroVuid = invalidVuid
+                        invalidVuid = self.GetVuid(callerName, f"{member.name}-parameter")
                         allFlagsName = 'All' + flagBitsName
-                        zeroVuidArg = ', nullptr' if member.optional else ', ' + zeroVuid
                         condition = [item for item in self.structMemberValidationConditions if (item['struct'] == structTypeName and item['field'] == flagBitsName)]
                         isInstanceFunction = 'false'
                         if (struct):
@@ -1235,7 +1202,7 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                         extended = getattr(member, 'extendedFlag', None)
                         if (extended):
                             usedLines.append(f'if (!vku::FindStructInPNextChain<{extended.struct}>({valuePrefix}pNext)) {{')
-                        usedLines.append(f'skip |= {context}ValidateFlags({errorLoc}.dot(Field::{member.name}), vvl::FlagBitmask::{flagBitsName}, {allFlagsName}, {valuePrefix}{member.name}, {flagsType}, {invalidVuid}{zeroVuidArg}, {isInstanceFunction});\n')
+                        usedLines.append(f'skip |= {context}ValidateFlags({errorLoc}.dot(Field::{member.name}), vvl::FlagBitmask::{flagBitsName}, {allFlagsName}, {valuePrefix}{member.name}, {flagsType}, {invalidVuid}, nullptr, {isInstanceFunction});\n')
                         if (extended):
                             usedLines.append(f'}}')
                     elif member.type == 'VkBool32':
@@ -1243,9 +1210,10 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
                     elif member.type == 'VkDeviceAddress' and not member.optional:
                         vuid = self.GetVuid(callerName, f"{member.name}-parameter")
                         usedLines.append(f'skip |= {context}ValidateNotZero({valuePrefix}{member.name} == 0, {vuid}, {errorLoc}.dot(Field::{member.name}));\n')
-                    elif member.type in self.vk.enums and member.type != 'VkStructureType':
+                    elif self.getEnumName(member.type) and member.type != 'VkStructureType':
+                        enumName = self.getEnumName(member.type)
                         vuid = self.GetVuid(callerName, f"{member.name}-parameter")
-                        usedLines.append(f'skip |= {context}ValidateRangedEnum({errorLoc}.dot(Field::{member.name}), vvl::Enum::{member.type}, {valuePrefix}{member.name}, {vuid});\n')
+                        usedLines.append(f'skip |= {context}ValidateRangedEnum({errorLoc}.dot(Field::{member.name}), vvl::Enum::{enumName}, {valuePrefix}{member.name}, {vuid});\n')
                     # If this is a struct, see if it contains members that need to be checked
                     if member.type in self.validatedStructs:
                         newErrorLoc = f'{member.name}_loc'
@@ -1286,14 +1254,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
 
         return lines
 
-    # Joins strings in English fashion
-    # TODO: move to some utility library
-    def englishJoin(self, strings, conjunction: str):
-        stringsList = list(strings)
-        if len(stringsList) <= 1:
-            return stringsList[0]
-        else: # len > 1
-            return f'{", ".join(stringsList[:-1])}, {conjunction} {stringsList[-1]}'
 
 
     # This logic was broken into its own function because we need to fill multiple functions with these structs
@@ -1304,10 +1264,6 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
         pNextCase += f'        // Validation code for {struct.name} structure members\n'
         pNextCase += f'        case {struct.sType}: {{ // Covers VUID-{struct.name}-sType-sType\n'
 
-        # TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9185
-        if struct.name == 'VkPhysicalDeviceLayeredApiPropertiesListKHR':
-            return ""
-
         tData = TemplateData(
             funcName = struct.name,
             errorLoc = 'pNext_loc',
@@ -1317,6 +1273,9 @@ class StatelessValidationHelperOutputGenerator(BaseGenerator):
             selector = None
         )
         expr = self.applyStringTemplate(struct.name, tData, [])
+        # When in the pNext of VkPipelineCreateInfoKHR, the rest of the chain belongs to VkPipelineCreateInfoKHR
+        if 'VkPipelineCreateInfoKHR' in struct.extends:
+            expr = [x for x in expr if f'allowed_structs_{struct.name} =' not in x and 'ValidateStructPnext(pNext_loc, structure->pNext,' not in x]
         structValidationSource = self.scrubStringTemplate(expr)
         if structValidationSource != '':
             # Only reasonable to validate content of structs if const as otherwise the date inside has not been writen to yet

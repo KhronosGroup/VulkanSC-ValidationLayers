@@ -34,6 +34,8 @@
 #include <spirv/unified1/spirv.hpp>
 #include "containers/limits.h"
 
+struct CachedDescriptorSize;
+
 namespace vvl {
 class Pipeline;
 }  // namespace vvl
@@ -77,6 +79,10 @@ struct DecorationBase {
         per_task_nv = 1 << 9,
         per_primitive_ext = 1 << 10,
         sample_bit = 1 << 11,
+        flat_bit = 1 << 12,
+        no_perspective_bit = 1 << 13,
+        descriptor_set_bit = 1 << 14,
+        binding_bit = 1 << 15,
     };
 
     // bits to know if things have been set or not by a Decoration
@@ -88,9 +94,14 @@ struct DecorationBase {
     uint32_t component = 0;
     uint32_t index = 0;
 
-    uint32_t offset = kInvalidValue;
-    uint32_t offset_id = kInvalidValue;  // OffsetIdEXT
-    uint32_t array_stride_id = kInvalidValue;  // ArrayStrideIdEXT
+    uint32_t offset = kInvalidValue;        // Offset or OffsetIdEXT
+    uint32_t array_stride = kInvalidValue;  // ArrayStride or ArrayStrideIdEXT
+    // instead of storing 2 copies of uint32 (which might only grow as we had more Id based decorations) just store the value and
+    // the caller needs to handle which one it is
+    bool is_offset_id = false;
+    bool is_array_stride_id = false;
+    uint32_t GetOffset(const Module& module_state, const CachedDescriptorSize& descriptor_sizes) const;
+    uint32_t GetArrayStride(const Module& module_state, const CachedDescriptorSize& descriptor_sizes) const;
 
     // A given object can only have a single BuiltIn OpDecoration
     spv::BuiltIn built_in = kInvalidBuiltIn;
@@ -103,7 +114,11 @@ struct DecorationBase {
 // subset only for OpDecorate
 // Can't have nested structs with OpMemberDecorate, this class prevents accidentally creating a 2nd level of member decorations,
 struct DecorationSet : public DecorationBase {
-    // For descriptors
+    // The only two times these are not set:
+    //  1. When not using a descriptor and these values should be ignored
+    //  2. When using descriptor heaps, so just call IsHeap()
+    //
+    // We still need these to have kInvalidValue because things like GetDescriptorSetLayoutBindingPtrFromBinding to work
     uint32_t set = kInvalidValue;
     uint32_t binding = kInvalidValue;
 
@@ -307,12 +322,17 @@ struct InterfaceSlot {
     const uint32_t type = 0;  // Opcode of OpType*
     const uint32_t bit_width = 0;
 
+    // For a block member, this is the variable's OpDecorate flags combined with the member's OpMemberDecorate flags
+    // (decoration such as Flat can be on either and applies the same way)
+    // Always zero for members of nested structs.
+    const uint32_t decoration_flags = 0;
+
     uint32_t Location() const { return slot / 4; }
     uint32_t Component() const { return slot % 4; }
     std::string Describe() const;
     // Having a single uint32_t slot allows a 64-bit Vec3 to pass in (Loc 0, Comp 5) and have it automatically mean (Loc 1, Comp 1)
-    InterfaceSlot(uint32_t location, uint32_t component, uint32_t type, uint32_t bit_width)
-        : slot(GetSlotValue(location, component)), type(type), bit_width(bit_width) {}
+    InterfaceSlot(uint32_t location, uint32_t component, uint32_t type, uint32_t bit_width, uint32_t decoration_flags = 0)
+        : slot(GetSlotValue(location, component)), type(type), bit_width(bit_width), decoration_flags(decoration_flags) {}
     InterfaceSlot(uint32_t slot, uint32_t type, uint32_t bit_width) : slot(slot), type(type), bit_width(bit_width) {}
 
     bool operator<(const InterfaceSlot &rhs) const { return slot < rhs.slot; }
@@ -524,8 +544,6 @@ struct ResourceInterfaceVariable : public VariableBase {
     bool is_sampled_image{false};
     bool is_combined_image_sampler{false};
     bool is_acceleration_structure{false};
-    bool is_acceleration_structure_nv{false};
-    bool is_partitioned_acceleration_structure{false};
     bool is_storage_tensor{false};
     // Way to print out extra useful information
     bool is_buffer_block{false};
@@ -600,8 +618,6 @@ struct EntryPoint {
     const std::vector<ResourceInterfaceVariable> resource_interface_variables;
     const std::vector<StageInterfaceVariable> stage_interface_variables;
 
-    bool uses_tosa_1_0{false};
-
     // Easier to lookup without having to check for the is_builtin bool
     // "Built-in interface variables" - vkspec.html#interfaces-iointerfaces-builtin
     std::vector<const StageInterfaceVariable *> built_in_variables;
@@ -614,6 +630,9 @@ struct EntryPoint {
     // spirv-val guarantees no overlap so 2 variables won't have same slot
     vvl::unordered_map<InterfaceSlot, const StageInterfaceVariable *, InterfaceSlot::Hash> input_interface_slots;
     vvl::unordered_map<InterfaceSlot, const StageInterfaceVariable *, InterfaceSlot::Hash> output_interface_slots;
+    // Every Location that has an input slot
+    // We want to reduce per-draw vertex binding check but building this up once
+    vvl::unordered_set<uint32_t> input_interface_locations;
     // Uesd for limit check
     const StageInterfaceVariable *max_input_slot_variable = nullptr;
     const StageInterfaceVariable *max_output_slot_variable = nullptr;
@@ -633,6 +652,10 @@ struct EntryPoint {
     bool has_alpha_to_coverage_variable{false};  // only for Fragment shaders
 
     bool has_physical_storage_buffer_interface{false};
+
+    bool has_input_attachment{false};
+
+    bool uses_tosa_1_0{false};
 
     EntryPoint(const Module &module_state, const Instruction &entrypoint_insn, const ParsedInfo &parsed);
 
@@ -669,6 +692,7 @@ struct StatelessData {
     std::vector<const Instruction *> fma_inst;
     std::vector<const Instruction *> tensor_inst;
     std::vector<const Instruction *> image_texel_pointer_inst;
+    std::vector<const Instruction *> loop_merge_inst;
 
     // simpler to just track all OpExecutionModeId and parse things needed later
     std::vector<const Instruction *> execution_mode_id_inst;
@@ -698,15 +722,13 @@ struct Module {
         vvl::unordered_map<uint32_t, const Instruction *> definitions;
 
         vvl::unordered_map<uint32_t, DecorationSet> decorations;
-        DecorationSet empty_decoration;  // all zero values, allows use to return a reference and not a copy each time
 
         // Some cases we can give better hints knowing the source shader language
         spv::SourceLanguage source_language{spv::SourceLanguageUnknown};
 
-        // Execution Modes are tied to a Function <id>, multiple EntryPoints can point to the same Funciton <id>
+        // Execution Modes are tied to a Function <id>, multiple EntryPoints can point to the same Function <id>
         // Keep a mapping so each EntryPoint can grab a reference to it
         vvl::unordered_map<uint32_t, ExecutionModeSet> execution_modes;
-        ExecutionModeSet empty_execution_mode;  // all zero values, allows use to return a reference and not a copy each time
 
         // [OpSpecConstant Result ID -> OpDecorate SpecID value] mapping
         vvl::unordered_map<uint32_t, uint32_t> id_to_spec_id;
@@ -732,7 +754,7 @@ struct Module {
         std::vector<const Instruction *> cooperative_matrix_inst;
         std::vector<const Instruction *> cooperative_vector_inst;
         std::vector<const Instruction *> emit_mesh_tasks_inst;
-        std::vector<const Instruction*> constant_size_of_inst;
+        std::vector<const Instruction*> constant_heap_inst;
         std::vector<const Instruction *> array_length_inst;
         std::vector<const Instruction *> vector_type_inst;
 
@@ -747,6 +769,11 @@ struct Module {
 
         bool has_specialization_constants{false};
         bool uses_interpolate_at_sample{false};
+
+        // GPU Dump will want the |FuncParameterMap| if someone is trying to pass an untyped descriptor
+        // into a function. Instead of tracking the memory for everyone, GPU Dump will just rebuild the info,
+        // but only if it is actually needed
+        bool has_untyped_pointer_function_params{false};
 
         // Will check if there is source debug information
         // Won't save any other info and will retrieve the debug info if requested in a VU error message
@@ -810,14 +837,17 @@ struct Module {
 
     const DecorationSet &GetDecorationSet(uint32_t id) const {
         // return the actual decorations for this id, or a default empty set.
+        // all zero values, allows use to return a reference and not a copy each time
+        static const DecorationSet kEmptyDecoration;
         const auto it = static_data_.decorations.find(id);
-        return (it != static_data_.decorations.end()) ? it->second : static_data_.empty_decoration;
+        return (it != static_data_.decorations.end()) ? it->second : kEmptyDecoration;
     }
 
     const ExecutionModeSet &GetExecutionModeSet(uint32_t function_id) const {
-        // return the actual execution modes for this id, or a default empty set.
+        // all zero values, allows use to return a reference and not a copy each time
+        static const ExecutionModeSet kEmptyExecutionMode;
         const auto it = static_data_.execution_modes.find(function_id);
-        return (it != static_data_.execution_modes.end()) ? it->second : static_data_.empty_execution_mode;
+        return (it != static_data_.execution_modes.end()) ? it->second : kEmptyExecutionMode;
     }
 
     std::shared_ptr<const TypeStructInfo> GetTypeStructInfo(const Instruction *insn) const;
@@ -835,12 +865,12 @@ struct Module {
     std::shared_ptr<const EntryPoint> FindEntrypoint(const char *name, VkShaderStageFlagBits stageBits) const;
     LocalSize FindLocalSize(const EntryPoint &entrypoint) const;
 
-    uint32_t CalculateWorkgroupSharedMemory() const;
+    uint32_t CalculateWorkgroupSharedMemory(const EntryPoint& entrypoint) const;
 
-    uint32_t ResolveConstantSizeOf(const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props, const spirv::Instruction& inst) const;
-    uint32_t ResolveConstantFoldHeaps(const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props,
+    uint32_t ResolveDescriptorConstant(const CachedDescriptorSize& descriptor_sizes, const spirv::Instruction& inst) const;
+    uint32_t ResolveConstantFoldHeaps(const CachedDescriptorSize& descriptor_sizes,
                                       const spirv::Instruction& spec_constant_op) const;
-    uint32_t GetHeapUntypedSize(const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props, const spirv::Instruction& inst) const;
+    uint32_t GetHeapUntypedSize(const CachedDescriptorSize& descriptor_sizes, const spirv::Instruction& inst) const;
 
     const Instruction *GetAnyConstantDef(uint32_t id) const;
     uint32_t GetConstantValueById(uint32_t id) const;

@@ -1242,11 +1242,11 @@ TEST_F(PositiveGpuAVDescriptorIndexing, SharedPipelineLayoutSubsetGraphicsShader
     shader_obj_ci.pName = "main";
     shader_obj_ci.setLayoutCount = 1u;
     shader_obj_ci.pSetLayouts = set_layouts;
-    vkt::Shader vs_1(*m_device, shader_obj_ci);
+    vkt::ShaderEXT vs_1(*m_device, shader_obj_ci);
     shader_obj_ci.codeSize = vs_spv_2.size() * sizeof(uint32_t);
     shader_obj_ci.pCode = vs_spv_2.data();
     shader_obj_ci.setLayoutCount = 2u;
-    vkt::Shader vs_2(*m_device, shader_obj_ci);
+    vkt::ShaderEXT vs_2(*m_device, shader_obj_ci);
 
     const std::array<VkShaderStageFlagBits, 5> stages = {{VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
                                                           VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
@@ -1296,7 +1296,7 @@ TEST_F(PositiveGpuAVDescriptorIndexing, SharedPipelineLayoutSubsetGraphicsShader
                               nullptr);
 
     vk::CmdBindShadersEXT(m_command_buffer, size32(stages), stages.data(), shaders_2.data());
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
 
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
 
@@ -1369,19 +1369,19 @@ TEST_F(PositiveGpuAVDescriptorIndexing, SharedPipelineLayoutSubsetGraphicsShader
     shader_obj_ci.pName = "main";
     shader_obj_ci.pushConstantRangeCount = 1;
     shader_obj_ci.pPushConstantRanges = &push_constant_ranges[0];
-    vkt::Shader vs_1(*m_device, shader_obj_ci);
+    vkt::ShaderEXT vs_1(*m_device, shader_obj_ci);
 
     shader_obj_ci.nextStage = VK_SHADER_STAGE_FRAGMENT_BIT;
     shader_obj_ci.codeSize = vs_spv_2.size() * sizeof(uint32_t);
     shader_obj_ci.pCode = vs_spv_2.data();
     shader_obj_ci.pushConstantRangeCount = 2;
-    vkt::Shader vs_2(*m_device, shader_obj_ci);
+    vkt::ShaderEXT vs_2(*m_device, shader_obj_ci);
 
     shader_obj_ci.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     shader_obj_ci.nextStage = 0u;
     shader_obj_ci.codeSize = fs_spv_2.size() * sizeof(uint32_t);
     shader_obj_ci.pCode = fs_spv_2.data();
-    vkt::Shader fs_2(*m_device, shader_obj_ci);
+    vkt::ShaderEXT fs_2(*m_device, shader_obj_ci);
 
     const std::array<VkShaderStageFlagBits, 5> stages = {{VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
                                                           VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
@@ -1402,7 +1402,7 @@ TEST_F(PositiveGpuAVDescriptorIndexing, SharedPipelineLayoutSubsetGraphicsShader
                          &push_constants_data[2]);
 
     vk::CmdBindShadersEXT(m_command_buffer, size32(stages), stages.data(), shaders_2.data());
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
 
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
 

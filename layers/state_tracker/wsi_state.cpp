@@ -72,6 +72,9 @@ static vku::safe_VkImageCreateInfo GetImageCreateInfo(const VkSwapchainCreateInf
     if (pCreateInfo->flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR) {
         image_ci.flags |= (VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT);
     }
+    if (pCreateInfo->flags & VK_SWAPCHAIN_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT) {
+        image_ci.flags |= VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT;
+    }
     return vku::safe_VkImageCreateInfo(&image_ci);
 }
 
@@ -184,15 +187,23 @@ void Swapchain::PresentImage(uint32_t image_index, uint64_t present_id, const Su
     }
 
     // Present id tracking
-    if (present_id > max_present_id) {
-        max_present_id = present_id;
+    if (present_id > max_present_id.load()) {
+        max_present_id.store(present_id);
     }
     if (present_id > 0) {
+        small_vector<SubmissionReference, 1> signal_submission_refs;
+        for (const auto& semaphore : present_wait_semaphores) {
+            if (auto signal = semaphore->GetPendingBinarySignalSubmission()) {
+                signal_submission_refs.emplace_back(*signal);
+            }
+        }
+        std::lock_guard lock(present_id_mutex);
         // the present id ring buffer is allocated only when the application uses present ids
         if (present_id_ring_buffer.empty()) {
             present_id_ring_buffer.resize(present_id_ring_buffer_size);
         }
-        present_id_ring_buffer[present_id_request_count % present_id_ring_buffer_size] = {present_id, present_submission_ref};
+        present_id_ring_buffer[present_id_request_count % present_id_ring_buffer_size] = {present_id, present_submission_ref,
+                                                                                          std::move(signal_submission_refs)};
         present_id_request_count++;
     }
 }
@@ -212,6 +223,7 @@ void Swapchain::AcquireImage(uint32_t image_index, const std::shared_ptr<vvl::Se
                              const std::shared_ptr<vvl::Fence>& fence_state) {
     acquired_images++;
     images[image_index].acquired = true;
+    images[image_index].ever_acquired = true;
     images[image_index].acquire_semaphore = semaphore_state;
     images[image_index].acquire_fence = fence_state;
 

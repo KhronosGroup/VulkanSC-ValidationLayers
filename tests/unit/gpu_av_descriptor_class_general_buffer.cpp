@@ -336,13 +336,13 @@ void NegativeGpuAVDescriptorClassGeneralBuffer::ShaderBufferSizeTest(VkDeviceSiz
     ds.WriteDescriptorBufferInfo(0, buffer, binding_offset, binding_range, descriptor_type);
     ds.UpdateDescriptorSets();
 
-    vkt::Shader* vso = nullptr;
-    vkt::Shader* fso = nullptr;
+    vkt::ShaderEXT* vso = nullptr;
+    vkt::ShaderEXT* fso = nullptr;
     if (shader_objects) {
-        vso = new vkt::Shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT,
-                              GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl), &ds.layout_.handle());
-        fso = new vkt::Shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader),
-                              &ds.layout_.handle());
+        vso = new vkt::ShaderEXT(*m_device, VK_SHADER_STAGE_VERTEX_BIT,
+                                 GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl), &ds.layout_.handle());
+        fso = new vkt::ShaderEXT(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader),
+                                 &ds.layout_.handle());
     }
     vkt::Buffer* indirect_buffer = nullptr;
     if (device_address_commands) {
@@ -389,7 +389,7 @@ void NegativeGpuAVDescriptorClassGeneralBuffer::ShaderBufferSizeTest(VkDeviceSiz
                                                 VK_SHADER_STAGE_FRAGMENT_BIT};
         const VkShaderEXT shaders[] = {vso->handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, fso->handle()};
         vk::CmdBindShadersEXT(m_command_buffer, 5u, stages, shaders);
-        SetDefaultDynamicStatesAll(m_command_buffer);
+        SetDefaultDynamicStatesAllEXT(m_command_buffer);
     } else {
         vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     }
@@ -600,231 +600,6 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLWrite) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLWriteSelectPipeline) {
-    TEST_DESCRIPTION("Select shaders within pipeline libraries for instrumentation");
-    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
-    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
-    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
-
-    std::vector<VkLayerSettingEXT> layer_settings(2);
-    layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
-    std::array<const char*, 2> shader_regexes = {{"bim_bap_boom", ".*_my_pipeline.*"}};
-    layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
-                         shader_regexes.data()};
-
-    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
-    RETURN_IF_SKIP(InitState());
-    InitRenderTarget();
-
-    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-
-    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer, 0, VK_WHOLE_SIZE);
-    descriptor_set.WriteDescriptorBufferInfo(1, write_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    descriptor_set.UpdateDescriptorSets();
-
-    uint32_t* data = (uint32_t*)offset_buffer.Memory().Map();
-    *data = 8;
-
-    const char vertshader[] = R"glsl(
-        #version 450
-        layout(set = 0, binding = 0) uniform Foo { uint index[]; };
-        layout(set = 0, binding = 1) buffer StorageBuffer { uint data[]; };
-        void main() {
-            uint index = index[0];
-            data[index] = 0xdeadca71;
-        }
-    )glsl";
-
-    // Create VkShaderModule to pass in
-    VkShaderObj vs(*m_device, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
-    name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
-
-    CreatePipelineHelper vertex_input_lib(*this);
-    vertex_input_lib.InitVertexInputLibInfo();
-    vertex_input_lib.CreateGraphicsPipeline(false);
-
-    // For GPU-AV tests this shrinks things so only a single fragment is executed
-    VkViewport viewport = {0, 0, 1, 1, 0, 1};
-    VkRect2D scissor = {{0, 0}, {1, 1}};
-
-    CreatePipelineHelper pre_raster_lib(*this);
-    {
-        pre_raster_lib.InitPreRasterLibInfo(&vs.GetStageCreateInfo());
-        pre_raster_lib.vp_state_ci_.pViewports = &viewport;
-        pre_raster_lib.vp_state_ci_.pScissors = &scissor;
-        pre_raster_lib.gp_ci_.layout = pipeline_layout;
-        pre_raster_lib.CreateGraphicsPipeline();
-
-        name_info.pObjectName = "oh_my_pipeline";
-        name_info.objectHandle = uint64_t(pre_raster_lib.Handle());
-        vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
-    }
-
-    CreatePipelineHelper frag_shader_lib(*this);
-    {
-        frag_shader_lib.InitFragmentLibInfo(&fs.GetStageCreateInfo());
-        frag_shader_lib.gp_ci_.layout = pipeline_layout;
-        frag_shader_lib.CreateGraphicsPipeline(false);
-    }
-
-    CreatePipelineHelper frag_out_lib(*this);
-    frag_out_lib.InitFragmentOutputLibInfo();
-    frag_out_lib.CreateGraphicsPipeline(false);
-
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredInfo("oh_my_pipeline");
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
-    m_errorMonitor->VerifyFound();
-
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe);
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
-                              nullptr);
-    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
-    m_command_buffer.EndRenderPass();
-    m_command_buffer.End();
-
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-storageBuffers-06936", 3);
-
-    m_default_queue->SubmitAndWait(m_command_buffer);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLWriteSelectShaders) {
-    TEST_DESCRIPTION("Select shaders within pipeline libraries for instrumentation");
-    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
-    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
-    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
-
-    std::vector<VkLayerSettingEXT> layer_settings(2);
-    layer_settings[0] = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
-    std::array<const char*, 2> shader_regexes = {{"verte[xyz]_foo", ".*gment_.*"}};
-    layer_settings[1] = {OBJECT_LAYER_NAME, "gpuav_shaders_to_instrument", VK_LAYER_SETTING_TYPE_STRING_EXT, size32(shader_regexes),
-                         shader_regexes.data()};
-
-    RETURN_IF_SKIP(InitGpuAvFramework(layer_settings));
-    RETURN_IF_SKIP(InitState());
-    InitRenderTarget();
-
-    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
-    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
-
-    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer, 0, VK_WHOLE_SIZE);
-    descriptor_set.WriteDescriptorBufferInfo(1, write_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    descriptor_set.UpdateDescriptorSets();
-
-    uint32_t* data = (uint32_t*)offset_buffer.Memory().Map();
-    *data = 8;
-
-    const char vertshader[] = R"glsl(
-        #version 450
-        layout(set = 0, binding = 0) uniform Foo { uint index[]; };
-        layout(set = 0, binding = 1) buffer StorageBuffer { uint data[]; };
-        void main() {
-            uint index = index[0];
-            data[index] = 0xdeadca71;
-        }
-    )glsl";
-
-    // Create VkShaderModule to pass in
-    VkShaderObj vs(*m_device, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
-    name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
-
-    name_info.pObjectName = "vertex_foo";
-    name_info.objectHandle = uint64_t(vs.handle());
-    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
-
-    name_info.pObjectName = "fragment_bar";
-    name_info.objectHandle = uint64_t(fs.handle());
-    vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
-
-    CreatePipelineHelper vertex_input_lib(*this);
-    vertex_input_lib.InitVertexInputLibInfo();
-    vertex_input_lib.CreateGraphicsPipeline(false);
-
-    // For GPU-AV tests this shrinks things so only a single fragment is executed
-    VkViewport viewport = {0, 0, 1, 1, 0, 1};
-    VkRect2D scissor = {{0, 0}, {1, 1}};
-
-    CreatePipelineHelper pre_raster_lib(*this);
-    {
-        pre_raster_lib.InitPreRasterLibInfo(&vs.GetStageCreateInfo());
-        pre_raster_lib.vp_state_ci_.pViewports = &viewport;
-        pre_raster_lib.vp_state_ci_.pScissors = &scissor;
-        pre_raster_lib.gp_ci_.layout = pipeline_layout;
-        pre_raster_lib.CreateGraphicsPipeline();
-    }
-
-    CreatePipelineHelper frag_shader_lib(*this);
-    {
-        frag_shader_lib.InitFragmentLibInfo(&fs.GetStageCreateInfo());
-        frag_shader_lib.gp_ci_.layout = pipeline_layout;
-        frag_shader_lib.CreateGraphicsPipeline(false);
-    }
-
-    CreatePipelineHelper frag_out_lib(*this);
-    frag_out_lib.InitFragmentOutputLibInfo();
-    frag_out_lib.CreateGraphicsPipeline(false);
-
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    m_errorMonitor->SetDesiredInfo("vertex_foo");
-    m_errorMonitor->SetDesiredInfo("fragment_bar");
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
-    m_errorMonitor->VerifyFound();
-
-    m_command_buffer.Begin();
-    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe);
-    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
-                              nullptr);
-    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
-    m_command_buffer.EndRenderPass();
-    m_command_buffer.End();
-
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-storageBuffers-06936", 3);
-
-    m_default_queue->SubmitAndWait(m_command_buffer);
-    m_errorMonitor->VerifyFound();
-}
-
 TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLRead) {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
@@ -962,20 +737,7 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLReadWriteIndependentSets) {
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
-    ASSERT_TRUE(exe_pipe.initialized());
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -1055,19 +817,7 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLNonInlined) {
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -1097,18 +847,15 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLIndependentSetsUnusedSets) 
 
     vkt::Buffer uniform_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     vkt::BufferView uniform_buffer_view(*m_device, uniform_texel_buffer, VK_FORMAT_R32_SFLOAT);
-    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     OneOffDescriptorSet vertex_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}});
     OneOffDescriptorSet common_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     OneOffDescriptorSet fragment_set(m_device,
                                      {{1, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}});
-    // No sampler is ever actually used
-    OneOffDescriptorSet bad_set(m_device, {{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}});
 
     const vkt::PipelineLayout pipeline_layout_vs(*m_device, {&common_set.layout_, &vertex_set.layout_, nullptr}, {},
                                                  VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-    const vkt::PipelineLayout pipeline_layout_fs(*m_device, {&common_set.layout_, &bad_set.layout_, &fragment_set.layout_}, {},
+    const vkt::PipelineLayout pipeline_layout_fs(*m_device, {&common_set.layout_, nullptr, &fragment_set.layout_}, {},
                                                  VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&common_set.layout_, &vertex_set.layout_, &fragment_set.layout_}, {},
                                               VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
@@ -1118,8 +865,6 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLIndependentSetsUnusedSets) 
     common_set.UpdateDescriptorSets();
     fragment_set.WriteDescriptorBufferView(1, uniform_buffer_view, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER);
     fragment_set.UpdateDescriptorSets();
-    bad_set.WriteDescriptorImageInfo(0, VK_NULL_HANDLE, sampler, VK_DESCRIPTOR_TYPE_SAMPLER);
-    bad_set.UpdateDescriptorSets();
 
     const char* vert_shader = R"glsl(
         #version 450
@@ -1170,20 +915,7 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLIndependentSetsUnusedSets) 
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
-    ASSERT_TRUE(exe_pipe.initialized());
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -2661,20 +2393,8 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLOneLibraryTwoLinkedPipeline
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
-    vkt::Pipeline exe_pipe_2(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
+    vkt::Pipeline exe_pipe_2(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -2757,22 +2477,10 @@ TEST_F(NegativeGpuAVDescriptorClassGeneralBuffer, GPLOneLibraryTwoLinkedPipeline
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
     {
-        vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+        vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
     }
-    vkt::Pipeline exe_pipe_2(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe_2(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);

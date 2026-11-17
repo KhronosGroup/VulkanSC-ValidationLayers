@@ -13,6 +13,7 @@
  *
  */
 
+#include <algorithm>
 #include "layer_validation_tests.h"
 #include "pipeline_helper.h"
 
@@ -307,6 +308,26 @@ TEST_F(NegativeDeviceQueue, QueuePriorities) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeDeviceQueue, QueuePrioritiesNull) {
+    RETURN_IF_SKIP(InitFramework());
+
+    VkDeviceQueueCreateInfo device_queue_ci = vku::InitStructHelper();
+    device_queue_ci.queueFamilyIndex = 0;
+    device_queue_ci.queueCount = 1;
+    device_queue_ci.pQueuePriorities = nullptr;
+
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
+    device_ci.queueCreateInfoCount = 1;
+    device_ci.pQueueCreateInfos = &device_queue_ci;
+    device_ci.enabledExtensionCount = m_device_extension_names.size();
+    device_ci.ppEnabledExtensionNames = m_device_extension_names.data();
+
+    VkDevice device = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueCreateInfo-maintenance12-12535");
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeDeviceQueue, BindPipeline) {
     TEST_DESCRIPTION("vkCmdPipelineBarrier with command pool with wrong queues");
     RETURN_IF_SKIP(Init());
@@ -511,6 +532,11 @@ TEST_F(NegativeDeviceQueue, NoQueues) {
 }
 
 TEST_F(NegativeDeviceQueue, DeviceCreateEnabledLayerNamesPointer) {
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+    // The Android loader reads ppEnabledLayerNames while building the layer chain, so it faults inside
+    // vulkan::api::CreateDevice before any layer gets a chance to report this
+    GTEST_SKIP() << "Android loader Bug";
+#endif  // VK_USE_PLATFORM_ANDROID_KHR
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitFramework());
 
@@ -744,5 +770,60 @@ TEST_F(NegativeDeviceQueue, ScaledFrequencyPerfHintButInvalidScale) {
 
     m_errorMonitor->SetDesiredError("VUID-VkPerfHintInfoQCOM-scale-12390");
     vk::QueueSetPerfHintQCOM(perf_hint_queue, &perf_hint_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDeviceQueue, ArmSchedulingControlsCreateDevice) {
+    TEST_DESCRIPTION("Validate VK_ARM_scheduling_controls queue shader-core control usage during device creation.");
+
+    AddRequiredExtensions(VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+
+    constexpr uint32_t queue_family_index = 0;
+
+    VkPhysicalDeviceSchedulingControlsPropertiesARM scheduling_controls_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(scheduling_controls_props);
+    const bool has_shader_core_count_control =
+        (scheduling_controls_props.schedulingControlsFlags & VK_PHYSICAL_DEVICE_SCHEDULING_CONTROLS_SHADER_CORE_COUNT_ARM) != 0;
+
+    float priority = 1.0f;
+    VkDeviceQueueShaderCoreControlCreateInfoARM queue_shader_core_control = vku::InitStructHelper();
+    queue_shader_core_control.shaderCoreCount = 1;
+
+    VkDeviceQueueCreateInfo device_queue_ci = vku::InitStructHelper(&queue_shader_core_control);
+    device_queue_ci.queueFamilyIndex = queue_family_index;
+    device_queue_ci.queueCount = 1;
+    device_queue_ci.pQueuePriorities = &priority;
+
+    VkDeviceQueueShaderCoreControlCreateInfoARM device_shader_core_control = vku::InitStructHelper();
+    device_shader_core_control.shaderCoreCount = 1;
+    VkPhysicalDeviceSchedulingControlsFeaturesARM scheduling_controls_features = vku::InitStructHelper(&device_shader_core_control);
+    scheduling_controls_features.schedulingControls = VK_TRUE;
+
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper(&scheduling_controls_features);
+    device_ci.queueCreateInfoCount = 1;
+    device_ci.pQueueCreateInfos = &device_queue_ci;
+    device_ci.enabledLayerCount = 0;
+    device_ci.enabledExtensionCount = m_device_extension_names.size();
+    device_ci.ppEnabledExtensionNames = m_device_extension_names.data();
+
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-09396");
+    if (!has_shader_core_count_control) {
+        m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-09397");
+        m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueCreateInfo-pNext-09398");
+    }
+    VkDevice device = VK_NULL_HANDLE;
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
+    m_errorMonitor->VerifyFound();
+
+    device_queue_ci.pNext = nullptr;
+    device_shader_core_control.shaderCoreCount = 0;
+
+    if (!has_shader_core_count_control) {
+        m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pNext-09397");
+    }
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueShaderCoreControlCreateInfoARM-shaderCoreCount-09399");
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }

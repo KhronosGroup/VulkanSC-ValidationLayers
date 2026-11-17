@@ -11,6 +11,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <spirv/unified1/spirv.hpp>
 #include <vulkan/vulkan_core.h>
 #include <cstdint>
 #include "layer_validation_tests.h"
@@ -19,6 +20,7 @@
 #include "descriptor_helper.h"
 #include "buffer_helper.h"
 #include "gpu_av_helper.h"
+#include "cooperative_matrix_helper.h"
 #include "utils/math_utils.h"
 
 void DebugPrintfTests::InitDebugPrintfFramework(void* p_next, bool reserve_slot) {
@@ -44,7 +46,8 @@ class NegativeDebugPrintf : public DebugPrintfTests {
   public:
     void BasicComputeTest(const char* shader, const char* message);
     void BasicFormattingTest(const char* shader, bool warning = false);
-    void CoopMat2CallbackTest(const char* shader_source, const char* message);
+    // The shaders use 16x16 float16 subgroup matrices with the given use
+    void CoopMat2CallbackTest(const char* shader_source, const char* message, uint32_t matrix_use);
 };
 
 void NegativeDebugPrintf::BasicComputeTest(const char* shader, const char* message) {
@@ -1885,19 +1888,7 @@ TEST_F(NegativeDebugPrintf, GPLFragmentIndependentSets) {
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    vkt::Pipeline pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pre_raster_lib.gp_ci_.layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -1911,6 +1902,118 @@ TEST_F(NegativeDebugPrintf, GPLFragmentIndependentSets) {
     m_errorMonitor->SetDesiredInfo("Vertex shader 0, 0x1030507");
     m_errorMonitor->SetDesiredInfo("Fragment shader 0x2040608");
     m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, GPLDestroyLinkedPipeline) {
+    TEST_DESCRIPTION("Libraries are instrumented at the first link, destroying that pipeline must not affect the next link");
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char* vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            if (gl_VertexIndex == 0) {
+                debugPrintfEXT("vertex shader from the library");
+            }
+            gl_Position = vec4(0.0);
+        }
+    )glsl";
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {});
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source);
+    vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    CreatePipelineHelper pre_raster_lib(*this);
+    pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci);
+    pre_raster_lib.gp_ci_.layout = pipeline_layout;
+    pre_raster_lib.CreateGraphicsPipeline();
+
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    CreatePipelineHelper frag_shader_lib(*this);
+    frag_shader_lib.InitFragmentLibInfo(&fs_stage.stage_ci);
+    frag_shader_lib.gp_ci_.layout = pipeline_layout;
+    frag_shader_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[4] = {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib};
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size32(libraries);
+    link_info.pLibraries = libraries;
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout;
+
+    auto draw = [&](VkPipeline pipeline) {
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+        m_command_buffer.EndRenderPass();
+        m_command_buffer.End();
+        m_errorMonitor->SetDesiredInfo("vertex shader from the library");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    };
+
+    {
+        vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+        draw(exe_pipe);
+    }
+    // Re-uses the instrumented libraries from the first link
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    draw(exe_pipe);
+}
+
+TEST_F(NegativeDebugPrintf, GPLDestroyLibrariesBeforeSubmitIsProcessed) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    const char* vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            if (gl_VertexIndex == 0) {
+                debugPrintfEXT("vertex shader from the library");
+            }
+            gl_Position = vec4(0.0);
+        }
+    )glsl";
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {});
+    auto pipe = std::make_unique<vkt::SimpleGPL>(*this, pipeline_layout, vs_source);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipe);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    SubmitWithLastBatchWaitingOnHost(*m_default_queue, m_command_buffer, timeline);
+    timeline.Wait(1, kWaitTimeout);
+    pipe.reset();
+
+    m_errorMonitor->SetDesiredInfo("vertex shader from the library");
+    timeline.Signal(2);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1932,13 +2035,13 @@ TEST_F(NegativeDebugPrintf, ShaderObjectsGraphics) {
             gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
         }
     )glsl";
-    const vkt::Shader vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, shader_source));
-    const vkt::Shader fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    const vkt::ShaderEXT vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, shader_source);
+    const vkt::ShaderEXT fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    m_command_buffer.BindShaders(vs, fs);
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    m_command_buffer.BindShadersEXT(vs, fs);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -1978,11 +2081,10 @@ TEST_F(NegativeDebugPrintf, ShaderObjects) {
             debugPrintfEXT("Here's a float in hex %1.9a", myfloat);
         }
     )glsl";
-    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, shader_source));
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, shader_source);
 
     m_command_buffer.Begin();
-    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+    m_command_buffer.BindCompShaderEXT(cs);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
@@ -2019,11 +2121,10 @@ TEST_F(NegativeDebugPrintf, ShaderObjectsInt64) {
             debugPrintfEXT("Unsigned long as decimal %lu and as hex 0x%lx", bigvar, bigvar);
         }
     )glsl";
-    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, shader_source));
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, shader_source);
 
     m_command_buffer.Begin();
-    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+    m_command_buffer.BindCompShaderEXT(cs);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
@@ -2060,8 +2161,8 @@ TEST_F(NegativeDebugPrintf, ShaderObjectsMultiDraw) {
             gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
         }
     )glsl";
-    const vkt::Shader vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, shader_source));
-    const vkt::Shader fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    const vkt::ShaderEXT vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, shader_source);
+    const vkt::ShaderEXT fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
 
     VkMultiDrawInfoEXT multi_draws[3] = {};
     multi_draws[0].vertexCount = multi_draws[1].vertexCount = multi_draws[2].vertexCount = 3;
@@ -2069,8 +2170,8 @@ TEST_F(NegativeDebugPrintf, ShaderObjectsMultiDraw) {
     multi_draw_indices[0].indexCount = multi_draw_indices[1].indexCount = multi_draw_indices[2].indexCount = 3;
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    m_command_buffer.BindShaders(vs, fs);
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    m_command_buffer.BindShadersEXT(vs, fs);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdDrawMultiEXT(m_command_buffer, 3, multi_draws, 1, 0, sizeof(VkMultiDrawInfoEXT));
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -2088,8 +2189,8 @@ TEST_F(NegativeDebugPrintf, ShaderObjectsMultiDraw) {
     ptr[2] = 2;
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    m_command_buffer.BindShaders(vs, fs);
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    m_command_buffer.BindShadersEXT(vs, fs);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdBindIndexBuffer(m_command_buffer, buffer, 0, VK_INDEX_TYPE_UINT16);
     vk::CmdDrawMultiIndexedEXT(m_command_buffer, 3, multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_command_buffer.EndRendering();
@@ -2143,17 +2244,17 @@ TEST_F(NegativeDebugPrintf, MeshTaskShaderObjects) {
         }
     )glsl";
 
-    const vkt::Shader ts(*m_device, VK_SHADER_STAGE_TASK_BIT_EXT,
-                         GLSLToSPV(VK_SHADER_STAGE_TASK_BIT_EXT, taskShaderText, SPV_ENV_VULKAN_1_3));
-    const vkt::Shader ms(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT,
-                         GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, meshShaderText, SPV_ENV_VULKAN_1_3));
-    const vkt::Shader fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+    const vkt::ShaderEXT ts(*m_device, VK_SHADER_STAGE_TASK_BIT_EXT,
+                            GLSLToSPV(VK_SHADER_STAGE_TASK_BIT_EXT, taskShaderText, SPV_ENV_VULKAN_1_3));
+    const vkt::ShaderEXT ms(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT,
+                            GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, meshShaderText, SPV_ENV_VULKAN_1_3));
+    const vkt::ShaderEXT fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdSetRasterizerDiscardEnableEXT(m_command_buffer, VK_TRUE);
-    m_command_buffer.BindMeshShaders(ts, ms, fs);
+    m_command_buffer.BindMeshShadersEXT(ts, ms, fs);
     vk::CmdDrawMeshTasksEXT(m_command_buffer, 1, 1, 1);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -2346,9 +2447,8 @@ TEST_F(NegativeDebugPrintf, ShaderObjectFragment) {
         }
     )glsl";
 
-    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT,
-                                  GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl));
-    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source));
+    const vkt::ShaderEXT vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl);
+    const vkt::ShaderEXT frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, fs_source);
 
     VkRenderingInfo renderingInfo = vku::InitStructHelper();
     renderingInfo.colorAttachmentCount = 0;
@@ -2357,8 +2457,8 @@ TEST_F(NegativeDebugPrintf, ShaderObjectFragment) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRendering(renderingInfo);
-    SetDefaultDynamicStatesExclude({VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT});
-    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    SetDefaultDynamicStatesExcludeEXT({VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT});
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -2382,15 +2482,81 @@ TEST_F(NegativeDebugPrintf, ShaderObjectCompute) {
             debugPrintfEXT("float == %f", myfloat);
         }
     )glsl";
-    const vkt::Shader comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source));
+    const vkt::ShaderEXT comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
 
     m_command_buffer.Begin();
-    m_command_buffer.BindCompShader(comp_shader);
+    m_command_buffer.BindCompShaderEXT(comp_shader);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredInfo("float == 3.141500");
     m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, DestroyPipelineBeforeSubmitIsProcessed) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            debugPrintfEXT("printf from a destroyed pipeline");
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    SubmitWithLastBatchWaitingOnHost(*m_default_queue, m_command_buffer, timeline);
+    timeline.Wait(1, kWaitTimeout);
+    pipe.Destroy();
+
+    m_errorMonitor->SetDesiredInfo("printf from a destroyed pipeline");
+    timeline.Signal(2);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, ShaderObjectDestroyBeforeSubmitIsProcessed) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            debugPrintfEXT("printf from a destroyed shader object");
+        }
+    )glsl";
+    vkt::ShaderEXT comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BindCompShaderEXT(comp_shader);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    SubmitWithLastBatchWaitingOnHost(*m_default_queue, m_command_buffer, timeline);
+    timeline.Wait(1, kWaitTimeout);
+    comp_shader.Destroy();
+
+    m_errorMonitor->SetDesiredInfo("printf from a destroyed shader object");
+    timeline.Signal(2);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -2881,12 +3047,12 @@ TEST_F(NegativeDebugPrintf, UseAllDescriptorSlotsShaderObjectReserved) {
             "This Shader Object has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "VkShaderEXT created with it");
 
-        const vkt::Shader comp_shader(*m_device,
-                                      ShaderCreateInfo(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, set_limit, layouts.data()));
+        const vkt::ShaderEXT comp_shader(*m_device,
+                                         ShaderCreateInfoEXT(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, set_limit, layouts.data()));
         m_errorMonitor->VerifyFound();
 
         m_command_buffer.Begin();
-        m_command_buffer.BindCompShader(comp_shader);
+        m_command_buffer.BindCompShaderEXT(comp_shader);
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
         m_command_buffer.End();
 
@@ -2903,11 +3069,11 @@ TEST_F(NegativeDebugPrintf, UseAllDescriptorSlotsShaderObjectReserved) {
         }
         vkt::PipelineLayout pipe_layout(*m_device, vkt_layouts);
 
-        const vkt::Shader comp_shader(*m_device,
-                                      ShaderCreateInfo(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, under_set_limit, layouts.data()));
+        const vkt::ShaderEXT comp_shader(
+            *m_device, ShaderCreateInfoEXT(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, under_set_limit, layouts.data()));
 
         m_command_buffer.Begin();
-        m_command_buffer.BindCompShader(comp_shader);
+        m_command_buffer.BindCompShaderEXT(comp_shader);
         vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_layout, 0, 1, &descriptor_set.set_, 0,
                                   nullptr);
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -2950,12 +3116,12 @@ TEST_F(NegativeDebugPrintf, UseAllDescriptorSlotsShaderObjectNotReserved) {
             "This Shader Object has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
             "VkShaderEXT created with it");
 
-        const vkt::Shader comp_shader(*m_device,
-                                      ShaderCreateInfo(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, set_limit, layouts.data()));
+        const vkt::ShaderEXT comp_shader(*m_device,
+                                         ShaderCreateInfoEXT(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, set_limit, layouts.data()));
         m_errorMonitor->VerifyFound();
 
         m_command_buffer.Begin();
-        m_command_buffer.BindCompShader(comp_shader);
+        m_command_buffer.BindCompShaderEXT(comp_shader);
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
         m_command_buffer.End();
 
@@ -2972,11 +3138,11 @@ TEST_F(NegativeDebugPrintf, UseAllDescriptorSlotsShaderObjectNotReserved) {
         }
         vkt::PipelineLayout pipe_layout(*m_device, vkt_layouts);
 
-        const vkt::Shader comp_shader(*m_device,
-                                      ShaderCreateInfo(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, set_limit - 1, layouts.data()));
+        const vkt::ShaderEXT comp_shader(*m_device,
+                                         ShaderCreateInfoEXT(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, set_limit - 1, layouts.data()));
 
         m_command_buffer.Begin();
-        m_command_buffer.BindCompShader(comp_shader);
+        m_command_buffer.BindCompShaderEXT(comp_shader);
         vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_layout, 0, 1, &descriptor_set.set_, 0,
                                   nullptr);
         vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -3024,8 +3190,8 @@ TEST_F(NegativeDebugPrintf, ShaderObjectMultiCreate) {
     const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source);
 
     VkShaderCreateInfoEXT shader_create_infos[2];
-    shader_create_infos[0] = ShaderCreateInfoLink(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT);
-    shader_create_infos[1] = ShaderCreateInfoLink(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    shader_create_infos[0] = ShaderCreateInfoLinkEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT);
+    shader_create_infos[1] = ShaderCreateInfoLinkEXT(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkShaderEXT shaders[2];
     vk::CreateShadersEXT(*m_device, 2, shader_create_infos, nullptr, shaders);
@@ -3037,7 +3203,7 @@ TEST_F(NegativeDebugPrintf, ShaderObjectMultiCreate) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRendering(rendering_info);
-    SetDefaultDynamicStatesExclude({VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT});
+    SetDefaultDynamicStatesExcludeEXT({VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT});
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     vk::CmdBindShadersEXT(m_command_buffer, 2, stages, shaders);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
@@ -3079,10 +3245,10 @@ TEST_F(NegativeDebugPrintf, ShaderObjectBoundDescriptor) {
     descriptor_set.WriteDescriptorBufferInfo(0, storage_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
 
-    const vkt::Shader comp_shader(*m_device,
-                                  ShaderCreateInfo(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, 1, &descriptor_set.layout_.handle()));
+    const vkt::ShaderEXT comp_shader(
+        *m_device, ShaderCreateInfoEXT(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, 1, &descriptor_set.layout_.handle()));
     m_command_buffer.Begin();
-    m_command_buffer.BindCompShader(comp_shader);
+    m_command_buffer.BindCompShaderEXT(comp_shader);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
                               nullptr);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -3120,9 +3286,9 @@ TEST_F(NegativeDebugPrintf, ShaderObjectUnusedBoundDescriptor) {
     descriptor_set1.UpdateDescriptorSets();
 
     VkDescriptorSetLayout layouts[2] = {descriptor_set0.layout_, descriptor_set1.layout_};
-    const vkt::Shader comp_shader(*m_device, ShaderCreateInfo(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, 2, layouts));
+    const vkt::ShaderEXT comp_shader(*m_device, ShaderCreateInfoEXT(cs_spirv, VK_SHADER_STAGE_COMPUTE_BIT, 2, layouts));
     m_command_buffer.Begin();
-    m_command_buffer.BindCompShader(comp_shader);
+    m_command_buffer.BindCompShaderEXT(comp_shader);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set0.set_, 0,
                               nullptr);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -3823,7 +3989,7 @@ TEST_F(NegativeDebugPrintf, DispatchIndirect) {
         }
     )glsl";
 
-    vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+    vkt::Buffer indirect_buffer(*m_device, sizeof(VkDispatchIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
                                 kHostVisibleMemProps);
     auto indirect_command = static_cast<VkDispatchIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->x = 1;
@@ -3955,9 +4121,9 @@ TEST_F(NegativeDebugPrintf, DrawIndexedIndirect) {
     auto indirect_command = static_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->indexCount = 3;
     indirect_command->instanceCount = 1;
-    indirect_command->firstIndex = 1;
-    indirect_command->vertexOffset = 1;
-    indirect_command->firstInstance = 1;
+    indirect_command->firstIndex = 0;
+    indirect_command->vertexOffset = 0;
+    indirect_command->firstInstance = 0;
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -4002,9 +4168,9 @@ TEST_F(NegativeDebugPrintf, DrawIndirectCount) {
     auto indirect_command = static_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->indexCount = 3;
     indirect_command->instanceCount = 1;
-    indirect_command->firstIndex = 1;
-    indirect_command->vertexOffset = 1;
-    indirect_command->firstInstance = 1;
+    indirect_command->firstIndex = 0;
+    indirect_command->vertexOffset = 0;
+    indirect_command->firstInstance = 0;
 
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
     uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
@@ -4054,9 +4220,9 @@ TEST_F(NegativeDebugPrintf, DrawIndexedIndirectCount) {
     auto indirect_command = static_cast<VkDrawIndexedIndirectCommand*>(indirect_buffer.Memory().Map());
     indirect_command->indexCount = 3;
     indirect_command->instanceCount = 1;
-    indirect_command->firstIndex = 1;
-    indirect_command->vertexOffset = 1;
-    indirect_command->firstInstance = 1;
+    indirect_command->firstIndex = 0;
+    indirect_command->vertexOffset = 0;
+    indirect_command->firstInstance = 0;
 
     vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
     uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
@@ -4954,6 +5120,9 @@ TEST_F(NegativeDebugPrintf, DescriptorBuffer) {
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
@@ -5018,6 +5187,13 @@ TEST_F(NegativeDebugPrintf, DescriptorBuffer) {
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
+    // GPU-AV should have created and cached a pipeline layout
+    // to bind the instrumentation descriptor buffer,
+    // make sure using the cached pipeline layout works.
+    m_errorMonitor->SetDesiredInfo("c == 20");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+
     // One more time, but bind prior the pipeline
     data[0] = 4;
     data[1] = 6;
@@ -5048,6 +5224,9 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferGPL) {
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
@@ -5118,20 +5297,8 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferGPL) {
     frag_out_lib.InitFragmentOutputLibInfo(&create_flags);
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    exe_pipe_ci.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout,
+                           VK_NULL_HANDLE, VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
     m_command_buffer.Begin();
 
@@ -5168,6 +5335,9 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferShaderObject) {
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
 
     vkt::Buffer buffer_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     uint32_t* data = (uint32_t*)buffer_data.Memory().Map();
@@ -5207,12 +5377,11 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferShaderObject) {
         }
     )glsl";
 
-    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
-                         &ds_layout.handle());
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
+                            &ds_layout.handle());
 
     m_command_buffer.Begin();
-    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+    m_command_buffer.BindCompShaderEXT(cs);
 
     VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
     descriptor_buffer_binding_info.address = descriptor_buffer.Address();
@@ -5240,6 +5409,12 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferPushConstantOnly) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
 
     VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
@@ -5291,6 +5466,12 @@ TEST_F(NegativeDebugPrintf, NoPipelineLayout) {
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
+
     vkt::Buffer descriptor_buffer(*m_device, 1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
 
     const char* cs_source = R"glsl(
@@ -5301,11 +5482,10 @@ TEST_F(NegativeDebugPrintf, NoPipelineLayout) {
             debugPrintfEXT("c == %u\n", c);
         }
     )glsl";
-    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source));
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
 
     m_command_buffer.Begin();
-    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+    m_command_buffer.BindCompShaderEXT(cs);
 
     VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
     descriptor_buffer_binding_info.address = descriptor_buffer.Address();
@@ -5316,7 +5496,236 @@ TEST_F(NegativeDebugPrintf, NoPipelineLayout) {
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
+    m_errorMonitor->SetDesiredInfo("c == 3");
     m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, ShaderObjectUnboundDescriptorSetLayout) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12597");
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    InitDynamicRenderTarget();
+
+    const char* fs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(set = 0, binding = 0) uniform Foo { uint bar; };
+        void main() {
+            float myfloat = 3.1415f;
+            debugPrintfEXT("float == %f", myfloat);
+        }
+    )glsl";
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    const vkt::DescriptorSetLayout ds_layout(*m_device, binding);
+
+    const vkt::ShaderEXT vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT,
+                                     GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl), &ds_layout.handle());
+    const vkt::ShaderEXT frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source),
+                                     &ds_layout.handle());
+
+    VkRenderingInfo rendering_info = vku::InitStructHelper();
+    rendering_info.colorAttachmentCount = 0;
+    rendering_info.layerCount = 1;
+    rendering_info.renderArea = {{0, 0}, {1, 1}};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    SetDefaultDynamicStatesExcludeEXT({VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT});
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("float == 3.141500");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, ShaderObjectUnboundDescriptorBufferSetLayout) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12597");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
+
+    vkt::Buffer descriptor_buffer(*m_device, 1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(set = 0, binding = 0) uniform Foo { uint bar; };
+        void main() {
+            debugPrintfEXT("constant == %u\n", 3);
+        }
+    )glsl";
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    const vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
+                            &ds_layout.handle());
+
+    m_command_buffer.Begin();
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
+    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("constant == 3");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, DISABLED_PipelineUnboundDescriptorBufferSetLayout) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13419");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer descriptor_buffer(*m_device, 1024, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+
+    const char* cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        layout(set = 0, binding = 0) uniform Foo { uint bar; };
+        void main() {
+            debugPrintfEXT("constant == %u\n", 3);
+        }
+    )glsl";
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    const vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
+
+    CreateComputePipelineHelper pipe_descriptor_buffer(*this);
+    pipe_descriptor_buffer.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe_descriptor_buffer.cp_ci_.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    pipe_descriptor_buffer.cp_ci_.layout = pipeline_layout;
+    pipe_descriptor_buffer.CreateComputePipeline();
+
+    // Same layouts, but using classic descriptor sets
+    vkt::Buffer uniform_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    OneOffDescriptorSet descriptor_set(m_device, {binding});
+    const vkt::PipelineLayout pipeline_layout_classic(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, uniform_buffer, 0, VK_WHOLE_SIZE);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreateComputePipelineHelper pipe_classic(*this);
+    pipe_classic.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe_classic.cp_ci_.layout = pipeline_layout_classic;
+    pipe_classic.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_classic);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_classic, 0, 1, &descriptor_set.set_,
+                              0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe_descriptor_buffer);
+
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info = vku::InitStructHelper();
+    descriptor_buffer_binding_info.address = descriptor_buffer.Address();
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &descriptor_buffer_binding_info);
+
+    // That dispatch will cause a self validation error:
+    // VUID-vkCmdDispatch-None-08115
+    // [Self Validation] vkCmdDispatch(): pipeline bound to VK_PIPELINE_BIND_POINT_COMPUTE requires a descriptor buffer
+    // (because it was created with VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT),
+    // but has a bound VkDescriptorSet (VkDescriptorSet 0x210000000021) at set 0
+    // The command buffer is currently in 'Descriptor Buffer' mode from previous call to vkCmdSetDescriptorBufferOffsetsEXT
+    // which invalidated the previous 'Classic Descriptor' mode that was set with vkCmdBindDescriptorSets.
+    //
+    // => GPU-AV causes this because it binds its resources at descriptor index 31 through a descriptor buffer,
+    // since the bound pipeline uses descriptor buffer.
+    // BUT the a descriptor set is still bound at set 0 due to the previous cmd in this test,
+    // AND the lack of a vkCmdSetDescriptorBufferOffsetsEXT call in this test.
+    //
+    // => Fix would be to bind a dummy descriptor buffer at set 0 using vkCmdSetDescriptorBufferOffsetsEXT,
+    // THEN after the dispatch restore descriptor set 0 binding.
+    // GPU-AV validation commands already do that, but as of writing instrumentation did not need to.
+    // For now, this case is deemed too esoteric, addressing it is low prio.
+
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("constant == 3");  // classic descriptor set pipeline
+    m_errorMonitor->SetDesiredInfo("constant == 3");  // descriptor buffer pipeline
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintf, ShaderObjectUselessPushDataDescriptorHeap) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12597");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+    InitDynamicRenderTarget();
+
+    const char* vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            if (gl_VertexIndex == 0) {
+                debugPrintfEXT("x == %u\n", gl_VertexIndex);
+            }
+            gl_Position = vec4(1.0f);
+        }
+    )glsl";
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source);
+    const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
+
+    // not using ShaderCreateInfoHeap()
+    VkShaderCreateInfoEXT vert_ci = ShaderCreateInfoLinkEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderCreateInfoEXT frag_ci = ShaderCreateInfoLinkEXT(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    vkt::ShaderEXT vert_shader(*m_device, vert_ci);
+    vkt::ShaderEXT frag_shader(*m_device, frag_ci);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExcludeEXT();
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, &stages[0], &vert_shader.handle());
+    vk::CmdBindShadersEXT(m_command_buffer, 1u, &stages[1], &frag_shader.handle());
+    uint32_t dummy_data = 0;
+    m_command_buffer.PushDataEXT(0, 4, &dummy_data);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredInfo("x == 0");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDebugPrintf, DescriptorBufferMixClassic) {
@@ -5329,6 +5738,9 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferMixClassic) {
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
 
     const char* cs_source = R"glsl(
         #version 450
@@ -5438,6 +5850,9 @@ TEST_F(NegativeDebugPrintf, DescriptorBufferMultipleCommandBuffers) {
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
+    if (descriptor_buffer_properties.maxResourceDescriptorBufferBindings < 2) {
+        GTEST_SKIP() << "maxResourceDescriptorBufferBindings is not 2, GPU-AV needs a binding for itself";
+    }
 
     vkt::Buffer buffer1_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     vkt::Buffer buffer2_data(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
@@ -5566,9 +5981,9 @@ TEST_F(NegativeDebugPrintf, DrawMeshTasksIndirectCountEXT) {
     mesh_ci.codeSize = mesh_code.size() * sizeof(mesh_code[0]);
     mesh_ci.pCode = mesh_code.data();
     mesh_ci.pName = "main";
-    const vkt::Shader mesh(*m_device, mesh_ci);
-    const vkt::Shader frag(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
-                           GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl, SPV_ENV_VULKAN_1_2));
+    const vkt::ShaderEXT mesh(*m_device, mesh_ci);
+    const vkt::ShaderEXT frag(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
+                              GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl, SPV_ENV_VULKAN_1_2));
 
     vkt::Buffer count_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, kHostVisibleMemProps);
     uint32_t* count_ptr = static_cast<uint32_t*>(count_buffer.Memory().Map());
@@ -5583,7 +5998,7 @@ TEST_F(NegativeDebugPrintf, DrawMeshTasksIndirectCountEXT) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
+    SetDefaultDynamicStatesExcludeEXT();
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_MESH_BIT_EXT, VK_SHADER_STAGE_FRAGMENT_BIT};
     const VkShaderEXT shaders[] = {VK_NULL_HANDLE, mesh, frag};
     vk::CmdBindShadersEXT(m_command_buffer, 3u, stages, shaders);
@@ -5698,12 +6113,11 @@ TEST_F(NegativeDebugPrintf, DisableShaderValidationShaderObject) {
         }
     )glsl";
 
-    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, shader_source),
-                         &ds.layout_.handle());
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, shader_source),
+                            &ds.layout_.handle());
 
     m_command_buffer.Begin();
-    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    vk::CmdBindShadersEXT(m_command_buffer, 1, stages, &cs.handle());
+    m_command_buffer.BindCompShaderEXT(cs);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &ds.set_, 0, nullptr);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
@@ -5838,17 +6252,13 @@ TEST_F(NegativeDebugPrintf, DescriptorHeap) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
 
-    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
-    vkt::HeapComputePipeline pipe2(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
+    vkt::HeapComputePipelineEXT pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
+    vkt::HeapComputePipelineEXT pipe2(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -5934,11 +6344,7 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapGraphics) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
@@ -5946,17 +6352,10 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapGraphics) {
     VkShaderObj vs_module = VkShaderObj(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs_module = VkShaderObj(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
     VkPipelineShaderStageCreateInfo stages[2] = {vs_module.GetStageCreateInfo(&mapping_info),
                                                  fs_module.GetStageCreateInfo(&mapping_info)};
 
-    CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.gp_ci_.layout = VK_NULL_HANDLE;
-    pipe.gp_ci_.stageCount = 2;
-    pipe.gp_ci_.pStages = stages;
-    pipe.CreateGraphicsPipeline(false);
+    vkt::HeapGraphicsPipelineEXT pipe(*this, stages, 2);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6032,7 +6431,7 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapUntypedPointers) {
             debugPrintfEXT("c == %u\n", heapBuffer[2].data);
         }
     )glsl";
-    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_2);
+    vkt::HeapComputePipelineEXT pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_2);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6106,11 +6505,7 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapGPL) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
@@ -6232,18 +6627,14 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapShaderObjects) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
 
     const auto spv = GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source);
-    VkShaderCreateInfoEXT shader_create_info = ShaderCreateInfoHeap(spv, VK_SHADER_STAGE_COMPUTE_BIT, &mapping_info);
-    vkt::Shader shader(*m_device, shader_create_info);
+    VkShaderCreateInfoEXT shader_create_info = ShaderCreateInfoHeapEXT(spv, VK_SHADER_STAGE_COMPUTE_BIT, &mapping_info);
+    vkt::ShaderEXT shader(*m_device, shader_create_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6280,12 +6671,12 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapPushConstantOnly) {
             debugPrintfEXT("int == %u", pc.x);
         }
     )glsl";
-    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0);
+    vkt::HeapComputePipelineEXT pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0);
 
     m_command_buffer.Begin();
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     uint32_t data = 4;
-    m_command_buffer.PushData(0, sizeof(uint32_t), &data);
+    m_command_buffer.PushDataEXT(0, sizeof(uint32_t), &data);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
@@ -6349,16 +6740,12 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeap) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
 
-    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
+    vkt::HeapComputePipelineEXT pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6377,14 +6764,10 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeap) {
     memory_barrier.dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     memory_barrier.dstAccessMask = VK_ACCESS_2_RESOURCE_HEAP_READ_BIT_EXT | VK_ACCESS_2_SAMPLER_HEAP_READ_BIT_EXT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.memoryBarrierCount = 1u;
-    dependency_info.pMemoryBarriers = &memory_barrier;
-
     m_command_buffer.Begin();
     vk::CmdCopyBuffer(m_command_buffer, copy_src, descriptor_heap, 1u, &copy_region);
 
-    vk::CmdPipelineBarrier2(m_command_buffer, &dependency_info);
+    m_command_buffer.Barrier(memory_barrier);
 
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
     vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
@@ -6457,11 +6840,7 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeapGraphics) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
@@ -6469,17 +6848,10 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeapGraphics) {
     VkShaderObj vs_module = VkShaderObj(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs_module = VkShaderObj(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
     VkPipelineShaderStageCreateInfo stages[2] = {vs_module.GetStageCreateInfo(&mapping_info),
                                                  fs_module.GetStageCreateInfo(&mapping_info)};
 
-    CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.gp_ci_.layout = VK_NULL_HANDLE;
-    pipe.gp_ci_.stageCount = 2;
-    pipe.gp_ci_.pStages = stages;
-    pipe.CreateGraphicsPipeline(false);
+    vkt::HeapGraphicsPipelineEXT pipe(*this, stages, 2);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6498,13 +6870,9 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeapGraphics) {
     memory_barrier.dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     memory_barrier.dstAccessMask = VK_ACCESS_2_RESOURCE_HEAP_READ_BIT_EXT | VK_ACCESS_2_SAMPLER_HEAP_READ_BIT_EXT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.memoryBarrierCount = 1u;
-    dependency_info.pMemoryBarriers = &memory_barrier;
-
     m_command_buffer.Begin();
     vk::CmdCopyBuffer(m_command_buffer, copy_src, descriptor_heap, 1u, &copy_region);
-    vk::CmdPipelineBarrier2(m_command_buffer, &dependency_info);
+    m_command_buffer.Barrier(memory_barrier);
     vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -6590,11 +6958,7 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeapMesh) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
-
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
@@ -6603,17 +6967,10 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeapMesh) {
     VkShaderObj ms_module = VkShaderObj(*m_device, mesh_source, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
     VkShaderObj fs_module = VkShaderObj(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
 
-    VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
-    pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
-
     VkPipelineShaderStageCreateInfo stages[3] = {ts_module.GetStageCreateInfo(&mapping_info),
                                                  ms_module.GetStageCreateInfo(&mapping_info), fs_module.GetStageCreateInfo()};
 
-    CreatePipelineHelper pipe(*this, &pipeline_create_flags_2_create_info);
-    pipe.gp_ci_.layout = VK_NULL_HANDLE;
-    pipe.gp_ci_.stageCount = 3;
-    pipe.gp_ci_.pStages = stages;
-    pipe.CreateGraphicsPipeline(false);
+    vkt::HeapGraphicsPipelineEXT pipe(*this, stages, 3);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6632,13 +6989,9 @@ TEST_F(NegativeDebugPrintf, DeviceLocalHeapMesh) {
     memory_barrier.dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     memory_barrier.dstAccessMask = VK_ACCESS_2_RESOURCE_HEAP_READ_BIT_EXT | VK_ACCESS_2_SAMPLER_HEAP_READ_BIT_EXT;
 
-    VkDependencyInfo dependency_info = vku::InitStructHelper();
-    dependency_info.memoryBarrierCount = 1u;
-    dependency_info.pMemoryBarriers = &memory_barrier;
-
     m_command_buffer.Begin();
     vk::CmdCopyBuffer(m_command_buffer, copy_src, descriptor_heap, 1u, &copy_region);
-    vk::CmdPipelineBarrier2(m_command_buffer, &dependency_info);
+    m_command_buffer.Barrier(memory_barrier);
     vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -6662,9 +7015,6 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapRebindHeap) {
     VkPhysicalDeviceDescriptorHeapPropertiesEXT heap_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(heap_props);
 
-    const VkDeviceSize resource_stride =
-        Align(Align(heap_props.bufferDescriptorAlignment, heap_props.imageDescriptorAlignment), heap_props.resourceHeapAlignment);
-
     vkt::Buffer ssbo1_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     vkt::Buffer ssbo2_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
     vkt::Buffer ssbo3_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
@@ -6681,9 +7031,10 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapRebindHeap) {
     data[1] = 9;
     data[2] = 1;
 
+    const VkDeviceSize descriptor_stride = std::max(heap_props.bufferDescriptorSize, heap_props.resourceHeapAlignment);
+
     // 1st heap hold 2 SSBO
-    VkDeviceSize resource_heap_size_app = Align(resource_stride * 2, heap_props.bufferDescriptorAlignment);
-    resource_heap_size_app = Align(resource_heap_size_app, heap_props.imageDescriptorAlignment);
+    VkDeviceSize resource_heap_size_app = Align(2 * descriptor_stride, heap_props.bufferDescriptorAlignment);
     const VkDeviceSize resource_heap_size_driver = resource_heap_size_app + heap_props.minResourceHeapReservedRange;
 
     vkt::Buffer descriptor_heap(*m_device, resource_heap_size_driver, VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT,
@@ -6695,14 +7046,14 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapRebindHeap) {
                                  vkt::device_address);
     const auto descriptor_heap2_ptr = static_cast<uint8_t*>(descriptor_heap2.Memory().Map());
 
-    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(resource_stride)};
+    VkHostAddressRangeEXT descriptor_host{descriptor_heap_ptr, static_cast<size_t>(descriptor_stride)};
     VkDeviceAddressRangeEXT device_range = ssbo1_buffer.AddressRange();
     VkResourceDescriptorInfoEXT descriptor_info = vku::InitStructHelper();
     descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_info.data.pAddressRange = &device_range;
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
-    descriptor_host.address = descriptor_heap_ptr + resource_stride;
+    descriptor_host.address = descriptor_heap_ptr + descriptor_stride;
     device_range = ssbo2_buffer.AddressRange();
     vk::WriteResourceDescriptorsEXT(*m_device, 1u, &descriptor_info, &descriptor_host);
 
@@ -6725,15 +7076,12 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapRebindHeap) {
         }
     )glsl";
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0, 0);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
-    mapping.sourceData.constantOffset.heapArrayStride = 0;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0, 0);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
 
-    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
+    vkt::HeapComputePipelineEXT pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_0, &mapping_info);
 
     VkBindHeapInfoEXT bind_resource_info = vku::InitStructHelper();
     bind_resource_info.heapRange.address = descriptor_heap.Address();
@@ -6746,9 +7094,9 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapRebindHeap) {
     vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
 
-    bind_resource_info.heapRange.address += resource_stride;
-    bind_resource_info.heapRange.size -= resource_stride;
-    bind_resource_info.reservedRangeOffset -= resource_stride;
+    bind_resource_info.heapRange.address += descriptor_stride;
+    bind_resource_info.heapRange.size -= descriptor_stride;
+    bind_resource_info.reservedRangeOffset -= descriptor_stride;
     vk::CmdBindResourceHeapEXT(m_command_buffer, &bind_resource_info);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
 
@@ -6767,7 +7115,7 @@ TEST_F(NegativeDebugPrintf, DescriptorHeapRebindHeap) {
     m_errorMonitor->VerifyFound();
 }
 
-void NegativeDebugPrintf::CoopMat2CallbackTest(const char* shader_source, const char* message) {
+void NegativeDebugPrintf::CoopMat2CallbackTest(const char* shader_source, const char* message, uint32_t matrix_use) {
     AddRequiredExtensions(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
     AddRequiredExtensions(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
@@ -6776,9 +7124,16 @@ void NegativeDebugPrintf::CoopMat2CallbackTest(const char* shader_source, const 
     AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
     AddRequiredFeature(vkt::Feature::storageBuffer16BitAccess);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    // Lets 16x16 work on devices that only list other fixed sizes
+    AddOptionalFeature(vkt::Feature::cooperativeMatrixFlexibleDimensions);
     SetTargetApiVersion(VK_API_VERSION_1_3);
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
+
+    CooperativeMatrixHelper helper(*this);
+    if (!helper.HasSupportedMatrixUse(VK_SCOPE_SUBGROUP_KHR, 16, 16, VK_COMPONENT_TYPE_FLOAT16_KHR, matrix_use)) {
+        GTEST_SKIP() << "16x16 float16 cooperative matrix not supported";
+    }
 
     CreateComputePipelineHelper pipe(*this);
     pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
@@ -6816,19 +7171,23 @@ TEST_F(NegativeDebugPrintf, CoopMat2PerElementOp) {
         layout(local_size_x = 32) in;
         layout(set = 0, binding = 0) buffer BufType { float16_t x[]; } buf;
         layout(buffer_reference, std430, buffer_reference_align = 2) buffer fp16Buf { float16_t f; };
+        shared uint printed;
         float16_t myFunc(const in uint32_t row, const in uint32_t col, const in float16_t x) {
-            if (row == 0 && col == 0) {
+            // Each subgroup has its own matrix, so element (0, 0) is visited once per subgroup
+            if (row == 0 && col == 0 && atomicExchange(printed, 1u) == 0u) {
                 debugPrintfEXT("perelemop callback");
             }
             return x;
         }
         void main() {
+            if (gl_LocalInvocationIndex == 0u) printed = 0u;
+            barrier();
             coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> m = coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(float16_t(0));
             coopMatPerElementNV(m, m, myFunc);
         }
     )glsl";
 
-    CoopMat2CallbackTest(shader_source, "perelemop callback");
+    CoopMat2CallbackTest(shader_source, "perelemop callback", spv::CooperativeMatrixUseMatrixAccumulatorKHR);
 }
 
 TEST_F(NegativeDebugPrintf, CoopMat2Reduce) {
@@ -6861,7 +7220,7 @@ TEST_F(NegativeDebugPrintf, CoopMat2Reduce) {
         }
     )glsl";
 
-    CoopMat2CallbackTest(shader_source, "reduce callback");
+    CoopMat2CallbackTest(shader_source, "reduce callback", spv::CooperativeMatrixUseMatrixAccumulatorKHR);
 }
 
 TEST_F(NegativeDebugPrintf, CoopMat2LoadTensorDecode) {
@@ -6898,7 +7257,7 @@ TEST_F(NegativeDebugPrintf, CoopMat2LoadTensorDecode) {
         }
     )glsl";
 
-    CoopMat2CallbackTest(shader_source, "decode callback");
+    CoopMat2CallbackTest(shader_source, "decode callback", spv::CooperativeMatrixUseMatrixAKHR);
 }
 
 TEST_F(NegativeDebugPrintf, CoopMat2LoadTensorDecodeWithView) {
@@ -6937,5 +7296,5 @@ TEST_F(NegativeDebugPrintf, CoopMat2LoadTensorDecodeWithView) {
         }
     )glsl";
 
-    CoopMat2CallbackTest(shader_source, "decode with view callback");
+    CoopMat2CallbackTest(shader_source, "decode with view callback", spv::CooperativeMatrixUseMatrixAKHR);
 }

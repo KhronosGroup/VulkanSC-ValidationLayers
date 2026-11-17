@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 #pragma once
-#include "state_tracker/subresource_adapter.h"
+#include <vulkan/vulkan.h>
+#include "sync/sync_image_encoding.h"
 #include "containers/range.h"
 #include "generated/sync_validation_types.h"
 #include "containers/limits.h"
@@ -27,7 +28,7 @@ class Buffer;
 
 namespace syncval {
 
-using ImageRangeGen = subresource_adapter::ImageRangeGenerator;
+using ImageRangeGen = ImageRangeGenerator;
 
 // The resource tag index is relative to the command buffer or queue in which it's found
 using QueueId = uint32_t;
@@ -51,11 +52,33 @@ struct ResourceUsageTagEx {
 };
 
 AccessRange MakeRange(VkDeviceSize start, VkDeviceSize size);
-AccessRange MakeRange(const vvl::Buffer &buffer, VkDeviceSize offset, VkDeviceSize size);
-inline const SyncAccessInfo &GetAccessInfo(SyncAccessIndex access) { return GetSyncAccessInfos()[access]; }
+AccessRange MakeRange(const vvl::Buffer& buffer, VkDeviceSize offset, VkDeviceSize size);
+inline const SyncAccessInfo& GetAccessInfo(SyncAccessIndex access) { return GetSyncAccessInfos()[access]; }
+
+inline bool LoadOpWrites(VkAttachmentLoadOp load_op) {
+    return load_op == VK_ATTACHMENT_LOAD_OP_CLEAR || load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+}
+
+// STORE_OP_NONE behaves like DONT_CARE after a writing load.
+// Writes from other attachment operations are not accounted for here.
+inline bool StoreOpWrites(VkAttachmentStoreOp store_op, VkAttachmentLoadOp load_op) {
+    return store_op != VK_ATTACHMENT_STORE_OP_NONE || LoadOpWrites(load_op);
+}
 
 extern const AccessRange kFullRange;
+
+constexpr VkImageAspectFlags kColorAspects =
+    VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
 constexpr VkImageAspectFlags kDepthStencilAspects = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+struct SyncFlag {
+    enum : uint8_t {
+        kPresent = 0x01,
+        kMarker = 0x02,
+        kExternalDependenciesMissFinalTransition = 0x04,
+    };
+};
+using SyncFlags = uint8_t;
 
 // Notes:
 //  * Design goal is performance optimized set creation during specific SyncVal operations
@@ -90,85 +113,6 @@ class CachedInsertSet : public std::set<IntegralKey> {
 
   private:
     key_type entries_[kSize];
-};
-
-// The ThreadSafeLookupTable supports fast object lookup in multithreaded environment.
-// The insertions are slow. The idea is that you have relatively small amount of
-// objects and you need to put them into a container in multithreaded environment.
-// In return you get an index of the inserted object. After that initial insertion all
-// further operations are the queries and they are fast (single atomic load in addition to
-// regular vector/hashmap lookup). You can query an object given its index or you can get
-// an index of already registered object.
-template <typename ObjectType>
-class ThreadSafeLookupTable {
-  public:
-    ThreadSafeLookupTable() { std::atomic_store(&snapshot_, std::make_shared<const Snapshot>()); }
-
-    // Returns the object with the given index.
-    // The object index is from the previous call to GetOrInsert.
-    // This operation uses single atomic load.
-    ObjectType GetObject(uint32_t object_index) const {
-        auto snapshot = std::atomic_load(&snapshot_);
-        return snapshot->objects[object_index];
-    }
-
-    // Returns the index of the given object. If the object is seen for the first time, it is registered.
-    // For already registerd objects the function performs single atomic load and hash map access (fast path).
-    // In order to register new object the follow expensive operations are performed (slow path):
-    // mutex lock, repeat the search, allocate new snapshot object, copy all data from the old snapshot.
-    uint32_t GetIndexAndMaybeInsert(const ObjectType &object) {
-        //
-        // Fast path: object was already registered
-        //
-        auto snapshot = std::atomic_load(&snapshot_);
-        if (auto it = snapshot->object_to_index.find(object); it != snapshot->object_to_index.end()) {
-            return it->second;
-        }
-
-        //
-        // Slow path: register new object
-        //
-        std::unique_lock<std::mutex> lock(snapshot_mutex_);
-
-        // Search again since another thread could have registered the object just before we locked the mutex
-        snapshot = std::atomic_load(&snapshot_);
-        if (auto it = snapshot->object_to_index.find(object); it != snapshot->object_to_index.end()) {
-            return it->second;
-        }
-
-        // Create a new snapshot. Copy constructor copies data from the old snapshot.
-        // The old snapshot is not allowed to be modified (so no move).
-        auto new_snapshot = std::make_shared<Snapshot>(*snapshot);
-
-        // Add new object
-        new_snapshot->objects.emplace_back(object);
-        const uint32_t index = uint32_t(new_snapshot->objects.size()) - 1;
-        new_snapshot->object_to_index.insert(std::make_pair(object, index));
-
-        // Update snapshot holder
-        std::atomic_store(&snapshot_, std::shared_ptr<const Snapshot>(std::move(new_snapshot)));
-
-        return index;
-    }
-
-    uint32_t ObjectCount() const {
-        auto snapshot = std::atomic_load(&snapshot_);
-        return (uint32_t)snapshot->objects.size();
-    }
-
-  private:
-    struct Snapshot {
-        std::vector<ObjectType> objects;
-        vvl::unordered_map<ObjectType, uint32_t> object_to_index;
-    };
-
-    // Once snapshot is created it must never be modified (other threads can access it at any time).
-    // New objects are added by replacing entire snapshot with an updated version.
-    // TODO: C++ 20: use std::atomic<std::shared_ptr<T>. Until then we use std::atomic_load/atomic_store.
-    std::shared_ptr<const Snapshot> snapshot_;
-
-    // Locks snapshot during rare insert events
-    std::mutex snapshot_mutex_;
 };
 
 }  // namespace syncval

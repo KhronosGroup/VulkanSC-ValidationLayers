@@ -44,7 +44,7 @@ struct CommandBufferSubmitState {
     std::string last_closed_cmdbuf_label;
     bool found_unbalanced_cmdbuf_label;
 
-    // The "local" prefix is about tracking state accross command buffers of a *single* QueueSubmit command.
+    // The "local" prefix is about tracking state across command buffers of a *single* QueueSubmit command.
     // This does not accumulate state from the previous submissions.
     QueryMap local_query_to_state_map;
     EventSignalStateMap local_event_signal_states;
@@ -82,10 +82,10 @@ struct CommandBufferSubmitState {
         }
         UpdateEventSignalStates(local_event_signal_states, cb_sub_state.event_signal_states);
 
-        VkQueryPool first_perf_query_pool = VK_NULL_HANDLE;
+        core::QueryUpdateState query_update(core::QueryUpdateState::Mode::Validate, &local_query_to_state_map, perf_pass,
+                                            loc.function);
         for (auto& function : cb_sub_state.query_updates) {
-            skip |= function(const_cast<vvl::CommandBuffer&>(cb_state), /*do_validate*/ true, first_perf_query_pool, perf_pass,
-                             &local_query_to_state_map);
+            skip |= function(const_cast<vvl::CommandBuffer&>(cb_state), query_update);
         }
 
         for (const auto& it : cb_state.video_session_updates) {
@@ -109,8 +109,8 @@ struct CommandBufferSubmitState {
                 barrier.dstQueueFamilyIndex != queue_state.queue_family_index) {
                 skip |= core.LogError("VUID-VkTensorMemoryBarrierARM-tensor-09757", cb_state.Handle(), loc,
                                       "Tensor (%s) used in barrier has sharing mode VK_SHARING_MODE_EXCLUSIVE but neither "
-                                      "srcQueueFamilyIndex (%" PRIu32 ") or dstQueueFamilyIndex (%" PRIu32
-                                      ") are VK_QUEUE_FAMILY_IGNORED or "
+                                      "srcQueueFamilyIndex (%" PRIu32 ") nor dstQueueFamilyIndex (%" PRIu32
+                                      ") is VK_QUEUE_FAMILY_IGNORED or "
                                       "the same queue family as this queue which is executing the barrier (%" PRIu32 ")",
                                       core.FormatHandle(barrier.tensor).c_str(), barrier.srcQueueFamilyIndex,
                                       barrier.dstQueueFamilyIndex, queue_state.queue_family_index);
@@ -167,7 +167,6 @@ bool CoreChecks::PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount,
     if (skip) return skip;
 
     auto queue_state = Get<vvl::Queue>(queue);
-    ASSERT_AND_RETURN_SKIP(queue_state);
     CommandBufferSubmitState cb_submit_state(*this, *queue_state);
     SemaphoreSubmitState sem_submit_state(*this, queue, queue_state->GetQueueFlags());
 
@@ -307,8 +306,8 @@ bool CoreChecks::ValidateRenderPassStripeSubmitInfo(VkQueue queue, const vvl::Co
     if (!rp_submit_info) {
         if (cb_state.has_render_pass_striped && !cb_state.resumes_render_pass_instance) {
             skip |= LogError("VUID-VkCommandBufferSubmitInfo-commandBuffer-09445", objlist, loc.dot(Field::pNext),
-                             "missing VkRenderPassStripeSubmitInfoARM struct because command buffer contain begin info "
-                             "with renderpass striped struct");
+                             "missing VkRenderPassStripeSubmitInfoARM struct because the command buffer contains a begin "
+                             "info with a renderpass striped struct");
         }
         return skip;
     }
@@ -354,7 +353,6 @@ bool CoreChecks::ValidateQueueSubmit2(VkQueue queue, uint32_t submitCount, const
     }
 
     auto queue_state = Get<vvl::Queue>(queue);
-    ASSERT_AND_RETURN_SKIP(queue_state);
     CommandBufferSubmitState cb_submit_state(*this, *queue_state);
     SemaphoreSubmitState sem_submit_state(*this, queue, queue_state->GetQueueFlags());
 
@@ -368,7 +366,7 @@ bool CoreChecks::ValidateQueueSubmit2(VkQueue queue, uint32_t submitCount, const
         skip |= ValidateSemaphoresForSubmit(sem_submit_state, submit, submit_loc);
 
         const bool protected_submit = (submit.flags & VK_SUBMIT_PROTECTED_BIT) != 0;
-        if ((protected_submit == true) && ((queue_state->create_flags & VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT)) == 0) {
+        if ((protected_submit == true) && ((queue_state->create_flags & VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT) == 0)) {
             skip |= LogError("VUID-vkQueueSubmit2-queue-06447", queue, submit_loc,
                              "contains a protected submission to %s which was not created with "
                              "VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT",
@@ -385,12 +383,9 @@ bool CoreChecks::ValidateQueueSubmit2(VkQueue queue, uint32_t submitCount, const
 
             skip |= cb_submit_state.Validate(cb_loc, *cb_state, perf_pass);
 
-            {
-                const LogObjectList objlist(queue);
-                skip |= ValidateDeviceMaskToPhysicalDeviceCount(submit.pCommandBufferInfos[i].deviceMask, queue,
-                                                                info_loc.dot(Field::deviceMask),
-                                                                "VUID-VkCommandBufferSubmitInfo-deviceMask-03891");
-            }
+            skip |= ValidateDeviceMaskToPhysicalDeviceCount(submit.pCommandBufferInfos[i].deviceMask, LogObjectList(queue),
+                                                            info_loc.dot(Field::deviceMask),
+                                                            "VUID-VkCommandBufferSubmitInfo-deviceMask-03891");
 
             // Make sure command buffers are all protected or unprotected
             if ((cb_state->unprotected == true) && (protected_submit == true)) {
@@ -584,7 +579,7 @@ bool CoreChecks::ValidateCommandBufferSimultaneousUse(const Location& loc, const
         !(cb_state.begin_info_flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT)) {
         const auto& vuid = GetQueueSubmitVUID(loc, vvl::SubmitError::kCmdNotSimultaneous);
 
-        skip |= LogError(vuid, device, loc, "%s is already in use and is not marked for simultaneous use.%s",
+        skip |= LogError(vuid, cb_state.Handle(), loc, "%s is already in use and is not marked for simultaneous use.%s",
                          FormatHandle(cb_state).c_str(),
                          is_device_lost ? "\n(a VK_ERROR_DEVICE_LOST has occurred, the command buffer must be freed)" : "");
     }
@@ -738,16 +733,16 @@ static Location GetSignaledSemaphoreLocation(const Location& submit_loc, uint32_
 }
 
 bool CoreChecks::ProcessSubmissionBatch(const vvl::SubmitTimeTracker& tracker,
-                                        const std::vector<std::shared_ptr<vvl::CommandBuffer>>& command_buffers,
+                                        const std::vector<vvl::CommandBufferSubmitInfo>& cb_infos,
                                         vvl::span<const VkSemaphoreSubmitInfo> signal_semaphores, const Location& submit_loc) {
     bool skip = false;
     // Validate image layouts on the command buffer boundaries
     {
         vvl::unordered_map<const vvl::Image*, ImageLayoutMap> local_image_layout_map;
-        for (const auto& cb : command_buffers) {
-            if (cb) {
-                auto cb_guard = cb->ReadLock();
-                skip |= ValidateCmdBufImageLayouts(submit_loc, *cb, local_image_layout_map);
+        for (const auto& cb_info : cb_infos) {
+            if (cb_info.cb) {
+                auto cb_guard = cb_info.cb->ReadLock();
+                skip |= ValidateCmdBufImageLayouts(submit_loc, cb_info, local_image_layout_map);
             }
         }
     }
@@ -767,14 +762,14 @@ bool CoreChecks::ProcessSubmissionBatch(const vvl::SubmitTimeTracker& tracker,
         if (invlid_signal_value) {
             const Location signal_semaphore_loc = GetSignaledSemaphoreLocation(submit_loc, i);
             const auto& vuid = GetQueueSubmitVUID(signal_semaphore_loc, vvl::SubmitError::kTimelineSemSmallValue);
-            LogError(vuid, semaphore, signal_semaphore_loc,
-                     "(%s) signaled with value %" PRIu64 " which is smaller than the current value %" PRIu64,
-                     FormatHandle(semaphore).c_str(), signal_value, *current_value);
+            skip |= LogError(vuid, semaphore, signal_semaphore_loc,
+                             "(%s) signaled with value %" PRIu64 " which is smaller than the current value %" PRIu64,
+                             FormatHandle(semaphore).c_str(), signal_value, *current_value);
         }
     }
     // Queue family ownership transfer (QFOT) validation
-    for (const auto& cb : command_buffers) {
-        if (cb) {
+    for (const auto& cb_info : cb_infos) {
+        if (const auto& cb = cb_info.cb) {
             auto cb_guard = cb->ReadLock();
             for (const vvl::CommandBuffer* secondary : cb->linked_command_buffers) {
                 skip |= ValidateQueuedQFOTransfers(*secondary, submit_loc);
@@ -783,8 +778,8 @@ bool CoreChecks::ProcessSubmissionBatch(const vvl::SubmitTimeTracker& tracker,
         }
     }
     if (!skip) {
-        for (const auto& cb : command_buffers) {
-            if (cb) {
+        for (const auto& cb_info : cb_infos) {
+            if (const auto& cb = cb_info.cb) {
                 auto cb_guard = cb->WriteLock();
                 for (vvl::CommandBuffer* secondary : cb->linked_command_buffers) {
                     UpdateCmdBufImageLayouts(*secondary);

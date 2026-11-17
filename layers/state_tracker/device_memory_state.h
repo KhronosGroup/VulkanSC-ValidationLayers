@@ -27,6 +27,8 @@ namespace vvl {
 
 std::optional<VkExternalMemoryHandleTypeFlagBits> GetImportHandleType(const VkMemoryAllocateInfo &alloc_info);
 
+bool IsMultiInstance(const VkMemoryAllocateInfo& alloc_info, const VkMemoryHeap& memory_heap, uint32_t physical_device_count);
+
 struct MemRange {
     VkDeviceSize offset = 0;
     VkDeviceSize size = 0;
@@ -108,6 +110,13 @@ class BindableMemoryTracker {
     virtual unsigned CountDeviceMemory(VkDeviceMemory memory) const = 0;
     virtual bool HasFullRangeBound() const = 0;
 
+    // Returns true if every byte of |range| (expressed in resource space, not VkDeviceMemory space) is backed by memory.
+    // Binding memory to a non-sparse resource is all-or-nothing, so only the sparse tracker needs to look at |range|.
+    virtual bool IsRangeFullyBound(const BufferRange& range) const {
+        (void)range;
+        return HasFullRangeBound();
+    }
+
     virtual void BindMemory(StateObject *, std::shared_ptr<vvl::DeviceMemory> &, VkDeviceSize, VkDeviceSize, VkDeviceSize) = 0;
 
     virtual BoundMemoryRange GetBoundMemoryRange(const MemoryRange &) const = 0;
@@ -169,6 +178,8 @@ class BindableSparseMemoryTracker : public BindableMemoryTracker {
     unsigned CountDeviceMemory(VkDeviceMemory memory) const override;
 
     bool HasFullRangeBound() const override;
+
+    bool IsRangeFullyBound(const BufferRange& range) const override;
 
     void BindMemory(StateObject *parent, std::shared_ptr<vvl::DeviceMemory> &memory_state, VkDeviceSize memory_offset,
                     VkDeviceSize resource_offset, VkDeviceSize size) override;
@@ -295,6 +306,10 @@ class Bindable : public StateObject {
 
     bool HasFullRangeBound() const { return memory_tracker_->HasFullRangeBound(); }
 
+    bool IsRangeFullyBound(const BindableMemoryTracker::BufferRange& range) const {
+        return memory_tracker_->IsRangeFullyBound(range);
+    }
+
     std::pair<VkDeviceMemory, BindableMemoryTracker::MemoryRange> GetResourceMemoryOverlap(
         const BindableMemoryTracker::MemoryRange &memory_region, const Bindable *other_resource,
         const BindableMemoryTracker::MemoryRange &other_memory_region) const;
@@ -303,8 +318,8 @@ class Bindable : public StateObject {
         return memory_tracker_->GetBoundMemoryRange(range);
     }
 
-    BindableLinearMemoryTracker::BoundRanges GetBoundRanges(const BindableMemoryTracker::BufferRange &ranges_bounds,
-                                                            const std::vector<BindableMemoryTracker::BufferRange> ranges) const {
+    BindableMemoryTracker::BoundRanges GetBoundRanges(const BindableMemoryTracker::BufferRange& ranges_bounds,
+                                                      const std::vector<BindableMemoryTracker::BufferRange>& ranges) const {
         return memory_tracker_->GetBoundRanges(ranges_bounds, ranges);
     }
 

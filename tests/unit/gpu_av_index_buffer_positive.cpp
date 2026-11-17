@@ -115,10 +115,7 @@ TEST_F(PositiveGpuAVIndexBuffer, DrawIndexedDynamicStates) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_CULL_MODE);
@@ -645,10 +642,7 @@ TEST_F(PositiveGpuAVIndexBuffer, IndirectDrawBadVertexIndex32) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
 
     pipe.CreateGraphicsPipeline();
@@ -706,10 +700,7 @@ TEST_F(PositiveGpuAVIndexBuffer, VertexIndex32MultiDraw) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
 
     pipe.CreateGraphicsPipeline();
@@ -1077,4 +1068,35 @@ TEST_F(PositiveGpuAVIndexBuffer, Ssbo) {
     for (uint32_t i = 0; i < 4; ++i) {
         ASSERT_EQ(in_buffer_ptr[i], out_buffer_ptr[i]);
     }
+}
+
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13040
+// This will fail self-validation with VU 13122
+TEST_F(PositiveGpuAVIndexBuffer, DISABLED_BindIndexBuffer3) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    vkt::Buffer index_buffer(*m_device, 256u, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vkt::device_address);
+
+    VkBindIndexBuffer3InfoKHR index_buffer_info = vku::InitStructHelper();
+    index_buffer_info.addressRange = index_buffer.AddressRange();
+    index_buffer_info.addressFlags = 0u;
+    index_buffer_info.indexType = VK_INDEX_TYPE_UINT32;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer3KHR(m_command_buffer, &index_buffer_info);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

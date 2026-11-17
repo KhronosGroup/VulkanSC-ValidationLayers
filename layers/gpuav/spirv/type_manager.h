@@ -65,6 +65,7 @@ struct Type {
     // Helpers to detect what the type is
     bool IsArray() const;
     bool IsSignedInt() const;
+    bool IsBDA() const;  // BufferDeviceAddress (PhysicalStorageBuffer)
     bool IsIVec3(const TypeManager& type_manager) const;
     // If returns 0, means it is a scalar
     uint32_t VectorSize() const;
@@ -158,60 +159,6 @@ struct Variable {
     static DescriptorInterface FindDescriptorInterface(const Module& module, const Instruction& inst);
 };
 
-// We often want to walk the SSA from an "access" (load, store, atomic, etc) to the Variable it is referencing. There can be a
-// single OpAccessChain or multiple, and this struct holds this information.
-// Background info: https://github.com/KhronosGroup/SPIRV-Guide/blob/main/chapters/access_chains.md
-//
-// Note - currently this is very heavily leaned towards use of descriptors, but will work for any variable type
-struct AccessPath {
-    // The type of the access itself (what type it will store or load)
-    const Type* access_type = nullptr;
-
-    // This the %ptr_type in
-    //   %ptr_type = OpTypeArray
-    //   %ptr = OpTypePointer StorageBuffer %ptr_type
-    //   %var = OpVariable %ptr StorageBuffer
-    const Type* pointer_type = nullptr;
-
-    // The variable at the end of the access chain
-    const Variable* variable = nullptr;
-
-    bool IsValid() const { return access_type != nullptr && pointer_type != nullptr && variable != nullptr; }
-
-    // List of OpAccessChains from the variable to the "access"
-    // - The front() will be closest to the OpVariable
-    // - The back() will be closest to the exact spot accesssed
-    // This is on purpose as we really will want to loop the OpAccessChain in reserve SSA order
-    //
-    // Note: GLSL will try to always create a single large OpAccessChain
-    std::vector<const Instruction*> ac_list;
-
-    //
-    // Descriptor variable access related info
-    //
-
-    // Optional variable of seperate sampler descriptor (still null if combinedImageSampler)
-    const Variable* sampler_variable = nullptr;
-    bool is_combined_image_sampler = false;
-    bool HasSampler() const { return sampler_variable != nullptr || is_combined_image_sampler; }
-
-    // The OpLoad to access an image descriptor
-    const Instruction* image_load_inst = nullptr;
-
-    // Most access paths are used to get the descriptor variable.
-    // This is the ID of the uint that indexes in the array (or constant zero if no array)
-    uint32_t descriptor_index_id = 0;
-    // Optional index if there is a seperate sampler as well
-    uint32_t sampler_descriptor_index_id = 0;
-
-    // TODO - Need to handle OffsetIdEXT correctly, this is a dumb hack
-    uint32_t heap_offset_member_index = 0;
-
-    VkDescriptorType descriptor_type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-
-    CooperativeMatrixAccess coop_mat{};
-};
-
 // In charge of tracking all Types, Constants, and Variable in the module.
 // Since both Variable and Constant both rely on Types, the Types are the core thing we track
 //
@@ -228,6 +175,7 @@ class TypeManager {
     const Type* FindTypeById(uint32_t id) const;
     const Type* FindFunctionType(const Instruction& inst) const;
     const Type* FindTypeGlobal(const Function& function, uint32_t id) const;
+    const Type* FindPointeeType(const Function& function, uint32_t pointer_id) const;
     // There shouldn't be a case where we need to query for a specific type, but then not add it if not found.
     const Type& GetTypeVoid();
     const Type& GetTypeBool();
@@ -271,7 +219,6 @@ class TypeManager {
     const Constant& GetConstantZeroVector(const Type& vector_type);
     const Constant& GetConstantNull(const Type& type);
 
-    const AccessPath BuildAccessPath(const Function& function, const Instruction& inst);
     const CooperativeMatrixAccess BuildCooperativeMatrixAccess(const Function& function, const Instruction& inst);
 
     const Variable& AddVariable(std::unique_ptr<Instruction> new_inst, const Type& type);
@@ -287,6 +234,8 @@ class TypeManager {
 
     void AddUndef(std::unique_ptr<Instruction> new_inst);
     bool IsUndef(uint32_t id) const;
+
+    void FindArrayOfPSBStructWithRuntime(vvl::unordered_set<uint32_t>& out_struct_ids);
 
   private:
     Module& module_;
@@ -334,7 +283,7 @@ class TypeManager {
 
     std::vector<const Variable*> input_variables_;
     std::vector<const Variable*> output_variables_;
-    // There is invalid to have more than 1 push constant variable per entrypoint
+    // It is invalid to have more than 1 push constant variable per entrypoint
     const Variable* push_constant_variable_ = nullptr;
     std::vector<const Variable*> shared_memory_variables_;
     std::vector<const Variable*> task_payload_variables_;

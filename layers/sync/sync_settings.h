@@ -1,6 +1,6 @@
-/* Copyright (c) 2025 The Khronos Group Inc.
- * Copyright (c) 2025 Valve Corporation
- * Copyright (c) 2025 LunarG, Inc.
+/* Copyright (c) 2025-2026 The Khronos Group Inc.
+ * Copyright (c) 2025-2026 Valve Corporation
+ * Copyright (c) 2025-2026 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@
 #pragma once
 
 struct SyncValSettings {
-    bool submit_time_validation = true;
+    bool full_validation = true;
+    bool record_time_validation = true;
     bool shader_accesses_heuristic = false;
 
     // This validation currently is controlled only by the settings and is disabled by default.

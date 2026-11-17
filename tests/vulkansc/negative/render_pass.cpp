@@ -291,6 +291,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassPreserveAttachmentsExce
         create_info.pSubpasses = subpasses.data();
         create_info.subpassCount = subpasses.size();
 
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo-None-10915");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass-attachments-device-05089");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo-attachmentCount-05052");
         for (uint32_t i = 0; i < subpass_count; ++i)
@@ -322,6 +323,7 @@ TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassPreserveAttachmentsExce
         create_info.pSubpasses = subpasses.data();
         create_info.subpassCount = subpasses.size();
 
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-None-10916");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
         for (uint32_t i = 0; i < subpass_count; ++i)

@@ -275,15 +275,15 @@ bool Tracker::ValidateDestroyObject(VulkanTypedHandle object, const VkAllocation
             if (allocated_with_custom && !custom_allocator && expected_custom_allocator_code != kVUIDUndefined) {
                 // This check only verifies that custom allocation callbacks were provided to both Create and Destroy calls,
                 // it cannot verify that these allocation callbacks are compatible with each other.
-                skip |=
-                    LogError(expected_custom_allocator_code, object, loc,
-                             "Custom allocator not specified while destroying %s obj 0x%" PRIxLEAST64 " but specified at creation.",
-                             string_VulkanObjectType(object_type), object_handle);
+                skip |= LogError(expected_custom_allocator_code, object, loc,
+                                 "Custom allocator not specified while destroying %s Object 0x%" PRIxLEAST64
+                                 ", but it was specified at creation.",
+                                 string_VulkanObjectType(object_type), object_handle);
             } else if (!allocated_with_custom && custom_allocator && expected_default_allocator_code != kVUIDUndefined) {
-                skip |=
-                    LogError(expected_default_allocator_code, object, loc,
-                             "Custom allocator specified while destroying %s obj 0x%" PRIxLEAST64 " but not specified at creation.",
-                             string_VulkanObjectType(object_type), object_handle);
+                skip |= LogError(expected_default_allocator_code, object, loc,
+                                 "Custom allocator specified while destroying %s Object 0x%" PRIxLEAST64
+                                 ", but it was not specified at creation.",
+                                 string_VulkanObjectType(object_type), object_handle);
             }
         }
     }
@@ -300,7 +300,10 @@ void Tracker::RecordDestroyObject(VulkanTypedHandle object, const Location& loc)
             // Poison users of this object (except the scenarios when users don't care)
             const bool pipeline_layout_maintenance4 =
                 object.type == kVulkanObjectTypePipelineLayout && is_device_maintenance4_enabled_;
-            const bool poison_users = !pipeline_layout_maintenance4;
+            // Pipeline layouts don't access their set layouts after vkCreatePipelineLayout
+            const bool is_set_layout = object.type == kVulkanObjectTypeDescriptorSetLayout;
+            const bool poison_users = !pipeline_layout_maintenance4 && !is_set_layout;
+
             if (poison_users) {
                 for (VulkanTypedHandle poisonee : object_state->objects_to_poison) {
                     if (auto poisonee_state = GetObjectState(poisonee)) {
@@ -322,6 +325,7 @@ void Tracker::RecordDestroyObject(VulkanTypedHandle object, const Location& loc)
 
 void Tracker::DestroyObjectSilently(VulkanTypedHandle object, const Location& loc) {
     assert(object.handle);
+    debug_report->EraseObjectName(object.handle);
     auto item = object_map[object.type].pop(object.handle);
     if (item == object_map[object.type].end()) {
         // We've already checked that the object exists. If we couldn't find and atomically remove it
@@ -431,7 +435,9 @@ bool Device::ValidateDescriptorWrite(VkWriteDescriptorSet const* desc, bool is_p
                                        "VUID-vkUpdateDescriptorSets-pDescriptorWrites-06236", loc.dot(Field::pTexelBufferView, i));
                     if (!enabled_features.nullDescriptor && desc->pTexelBufferView[i] == VK_NULL_HANDLE) {
                         skip |= LogError("VUID-VkWriteDescriptorSet-descriptorType-02995", desc->dstSet,
-                                         loc.dot(Field::pTexelBufferView, i), "is VK_NULL_HANDLE, and descriptorType is %s",
+                                         loc.dot(Field::pTexelBufferView, i),
+                                         "is VK_NULL_HANDLE, and descriptorType is %s.\nHint: This can be allowed if the "
+                                         "nullDescriptor feature is enabled.",
                                          string_VkDescriptorType(desc->descriptorType));
                     }
                 }
@@ -448,10 +454,11 @@ bool Device::ValidateDescriptorWrite(VkWriteDescriptorSet const* desc, bool is_p
                                            "VUID-vkUpdateDescriptorSets-pDescriptorWrites-06239",
                                            loc.dot(Field::pImageInfo, i).dot(Field::imageView));
                     if (!enabled_features.nullDescriptor && desc->pImageInfo[i].imageView == VK_NULL_HANDLE) {
-                        skip |=
-                            LogError("VUID-VkWriteDescriptorSet-descriptorType-02997", desc->dstSet,
-                                     loc.dot(Field::pImageInfo, i).dot(Field::imageView),
-                                     "is VK_NULL_HANDLE, and descriptorType is %s", string_VkDescriptorType(desc->descriptorType));
+                        skip |= LogError("VUID-VkWriteDescriptorSet-descriptorType-02997", desc->dstSet,
+                                         loc.dot(Field::pImageInfo, i).dot(Field::imageView),
+                                         "is VK_NULL_HANDLE, and descriptorType is %s.\nHint: This can be allowed if the "
+                                         "nullDescriptor feature is enabled.",
+                                         string_VkDescriptorType(desc->descriptorType));
                     }
                 }
             }
@@ -482,17 +489,17 @@ bool Device::ValidateDescriptorWrite(VkWriteDescriptorSet const* desc, bool is_p
                         desc->pBufferInfo[i].buffer, kVulkanObjectTypeBuffer, true, "VUID-VkDescriptorBufferInfo-buffer-parameter",
                         "VUID-vkUpdateDescriptorSets-pDescriptorWrites-06237", loc.dot(Field::pBufferInfo, i).dot(Field::buffer));
                     if (!enabled_features.nullDescriptor && desc->pBufferInfo[i].buffer == VK_NULL_HANDLE) {
-                        skip |=
-                            LogError("VUID-VkDescriptorBufferInfo-buffer-02998", desc->dstSet,
-                                     loc.dot(Field::pBufferInfo, i).dot(Field::buffer),
-                                     "is VK_NULL_HANDLE, and descriptorType is %s", string_VkDescriptorType(desc->descriptorType));
+                        skip |= LogError("VUID-VkDescriptorBufferInfo-buffer-02998", desc->dstSet,
+                                         loc.dot(Field::pBufferInfo, i).dot(Field::buffer),
+                                         "is VK_NULL_HANDLE, and descriptorType is %s.\nHint: This can be allowed if the "
+                                         "nullDescriptor feature is enabled.",
+                                         string_VkDescriptorType(desc->descriptorType));
                     }
                 }
             }
             break;
         }
 
-        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
             if (const auto* acc_info = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureKHR>(desc->pNext)) {
                 for (uint32_t i = 0; i < desc->descriptorCount; ++i) {
@@ -501,15 +508,6 @@ bool Device::ValidateDescriptorWrite(VkWriteDescriptorSet const* desc, bool is_p
                         "VUID-VkWriteDescriptorSetAccelerationStructureKHR-pAccelerationStructures-parameter",
                         "VUID-vkUpdateDescriptorSets-pDescriptorWrites-06240",
                         loc.pNext(Struct::VkWriteDescriptorSetAccelerationStructureKHR, Field::pAccelerationStructures, i));
-                }
-            }
-            if (const auto* acc_info_nv = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureNV>(desc->pNext)) {
-                for (uint32_t i = 0; i < desc->descriptorCount; ++i) {
-                    skip |= ValidateObject(
-                        acc_info_nv->pAccelerationStructures[i], kVulkanObjectTypeAccelerationStructureNV, true,
-                        "VUID-VkWriteDescriptorSetAccelerationStructureNV-pAccelerationStructures-parameter",
-                        "VUID-vkUpdateDescriptorSets-pDescriptorWrites-06241",
-                        loc.pNext(Struct::VkWriteDescriptorSetAccelerationStructureNV, Field::pAccelerationStructures, i));
                 }
             }
             break;
@@ -544,6 +542,8 @@ bool Device::ValidateDescriptorWrite(VkWriteDescriptorSet const* desc, bool is_p
             break;
         }
 
+        // VK_NV_ray_tracing is not validated
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
         // PTLAS uses VkDeviceAddress values, not VkAccelerationStructureKHR handles - no objects to validate
         case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
         // Inline has no objects, so nothing to validate
@@ -1120,6 +1120,7 @@ void Device::PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKHR sw
     auto snapshot = image_map.snapshot(
         [swapchain](const std::shared_ptr<ObjectState>& pNode) { return pNode->parent_object == HandleToUint64(swapchain); });
     for (const auto& itr : snapshot) {
+        debug_report->EraseObjectName(itr.first);
         image_map.erase(itr.first);
     }
 }
@@ -1365,7 +1366,7 @@ bool Device::PreCallValidateCreateFramebuffer(VkDevice device, const VkFramebuff
     if ((pCreateInfo->flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) == 0) {
         for (uint32_t index1 = 0; index1 < pCreateInfo->attachmentCount; ++index1) {
             skip |= ValidateObject(pCreateInfo->pAttachments[index1], kVulkanObjectTypeImageView, true,
-                                   "VUID-VkFramebufferCreateInfo-flags-02778", "VUID-VkFramebufferCreateInfo-commonparent",
+                                   "VUID-VkFramebufferCreateInfo-flags-02778", "VUID-vkCreateFramebuffer-pCreateInfo-02777",
                                    create_info_loc.dot(Field::pAttachments, index1));
         }
     }
@@ -1432,8 +1433,8 @@ bool Device::PreCallValidateSetDebugUtilsObjectNameEXT(VkDevice device, const Vk
     } else if (object_type == VK_OBJECT_TYPE_DEVICE) {
         if (HandleToUint64(device) != object_handle) {
             skip |= LogError("VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-07874", device, error_obj.location.dot(Field::objectType),
-                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") != device (%s).", object_handle,
-                             FormatHandle(device).c_str());
+                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") is not equal to device (%s).",
+                             object_handle, FormatHandle(device).c_str());
         }
     } else {
         skip |= ValidateAnonymousObject(object_handle, object_type, "VUID-VkDebugUtilsObjectNameInfoEXT-objectType-02590",
@@ -1459,8 +1460,8 @@ bool Device::PreCallValidateSetDebugUtilsObjectTagEXT(VkDevice device, const VkD
         if (HandleToUint64(device) != object_handle) {
             skip |= LogError("VUID-vkSetDebugUtilsObjectTagEXT-pNameInfo-07877", device,
                              error_obj.location.dot(Field::pTagInfo).dot(Field::objectType),
-                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") != device (%s).", object_handle,
-                             FormatHandle(device).c_str());
+                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") is not equal to device (%s).",
+                             object_handle, FormatHandle(device).c_str());
         }
     } else {
         skip |= ValidateAnonymousObject(object_handle, object_type, "VUID-VkDebugUtilsObjectTagInfoEXT-objectHandle-01910",
@@ -1677,23 +1678,6 @@ void Device::PostCallRecordCreateRayTracingPipelinesKHR(VkDevice device, VkDefer
     }
 }
 
-void Device::PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                       const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
-                                                       const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                       const RecordObject& record_obj) {
-    if (VK_ERROR_VALIDATION_FAILED_EXT == record_obj.result) {
-        return;
-    }
-    if (pPipelines) {
-        for (uint32_t index = 0; index < createInfoCount; index++) {
-            if (!pPipelines[index]) continue;
-            tracker.CreateObject(pPipelines[index], kVulkanObjectTypePipeline, pAllocator,
-                                 record_obj.location.dot(Field::pPipelines, index), device);
-            RegisterCommonPipelinePoisoning(pCreateInfos, pPipelines, index);
-        }
-    }
-}
-
 void Device::PostCallRecordCreateDataGraphPipelinesARM(VkDevice device, VkDeferredOperationKHR deferredOperation,
                                                        VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                        const VkDataGraphPipelineCreateInfoARM* pCreateInfos,
@@ -1783,13 +1767,13 @@ bool Device::PreCallValidateSetPrivateData(VkDevice device, VkObjectType objectT
     bool skip = false;
 
     if (IsInstanceVkObjectType(objectType) || objectType == VK_OBJECT_TYPE_UNKNOWN) {
-        skip |= LogError("VUID-vkSetPrivateData-objectHandle-04016", device, error_obj.location.dot(Field::objectType), "is %s.",
-                         string_VkObjectType(objectType));
+        skip |= LogError("VUID-vkSetPrivateData-objectHandle-04016", device, error_obj.location.dot(Field::objectType),
+                         "is %s, but must be a device-level object type.", string_VkObjectType(objectType));
     } else if (objectType == VK_OBJECT_TYPE_DEVICE) {
         // Need to check device handle as has no parent to check as the caller is the same device object
         if (HandleToUint64(device) != objectHandle) {
             skip |= LogError("VUID-vkSetPrivateData-objectHandle-04016", device, error_obj.location.dot(Field::objectType),
-                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") != device (%s).", objectHandle,
+                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") is not equal to device (%s).", objectHandle,
                              FormatHandle(device).c_str());
         }
     } else {
@@ -1808,13 +1792,13 @@ bool Device::PreCallValidateGetPrivateData(VkDevice device, VkObjectType objectT
                                            VkPrivateDataSlot privateDataSlot, uint64_t* pData, const ErrorObject& error_obj) const {
     bool skip = false;
     if (IsInstanceVkObjectType(objectType) || objectType == VK_OBJECT_TYPE_UNKNOWN) {
-        skip |= LogError("VUID-vkGetPrivateData-objectType-04018", device, error_obj.location.dot(Field::objectType), "is %s.",
-                         string_VkObjectType(objectType));
+        skip |= LogError("VUID-vkGetPrivateData-objectType-04018", device, error_obj.location.dot(Field::objectType),
+                         "is %s, but must be a device-level object type.", string_VkObjectType(objectType));
     } else if (objectType == VK_OBJECT_TYPE_DEVICE) {
         // Need to check device handle as has no parent to check as the caller is the same device object
         if (HandleToUint64(device) != objectHandle) {
             skip |= LogError("VUID-vkGetPrivateData-objectType-04018", device, error_obj.location.dot(Field::objectType),
-                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") != device (%s).", objectHandle,
+                             "is VK_OBJECT_TYPE_DEVICE but objectHandle (0x%" PRIx64 ") is not equal to device (%s).", objectHandle,
                              FormatHandle(device).c_str());
         }
     } else {
@@ -1979,7 +1963,7 @@ bool Device::PreCallValidateWriteResourceDescriptorsEXT(VkDevice device, uint32_
                     [[maybe_unused]] const Location pView_loc = pImage_loc.dot(Field::pView);
                     skip |= ValidateObject(pResources[index0].data.pImage->pView->image, kVulkanObjectTypeImage, false,
                                            "VUID-VkImageViewCreateInfo-image-parameter",
-                                           "UNASSIGNED-VkImageViewCreateInfo-image-parent", pView_loc.dot(Field::image));
+                                           "VUID-vkWriteResourceDescriptorsEXT-pResources-12495", pView_loc.dot(Field::image));
                     if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkSamplerYcbcrConversionInfo>(
                             pResources[index0].data.pImage->pView->pNext)) {
                         [[maybe_unused]] const Location pNext_loc = pView_loc.pNext(Struct::VkSamplerYcbcrConversionInfo);
@@ -2004,18 +1988,24 @@ bool Device::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t createInf
     if (pCreateInfos) {
         for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
             [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pCreateInfos, index0);
+            if (pCreateInfos[index0].setLayoutCount == 0) {
+                continue;
+            }
 
             const bool has_independent_set_flags = pCreateInfos[index0].flags & VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR;
             // VK_KHR_maintenance11 added flag to allow null objects
             bool null_allowed = has_independent_set_flags;
             const char* vuid = null_allowed ? "VUID-VkShaderCreateInfoEXT-setLayoutCount-13360"
                                             : "VUID-VkShaderCreateInfoEXT-setLayoutCount-13359";
-            if ((pCreateInfos[index0].setLayoutCount > 0) && (pCreateInfos[index0].pSetLayouts)) {
+            if (pCreateInfos[index0].pSetLayouts) {
                 for (uint32_t index1 = 0; index1 < pCreateInfos[index0].setLayoutCount; ++index1) {
                     skip |= ValidateObject(pCreateInfos[index0].pSetLayouts[index1], kVulkanObjectTypeDescriptorSetLayout,
                                            null_allowed, vuid, "UNASSIGNED-VkShaderCreateInfoEXT-pSetLayouts-parent",
                                            index0_loc.dot(Field::pSetLayouts, index1));
                 }
+            } else {
+                skip |= LogError(vuid, device, index0_loc.dot(Field::pSetLayouts), "is NULL, but setLayoutCount is %" PRIu32 ".",
+                                 pCreateInfos[index0].setLayoutCount);
             }
         }
     }

@@ -62,10 +62,10 @@ TEST_F(NegativeShader64BitIndexing, ShaderObjectLength64) {
                                            {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                        });
 
-    VkShaderCreateInfoEXT create_info = ShaderCreateInfo(spv, VK_SHADER_STAGE_COMPUTE_BIT, 1, &descriptor_set.layout_.handle());
+    VkShaderCreateInfoEXT create_info = ShaderCreateInfoEXT(spv, VK_SHADER_STAGE_COMPUTE_BIT, 1, &descriptor_set.layout_.handle());
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpArrayLength-11807");
-    const vkt::Shader shader(*m_device, create_info);
+    const vkt::ShaderEXT shader(*m_device, create_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -234,11 +234,11 @@ TEST_F(NegativeShader64BitIndexing, ShaderMissingEnable) {
                                            {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                                        });
 
-    VkShaderCreateInfoEXT create_info = ShaderCreateInfo(spv, VK_SHADER_STAGE_COMPUTE_BIT, 1, &descriptor_set.layout_.handle());
+    VkShaderCreateInfoEXT create_info = ShaderCreateInfoEXT(spv, VK_SHADER_STAGE_COMPUTE_BIT, 1, &descriptor_set.layout_.handle());
     create_info.flags = VK_SHADER_CREATE_64_BIT_INDEXING_BIT_EXT;
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderCreateInfoEXT-flags-11758");
-    const vkt::Shader shader(*m_device, create_info);
+    const vkt::ShaderEXT shader(*m_device, create_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -274,6 +274,6 @@ TEST_F(NegativeShader64BitIndexing, ConstantSizeOfLength64) {
                OpFunctionEnd
     )";
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpConstantSizeOfEXT-11475");
-    vkt::HeapComputePipeline pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_2, nullptr, SPV_SOURCE_ASM);
+    vkt::HeapComputePipelineEXT pipe(*m_device, cs_source, SPV_ENV_VULKAN_1_2, nullptr, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }

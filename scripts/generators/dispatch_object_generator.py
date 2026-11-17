@@ -341,6 +341,8 @@ class DispatchObjectGenerator(BaseGenerator):
             self.generateFunctions()
         elif self.filename == 'dispatch_object.cpp':
             self.generateSource()
+        elif self.filename == 'dispatch_object_init.cpp':
+            self.generateInitSource()
         else:
             self.write(f'\nFile name {self.filename} has no code to generate\n')
 
@@ -375,7 +377,7 @@ class DispatchObjectGenerator(BaseGenerator):
     def generateInstanceMethods(self):
         out = []
         out.append('''
-            // This file contains methods for class DispatchInstance  and it is designed to ONLY be
+            // This file contains methods for class DispatchInstance and it is designed to ONLY be
             // included into dispatch_object.h.
 
             #pragma once
@@ -386,7 +388,7 @@ class DispatchObjectGenerator(BaseGenerator):
     def generateFunctions(self):
         out = []
         out.append('''
-            // This file contains contains convience functions for non-chassis code that needs to
+            // This file contains convenience functions for non-chassis code that needs to
             // make vulkan calls.
 
             #pragma once
@@ -437,31 +439,19 @@ class DispatchObjectGenerator(BaseGenerator):
                 ''')
         self.write("".join(out))
 
-    def generateSource(self):
-        # Construct list of extension structs containing handles
-        # Generate the list of APIs that might need to handle wrapped extension structs
-        for struct in [x for x in self.vk.structs.values() if x.sType and x.extendedBy]:
-            for extendedStruct in struct.extendedBy:
-                if self.containsNonDispatchableObject(extendedStruct) and extendedStruct not in self.ndo_extension_structs:
-                    self.ndo_extension_structs.append(extendedStruct)
-
+    # Creating the validation objects is the only code that needs the header of every one of them. It lives in its own file
+    # so the rest of the dispatch code does not have to parse them, nor emit all their vtables.
+    def generateInitSource(self):
         out = []
         out.append('''
             #include "chassis/dispatch_object.h"
-            #include "utils/cast_utils.h"
-            #include <vulkan/utility/vk_safe_struct.hpp>
-            #include "state_tracker/pipeline_state.h"
-            #include "containers/custom_containers.h"
-
-             ''')
+            ''')
         for layer in APISpecific.getValidationLayerList(self.targetApiName):
              include_file = layer['include']
              out.append(f'#include "{include_file}"\n')
         out.append('\n')
 
         out.append('''
-            #define DISPATCH_MAX_STACK_ALLOCATIONS 32
-
             namespace vvl {
 
             void DispatchInstance::InitValidationObjects() {
@@ -493,6 +483,31 @@ class DispatchObjectGenerator(BaseGenerator):
                  }}''')
         out.append('\n')
         out.append('}\n')
+        out.append('} // namespace vvl\n')
+        self.write("".join(out))
+
+    def generateSource(self):
+        # Construct list of extension structs containing handles
+        # Generate the list of APIs that might need to handle wrapped extension structs
+        for struct in [x for x in self.vk.structs.values() if x.sType and x.extendedBy]:
+            for extendedStruct in struct.extendedBy:
+                if self.containsNonDispatchableObject(extendedStruct) and extendedStruct not in self.ndo_extension_structs:
+                    self.ndo_extension_structs.append(extendedStruct)
+
+        # The validation objects are created in dispatch_object_init.cpp (InitValidationObjects), so this file does not
+        # include their headers: it only needs the chassis and handle wrapping code.
+        out = []
+        out.append('''
+            #include "chassis/dispatch_object.h"
+            #include "utils/cast_utils.h"
+            #include <vulkan/utility/vk_safe_struct.hpp>
+            #include "state_tracker/pipeline_state.h"
+            #include "containers/custom_containers.h"
+
+            #define DISPATCH_MAX_STACK_ALLOCATIONS 32
+
+            namespace vvl {
+            ''')
 
         out.append('''
             // Unique Objects pNext extension handling function

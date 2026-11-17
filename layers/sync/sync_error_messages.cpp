@@ -28,40 +28,93 @@
 
 namespace syncval {
 
-ErrorMessages::ErrorMessages(SyncValidator& validator) : validator_(validator) {}
+vvl::Func ErrorMessages::AddReplayInfo(const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter,
+                                       AdditionalMessageInfo& additional_info) const {
+    if (!reporter.IsReplay()) {
+        return reporter.loc.function;
+    }
+    const ResourceUsageInfo recorded_usage_info = reporter.cb_context.GetResourceUsageInfo(ResourceUsageTagEx{reporter.replay_tag});
 
-std::string ErrorMessages::Error(const HazardResult& hazard, const CommandExecutionContext& context, vvl::Func command,
+    additional_info.message_type_override = "SubmitTimeError";
+    additional_info.properties.Add(kPropertyCommandBufferIndex, reporter.loc.index);
+    if (!recorded_usage_info.debug_region_name.empty()) {
+        additional_info.properties.Add(kPropertyDebugRegion, recorded_usage_info.debug_region_name);
+    }
+
+    std::ostringstream ss;
+    ss << vvl::String(recorded_usage_info.command);
+    if (!recorded_usage_info.debug_region_name.empty()) {
+        ss << "[" << recorded_usage_info.debug_region_name << "]";
+    }
+    if (env.handle.type == kVulkanObjectTypeQueue) {
+        ss << " (from " << validator_.FormatHandle(reporter.cb_context.GetCBState().Handle());
+        ss << " submitted on the current ";
+        ss << validator_.FormatHandle(env.handle) << ")";
+    } else {  // primary command buffer executes secondary one
+        assert(env.handle.type == kVulkanObjectTypeCommandBuffer);
+        ss << " (from the secondary " << validator_.FormatHandle(reporter.cb_context.GetCBState().Handle()) << ")";
+    }
+    additional_info.access_initiator = ss.str();
+
+    const ResourceUsageTagEx prior_tag_ex = hazard.PriorTagEx();
+    if (prior_tag_ex.tag != kInvalidTag) {
+        const ResourceUsageInfo prior_usage_info = env.usage_info_provider.GetResourceUsageInfo(prior_tag_ex);
+        std::ostringstream ss2;
+        if (prior_usage_info.queue) {
+            if (prior_usage_info.cb) {
+                ss2 << "(from " << validator_.FormatHandle(prior_usage_info.cb->Handle());
+                ss2 << " submitted on " << validator_.FormatHandle(prior_usage_info.queue->Handle()) << ")";
+            } else {  // QueuePresent case (not recorded into command buffer)
+                ss2 << "(submitted on " << validator_.FormatHandle(prior_usage_info.queue->Handle()) << ")";
+            }
+        } else if (prior_usage_info.cb) {
+            // TODO: distinuish between "native" primary command buffer commands and
+            // command recorded from the secondary command buffers.
+            ss2 << "(from the primary " << validator_.FormatHandle(prior_usage_info.cb->Handle()) << ")";
+        }
+        additional_info.brief_description_end_text = ss2.str();
+    }
+    return recorded_usage_info.command;
+}
+
+std::string ErrorMessages::Error(const SyncEnvironment& env, const HazardResult& hazard, vvl::Func command,
                                  const std::string& resource_description, const char* message_type,
                                  const AdditionalMessageInfo& additional_info) const {
-    std::string message = FormatErrorMessage(hazard, context, command, resource_description, additional_info);
+    std::string message = FormatErrorMessage(env, hazard, command, resource_description, additional_info);
 
     if (validator_.syncval_settings.message_extra_properties) {
         if (!message.empty() && message.back() != '\n') {
             message += '\n';
         }
-        const ReportProperties properties = GetErrorMessageProperties(hazard, context, command, message_type, additional_info);
+        if (additional_info.message_type_override) {
+            message_type = additional_info.message_type_override;
+        }
+        const ReportProperties properties = GetErrorMessageProperties(env, hazard, command, message_type, additional_info);
         message += properties.FormatExtraPropertiesSection();
     }
     return message;
 }
 
-std::string ErrorMessages::BufferError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context, vvl::Func command,
-                                       const std::string& resource_description, const AccessRange range,
-                                       AdditionalMessageInfo additional_info) const {
+std::string ErrorMessages::BufferError(const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter,
+                                       const std::string& resource_description, const AccessRange range) const {
+    AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     std::ostringstream ss;
     ss << "\nBuffer access region: {\n";
     ss << "  offset = " << range.begin << "\n";
     ss << "  size = " << range.end - range.begin << "\n";
     ss << "}\n";
     additional_info.message_end_text += ss.str();
-
-    return Error(hazard, cb_context, command, resource_description, "BufferError", additional_info);
+    return Error(env, hazard, command, resource_description, "BufferError", additional_info);
 }
 
-std::string ErrorMessages::BufferCopyError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                           const vvl::Func command, const std::string& resource_description, uint32_t region_index,
+std::string ErrorMessages::BufferCopyError(const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter,
+                                           const std::string& resource_description, uint32_t region_index,
                                            AccessRange range) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     additional_info.properties.Add(kPropertyRegionIndex, region_index);
 
     std::ostringstream ss;
@@ -69,16 +122,17 @@ std::string ErrorMessages::BufferCopyError(const HazardResult& hazard, const Com
     ss << "  offset = " << range.begin << ",\n";
     ss << "  size = " << range.end - range.begin << "\n";
     ss << "}\n";
-    additional_info.message_end_text = ss.str();
+    additional_info.message_end_text += ss.str();
 
-    return Error(hazard, cb_context, command, resource_description, "BufferCopyError", additional_info);
+    return Error(env, hazard, command, resource_description, "BufferCopyError", additional_info);
 }
 
-std::string ErrorMessages::AccelerationStructureError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                      const vvl::Func command, const std::string& resource_description,
-                                                      const AccessRange range, VkAccelerationStructureKHR as,
+std::string ErrorMessages::AccelerationStructureError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                      const ErrorReporter& reporter, const std::string& resource_description,
+                                                      AccessRange range, VkAccelerationStructureKHR as,
                                                       const Location& as_location) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
 
     std::ostringstream ss;
     ss << "The buffer backs ";
@@ -93,13 +147,16 @@ std::string ErrorMessages::AccelerationStructureError(const HazardResult& hazard
     ss2 << "}\n";
     additional_info.message_end_text += ss2.str();
 
-    return Error(hazard, cb_context, command, resource_description, "AccelerationStructureError", additional_info);
+    return Error(env, hazard, command, resource_description, "AccelerationStructureError", additional_info);
 }
 
-std::string ErrorMessages::ImageCopyResolveBlitError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                     vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::ImageCopyResolveBlitError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                     const ErrorReporter& reporter, const std::string& resource_description,
                                                      uint32_t region_index, const VkOffset3D& offset, const VkExtent3D& extent,
                                                      const VkImageSubresourceLayers& subresource) const {
+    AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     const char* action = nullptr;
     const char* message_type = nullptr;
     if (IsValueIn(command, {vvl::Func::vkCmdBlitImage, vvl::Func::vkCmdBlitImage2, vvl::Func::vkCmdBlitImage2KHR})) {
@@ -120,16 +177,14 @@ std::string ErrorMessages::ImageCopyResolveBlitError(const HazardResult& hazard,
     ss << "  subresource = {" << string_VkImageSubresourceLayers(subresource) << "}\n";
     ss << "}\n";
 
-    AdditionalMessageInfo additional_info;
-    additional_info.message_end_text = ss.str();
+    additional_info.message_end_text += ss.str();
     additional_info.properties.Add(kPropertyRegionIndex, region_index);
 
-    return Error(hazard, cb_context, command, resource_description, message_type, additional_info);
+    return Error(env, hazard, command, resource_description, message_type, additional_info);
 }
 
-std::string ErrorMessages::ImageClearError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                           vvl::Func command, const std::string& resource_description,
-                                           uint32_t subresource_range_index,
+std::string ErrorMessages::ImageClearError(const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter,
+                                           const std::string& resource_description, uint32_t subresource_range_index,
                                            const VkImageSubresourceRange& subresource_range) const {
     std::ostringstream ss;
     ss << "\nImage clear subresource range " << subresource_range_index << ": {\n";
@@ -137,10 +192,11 @@ std::string ErrorMessages::ImageClearError(const HazardResult& hazard, const Com
     ss << "}\n";
 
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
     additional_info.message_end_text = ss.str();
     additional_info.properties.Add(kPropertyRegionIndex, subresource_range_index);
 
-    return Error(hazard, cb_context, command, resource_description, "ImageSubresourceRangeError", additional_info);
+    return Error(env, hazard, command, resource_description, "ImageSubresourceRangeError", additional_info);
 }
 
 static void PrepareCommonDescriptorMessage(Logger& logger, const vvl::Pipeline& pipeline, uint32_t descriptor_set_number,
@@ -153,7 +209,12 @@ static void PrepareCommonDescriptorMessage(Logger& logger, const vvl::Pipeline& 
     additional_info.properties.Add(kPropertyDescriptorType, descriptor_type_str);
     additional_info.properties.Add(kPropertyDescriptorBinding, descriptor_binding);
     additional_info.properties.Add(kPropertyDescriptorArrayElement, descriptor_array_element);
-    additional_info.access_initiator = std::string("Shader stage ") + string_VkShaderStageFlagBits(shader_stage);
+    const std::string shader_stage_description = std::string("Shader stage ") + string_VkShaderStageFlagBits(shader_stage);
+    if (additional_info.access_initiator.empty()) {
+        additional_info.access_initiator = shader_stage_description;
+    } else {
+        additional_info.access_initiator = shader_stage_description + " in " + additional_info.access_initiator;
+    }
 
     ss << "\nThe " << resource_type << " is referenced by descriptor binding " << descriptor_binding;
     ss << " (" << descriptor_type_str << ")";
@@ -164,29 +225,33 @@ static void PrepareCommonDescriptorMessage(Logger& logger, const vvl::Pipeline& 
     ss << ", " << logger.FormatHandle(pipeline);
 }
 
-std::string ErrorMessages::BufferDescriptorError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                 vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::BufferDescriptorError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                 const ErrorReporter& reporter, const std::string& resource_description,
                                                  const vvl::Pipeline& pipeline, uint32_t set_number,
                                                  const vvl::DescriptorSet& descriptor_set, VkDescriptorType descriptor_type,
                                                  uint32_t descriptor_binding, uint32_t descriptor_array_element,
                                                  VkShaderStageFlagBits shader_stage) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     std::ostringstream ss;
     PrepareCommonDescriptorMessage(validator_, pipeline, set_number, descriptor_set, descriptor_type, descriptor_binding,
                                    descriptor_array_element, shader_stage, "buffer", additional_info, ss);
     ss << ".";
 
     additional_info.pre_synchronization_text = ss.str();
-    return Error(hazard, cb_context, command, resource_description, "BufferDescriptorError", additional_info);
+    return Error(env, hazard, command, resource_description, "BufferDescriptorError", additional_info);
 }
 
-std::string ErrorMessages::ImageDescriptorError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::ImageDescriptorError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                const ErrorReporter& reporter, const std::string& resource_description,
                                                 const vvl::Pipeline& pipeline, uint32_t set_number,
                                                 const vvl::DescriptorSet& descriptor_set, VkDescriptorType descriptor_type,
                                                 uint32_t descriptor_binding, uint32_t descriptor_array_element,
                                                 VkShaderStageFlagBits shader_stage, VkImageLayout image_layout) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     std::ostringstream ss;
     PrepareCommonDescriptorMessage(validator_, pipeline, set_number, descriptor_set, descriptor_type, descriptor_binding,
                                    descriptor_array_element, shader_stage, "image", additional_info, ss);
@@ -194,28 +259,28 @@ std::string ErrorMessages::ImageDescriptorError(const HazardResult& hazard, cons
 
     additional_info.pre_synchronization_text = ss.str();
     additional_info.properties.Add(kPropertyImageLayout, string_VkImageLayout(image_layout));
-    return Error(hazard, cb_context, command, resource_description, "ImageDescriptorError", additional_info);
+    return Error(env, hazard, command, resource_description, "ImageDescriptorError", additional_info);
 }
 
 std::string ErrorMessages::AccelerationStructureDescriptorError(
-    const HazardResult& hazard, const CommandBufferAccessContext& cb_context, vvl::Func command,
-    const std::string& resource_description, const vvl::Pipeline& pipeline, uint32_t set_number,
-    const vvl::DescriptorSet& descriptor_set, VkDescriptorType descriptor_type, uint32_t descriptor_binding,
-    uint32_t descriptor_array_element, VkShaderStageFlagBits shader_stage) const {
+    const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter, const std::string& resource_description,
+    const vvl::Pipeline& pipeline, uint32_t set_number, const vvl::DescriptorSet& descriptor_set, VkDescriptorType descriptor_type,
+    uint32_t descriptor_binding, uint32_t descriptor_array_element, VkShaderStageFlagBits shader_stage) const {
     AdditionalMessageInfo additional_info;
-    additional_info.access_action = "traces rays against";
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
 
     std::ostringstream ss;
     PrepareCommonDescriptorMessage(validator_, pipeline, set_number, descriptor_set, descriptor_type, descriptor_binding,
                                    descriptor_array_element, shader_stage, "acceleration structure", additional_info, ss);
     ss << ".";
-    additional_info.pre_synchronization_text = ss.str();
 
-    return Error(hazard, cb_context, command, resource_description, "AccelerationStructureDescriptorError", additional_info);
+    additional_info.access_action = "traces rays against";
+    additional_info.pre_synchronization_text = ss.str();
+    return Error(env, hazard, command, resource_description, "AccelerationStructureDescriptorError", additional_info);
 }
 
-std::string ErrorMessages::ClearAttachmentError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::ClearAttachmentError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                const ErrorReporter& reporter, const std::string& resource_description,
                                                 VkImageAspectFlags clear_aspects, uint32_t clear_rect_index,
                                                 const VkClearRect& clear_rect) const {
     std::ostringstream ss;
@@ -227,16 +292,27 @@ std::string ErrorMessages::ClearAttachmentError(const HazardResult& hazard, cons
     ss << "}\n";
 
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
     additional_info.properties.Add(kPropertyImageAspects, string_VkImageAspectFlags(clear_aspects));
     additional_info.access_action = "clears";
     additional_info.message_end_text = ss.str();
 
-    return Error(hazard, cb_context, command, resource_description, "ClearAttachmentError", additional_info);
+    return Error(env, hazard, command, resource_description, "ClearAttachmentError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassAttachmentError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                     vvl::Func command, const std::string& resource_description) const {
-    return Error(hazard, cb_context, command, resource_description, "RenderPassAttachmentError");
+std::string ErrorMessages::RenderPassAttachmentError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                     const ErrorReporter& reporter, const std::string& resource_description) const {
+    AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "RenderPassAttachmentError", additional_info);
+}
+
+std::string ErrorMessages::DynamicRenderingAttachmentError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                           const ErrorReporter& reporter,
+                                                           const std::string& resource_description) const {
+    AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "DynamicRenderingAttachmentError", additional_info);
 }
 
 static const char* GetLoadOpActionName(VkAttachmentLoadOp load_op) {
@@ -265,208 +341,194 @@ static void CheckForLoadOpDontCareInsight(VkAttachmentLoadOp load_op, bool is_co
     }
 }
 
-std::string ErrorMessages::BeginRenderingError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                               vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::BeginRenderingError(const SyncEnvironment& env, const HazardResult& hazard,
+                                               const ErrorReporter& reporter, const std::string& resource_description,
                                                VkAttachmentLoadOp load_op) const {
     AdditionalMessageInfo additional_info;
-    const char* load_op_str = string_VkAttachmentLoadOp(load_op);
-    additional_info.properties.Add(kPropertyLoadOp, load_op_str);
+    additional_info.properties.Add(kPropertyLoadOp, string_VkAttachmentLoadOp(load_op));
     additional_info.access_action = GetLoadOpActionName(load_op);
-    return Error(hazard, cb_context, command, resource_description, "BeginRenderingError", additional_info);
+
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "BeginRenderingError", additional_info);
 }
 
-std::string ErrorMessages::EndRenderingResolveError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                    vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::EndRenderingResolveError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                    const ErrorReporter& reporter, const std::string& resource_description,
                                                     VkResolveModeFlagBits resolve_mode, bool resolve_write) const {
     AdditionalMessageInfo additional_info;
-    const char* resolve_mode_str = string_VkResolveModeFlagBits(resolve_mode);
-    additional_info.properties.Add(kPropertyResolveMode, resolve_mode_str);
+    additional_info.properties.Add(kPropertyResolveMode, string_VkResolveModeFlagBits(resolve_mode));
     additional_info.access_action = resolve_write ? "writes to single sample resolve attachment" : "reads multisample attachment";
-    return Error(hazard, cb_context, command, resource_description, "EndRenderingResolveError", additional_info);
+
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "EndRenderingResolveError", additional_info);
 }
 
-std::string ErrorMessages::EndRenderingStoreError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                  vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::EndRenderingStoreError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                  const ErrorReporter& reporter, const std::string& resource_description,
                                                   VkAttachmentStoreOp store_op) const {
     AdditionalMessageInfo additional_info;
-    const char* store_op_str = string_VkAttachmentStoreOp(store_op);
-    additional_info.properties.Add(kPropertyStoreOp, store_op_str);
-    return Error(hazard, cb_context, command, resource_description, "EndRenderingStoreError", additional_info);
+    additional_info.properties.Add(kPropertyStoreOp, string_VkAttachmentStoreOp(store_op));
+
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "EndRenderingStoreError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassLoadOpError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                 vvl::Func command, const std::string& resource_description, uint32_t subpass,
-                                                 uint32_t attachment, VkAttachmentLoadOp load_op, bool is_color) const {
+std::string ErrorMessages::RenderPassLoadOpError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                 const ErrorReporter& reporter, const std::string& resource_description,
+                                                 uint32_t subpass, uint32_t attachment, VkAttachmentLoadOp load_op,
+                                                 bool is_color) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     const char* load_op_str = string_VkAttachmentLoadOp(load_op);
     additional_info.properties.Add(kPropertyLoadOp, load_op_str);
     additional_info.access_action = GetLoadOpActionName(load_op);
     CheckForLoadOpDontCareInsight(load_op, is_color, additional_info.message_end_text);
-    return Error(hazard, cb_context, command, resource_description, "RenderPassLoadOpError", additional_info);
+    return Error(env, hazard, command, resource_description, "RenderPassLoadOpError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassLoadOpVsLayoutTransitionError(const HazardResult& hazard,
-                                                                   const CommandBufferAccessContext& cb_context, vvl::Func command,
+std::string ErrorMessages::RenderPassLoadOpVsLayoutTransitionError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                                   const ErrorReporter& reporter,
                                                                    const std::string& resource_description,
                                                                    VkAttachmentLoadOp load_op, bool is_color) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     const char* load_op_str = string_VkAttachmentLoadOp(load_op);
     additional_info.properties.Add(kPropertyLoadOp, load_op_str);
     additional_info.hazard_overview = "attachment loadOp access is not synchronized with the attachment layout transition";
     additional_info.access_action = GetLoadOpActionName(load_op);
     CheckForLoadOpDontCareInsight(load_op, is_color, additional_info.message_end_text);
-    return Error(hazard, cb_context, command, resource_description, "RenderPassLoadOpVsLayoutTransitionError", additional_info);
+    return Error(env, hazard, command, resource_description, "RenderPassLoadOpVsLayoutTransitionError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassResolveError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                  vvl::Func command, const std::string& resource_description) const {
-    return Error(hazard, cb_context, command, resource_description, "RenderPassResolveError");
+std::string ErrorMessages::RenderPassResolveError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                  const ErrorReporter& reporter, const std::string& resource_description) const {
+    AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "RenderPassResolveError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassStoreOpError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                  vvl::Func command, const std::string& resource_description,
+std::string ErrorMessages::RenderPassStoreOpError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                  const ErrorReporter& reporter, const std::string& resource_description,
                                                   VkAttachmentStoreOp store_op) const {
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
     const char* store_op_str = string_VkAttachmentStoreOp(store_op);
     additional_info.properties.Add(kPropertyStoreOp, store_op_str);
-    return Error(hazard, cb_context, command, resource_description, "RenderPassStoreOpError", additional_info);
+    return Error(env, hazard, command, resource_description, "RenderPassStoreOpError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassLayoutTransitionError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context,
-                                                           vvl::Func command, const std::string& resource_description,
-                                                           VkImageLayout old_layout, VkImageLayout new_layout) const {
+std::string ErrorMessages::RenderPassLayoutTransitionError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                           const ErrorReporter& reporter, const std::string& resource_description,
+                                                           VkImageLayout old_layout, VkImageLayout new_layout,
+                                                           bool external_dependencies_miss_initial_transition) const {
     const char* old_layout_str = string_VkImageLayout(old_layout);
     const char* new_layout_str = string_VkImageLayout(new_layout);
 
     AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+
     additional_info.properties.Add(kPropertyOldLayout, old_layout_str);
     additional_info.properties.Add(kPropertyNewLayout, new_layout_str);
     additional_info.access_action = "performs image layout transition";
-    return Error(hazard, cb_context, command, resource_description, "RenderPassLayoutTransitionError", additional_info);
+    if (hazard.PriorQueue() == env.queue_id && external_dependencies_miss_initial_transition) {
+        additional_info.message_end_text =
+            "\nHint: None of the explicit dependencies from VK_SUBPASS_EXTERNAL targets a subpass that uses this attachment, "
+            "so they do not synchronize its initial layout transition. Check their dstSubpass.";
+    }
+    return Error(env, hazard, command, resource_description, "RenderPassLayoutTransitionError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassLayoutTransitionVsResolveError(const HazardResult& hazard,
-                                                                    const CommandBufferAccessContext& cb_context, vvl::Func command,
+std::string ErrorMessages::RenderPassLayoutTransitionVsResolveError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                                    const ErrorReporter& reporter,
                                                                     const std::string& resource_description,
-                                                                    VkImageLayout old_layout, VkImageLayout new_layout,
-                                                                    uint32_t resolve_subpass) const {
-    const char* old_layout_str = string_VkImageLayout(old_layout);
-    const char* new_layout_str = string_VkImageLayout(new_layout);
-
+                                                                    VulkanTypedHandle render_pass_handle, VkImageLayout old_layout,
+                                                                    VkImageLayout new_layout, uint32_t resolve_subpass) const {
     AdditionalMessageInfo additional_info;
-    additional_info.properties.Add(kPropertyOldLayout, old_layout_str);
-    additional_info.properties.Add(kPropertyNewLayout, new_layout_str);
-    additional_info.access_action =
-        "performs image layout transition during " +
-        validator_.FormatHandle(cb_context.GetCurrentRenderPassContext()->GetRenderPassState()->Handle());
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    additional_info.properties.Add(kPropertyOldLayout, string_VkImageLayout(old_layout));
+    additional_info.properties.Add(kPropertyNewLayout, string_VkImageLayout(new_layout));
+    additional_info.access_action = "performs image layout transition during " + validator_.FormatHandle(render_pass_handle);
     additional_info.brief_description_end_text = "during resolve operation in subpass ";
     additional_info.brief_description_end_text += std::to_string(resolve_subpass);
-    return Error(hazard, cb_context, command, resource_description, "RenderPassLayoutTransitionVsResolveError", additional_info);
+    return Error(env, hazard, command, resource_description, "RenderPassLayoutTransitionVsResolveError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassFinalLayoutTransitionError(const HazardResult& hazard,
-                                                                const CommandBufferAccessContext& cb_context, vvl::Func command,
-                                                                const std::string& resource_description, VkImageLayout old_layout,
+std::string ErrorMessages::RenderPassFinalLayoutTransitionError(const SyncEnvironment& env, const HazardResult& hazard,
+                                                                const ErrorReporter& reporter,
+                                                                const std::string& resource_description,
+                                                                VulkanTypedHandle render_pass_handle, VkImageLayout old_layout,
                                                                 VkImageLayout new_layout) const {
-    const char* old_layout_str = string_VkImageLayout(old_layout);
-    const char* new_layout_str = string_VkImageLayout(new_layout);
-
     AdditionalMessageInfo additional_info;
-    additional_info.properties.Add(kPropertyOldLayout, old_layout_str);
-    additional_info.properties.Add(kPropertyNewLayout, new_layout_str);
-    additional_info.access_action =
-        "performs final image layout transition during " +
-        validator_.FormatHandle(cb_context.GetCurrentRenderPassContext()->GetRenderPassState()->Handle());
-    return Error(hazard, cb_context, command, resource_description, "RenderPassFinalLayoutTransitionError", additional_info);
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    additional_info.properties.Add(kPropertyOldLayout, string_VkImageLayout(old_layout));
+    additional_info.properties.Add(kPropertyNewLayout, string_VkImageLayout(new_layout));
+    additional_info.access_action = "performs final image layout transition during " + validator_.FormatHandle(render_pass_handle);
+    return Error(env, hazard, command, resource_description, "RenderPassFinalLayoutTransitionError", additional_info);
 }
 
-std::string ErrorMessages::RenderPassFinalLayoutTransitionVsStoreOrResolveError(const HazardResult& hazard,
-                                                                                const CommandBufferAccessContext& cb_context,
-                                                                                vvl::Func command,
-                                                                                const std::string& resource_description,
-                                                                                VkImageLayout old_layout, VkImageLayout new_layout,
-                                                                                uint32_t store_resolve_subpass) const {
-    const char* old_layout_str = string_VkImageLayout(old_layout);
-    const char* new_layout_str = string_VkImageLayout(new_layout);
-
+std::string ErrorMessages::RenderPassFinalLayoutTransitionVsStoreOrResolveError(
+    const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter, const std::string& resource_description,
+    VulkanTypedHandle render_pass_handle, VkImageLayout old_layout, VkImageLayout new_layout,
+    uint32_t store_resolve_subpass) const {
     AdditionalMessageInfo additional_info;
-    additional_info.properties.Add(kPropertyOldLayout, old_layout_str);
-    additional_info.properties.Add(kPropertyNewLayout, new_layout_str);
-    additional_info.access_action =
-        "performs final image layout transition during " +
-        validator_.FormatHandle(cb_context.GetCurrentRenderPassContext()->GetRenderPassState()->Handle());
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    additional_info.properties.Add(kPropertyOldLayout, string_VkImageLayout(old_layout));
+    additional_info.properties.Add(kPropertyNewLayout, string_VkImageLayout(new_layout));
+    additional_info.access_action = "performs final image layout transition during " + validator_.FormatHandle(render_pass_handle);
     additional_info.brief_description_end_text = "during store/resolve operation in subpass ";
     additional_info.brief_description_end_text += std::to_string(store_resolve_subpass);
-
-    return Error(hazard, cb_context, command, resource_description, "RenderPassFinalLayoutTransitionVsStoreOrResolveError",
+    return Error(env, hazard, command, resource_description, "RenderPassFinalLayoutTransitionVsStoreOrResolveError",
                  additional_info);
 }
 
-std::string ErrorMessages::ImageBarrierError(const HazardResult& hazard, const CommandExecutionContext& context, vvl::Func command,
-                                             const std::string& resource_description, const SyncImageBarrier& barrier) const {
-    AdditionalMessageInfo additional_info;
-    additional_info.access_action = "performs image layout transition on the";
+static void FormatImageBarrier(std::ostringstream& ss, const SyncImageBarrier& barrier) {
+    const VkPipelineStageFlags2 src_stage_mask = barrier.barrier.src_exec_scope.stage_mask;
+    const VkPipelineStageFlags2 dst_stage_mask = barrier.barrier.dst_exec_scope.stage_mask;
+    const VkAccessFlags2 src_access_mask = barrier.barrier.original_src_access;
+    const VkAccessFlags2 dst_access_mask = barrier.barrier.original_dst_access;
 
-    std::ostringstream ss;
     ss << "\npImageMemoryBarriers[" << barrier.barrier_index << "]: {\n";
-    ss << "  srcStageMask = " << string_VkPipelineStageFlags2(barrier.barrier.src_exec_scope.stage_mask) << ",\n";
-    ss << "  srcAccessMask = " << string_VkAccessFlags2(barrier.barrier.original_src_access) << ",\n";
-    ss << "  dstStageMask = " << string_VkPipelineStageFlags2(barrier.barrier.dst_exec_scope.stage_mask) << ",\n";
-    ss << "  dstAccessMask = " << string_VkAccessFlags2(barrier.barrier.original_dst_access) << ",\n";
+    ss << "  srcStageMask = " << (src_stage_mask ? string_VkPipelineStageFlags2(src_stage_mask) : "VK_PIPELINE_STAGE_2_NONE")
+       << ",\n";
+    ss << "  srcAccessMask = " << (src_access_mask ? string_VkAccessFlags2(src_access_mask) : "VK_ACCESS_2_NONE") << ",\n";
+    ss << "  dstStageMask = " << (dst_stage_mask ? string_VkPipelineStageFlags2(dst_stage_mask) : "VK_PIPELINE_STAGE_2_NONE")
+       << ",\n";
+    ss << "  dstAccessMask = " << (dst_access_mask ? string_VkAccessFlags2(dst_access_mask) : "VK_ACCESS_2_NONE") << ",\n";
+    ss << "  oldLayout = " << string_VkImageLayout(barrier.old_layout) << ",\n";
+    ss << "  newLayout = " << string_VkImageLayout(barrier.new_layout) << ",\n";
+    ss << "  subresourceRange = {" << string_VkImageSubresourceRange(barrier.subresource_range) << "}\n";
     ss << "}\n";
-    additional_info.message_end_text = ss.str();
-
-    return Error(hazard, context, command, resource_description, "ImageBarrierError", additional_info);
 }
 
-std::string ErrorMessages::FirstUseError(const HazardResult& hazard, const CommandExecutionContext& exec_context,
-                                         const CommandBufferAccessContext& recorded_context, uint32_t command_buffer_index) const {
-    const ResourceUsageInfo prior_usage_info = exec_context.GetResourceUsageInfo(hazard.TagEx());
-    const ResourceUsageInfo recorded_usage_info = recorded_context.GetResourceUsageInfo(hazard.RecordedAccess()->TagEx());
-
+std::string ErrorMessages::ImageBarrierError(const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter,
+                                             const std::string& resource_description, const SyncImageBarrier& barrier) const {
     AdditionalMessageInfo additional_info;
-    additional_info.properties.Add(kPropertyCommandBufferIndex, command_buffer_index);
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    // Keep ImageBarrierError for event waits during replay for message-type compatibility
+    if (IsValueIn(command, {vvl::Func::vkCmdWaitEvents, vvl::Func::vkCmdWaitEvents2, vvl::Func::vkCmdWaitEvents2KHR})) {
+        additional_info.message_type_override = nullptr;
+    }
 
+    additional_info.access_action = "performs image layout transition on the";
+
+    const SyncImageBarrier* prior_barrier = nullptr;
+    if (hazard.State().prior_access_index == SYNC_IMAGE_LAYOUT_TRANSITION && hazard.PriorTag() != kInvalidTag) {
+        prior_barrier = env.usage_info_provider.GetResourceUsageInfo(hazard.PriorTagEx()).image_barrier;
+    }
     std::ostringstream ss;
-    ss << vvl::String(recorded_usage_info.command);
-    if (!recorded_usage_info.debug_region_name.empty()) {
-        ss << "[" << recorded_usage_info.debug_region_name << "]";
+    if (prior_barrier) {
+        ss << "\nBarrier for current layout transition:";
     }
-    if (exec_context.Handle().type == kVulkanObjectTypeQueue) {
-        ss << " (from " << validator_.FormatHandle(recorded_context.Handle());
-        ss << " submitted on the current ";
-        ss << validator_.FormatHandle(exec_context.Handle()) << ")";
-    } else {  // primary command buffer executes secondary one
-        assert(exec_context.Handle().type == kVulkanObjectTypeCommandBuffer);
-        ss << " (from the secondary " << validator_.FormatHandle(recorded_context.Handle()) << ")";
+    FormatImageBarrier(ss, barrier);
+    if (prior_barrier) {
+        ss << "\nBarrier for prior layout transition:";
+        FormatImageBarrier(ss, *prior_barrier);
     }
-    additional_info.access_initiator = ss.str();
+    additional_info.message_end_text += ss.str();
 
-    std::ostringstream ss2;
-    if (prior_usage_info.queue) {
-        if (prior_usage_info.cb) {
-            ss2 << "(from " << validator_.FormatHandle(prior_usage_info.cb->Handle());
-            ss2 << " submitted on " << validator_.FormatHandle(prior_usage_info.queue->Handle()) << ")";
-        } else {  // QueuePresent case (not recorded into command buffer)
-            ss2 << "(submitted on " << validator_.FormatHandle(prior_usage_info.queue->Handle()) << ")";
-        }
-    } else if (prior_usage_info.cb) {
-        // TODO: distinuish between "native" primary command buffer commands and
-        // command recorded from the secondary command buffers.
-        ss2 << "(from the primary " << validator_.FormatHandle(prior_usage_info.cb->Handle()) << ")";
-    }
-    additional_info.brief_description_end_text = ss2.str();
-
-    if (!recorded_usage_info.debug_region_name.empty()) {
-        additional_info.properties.Add(kPropertyDebugRegion, recorded_usage_info.debug_region_name);
-    }
-
-    // Use generic "resource" when resource handle is not specified for some reason (likely just a missing code).
-    // TODO: specify resources in EndRenderPass (NegativeSyncVal.QSOBarrierHazard).
-    const std::string resource_description = (recorded_usage_info.resource_handle != NullVulkanTypedHandle)
-                                                 ? validator_.FormatHandle(recorded_usage_info.resource_handle)
-                                                 : "resource";
-    return Error(hazard, exec_context, recorded_usage_info.command, resource_description, "SubmitTimeError", additional_info);
+    return Error(env, hazard, command, resource_description, "ImageBarrierError", additional_info);
 }
 
 std::string ErrorMessages::PresentError(const HazardResult& hazard, const QueueBatchContext& batch_context, vvl::Func command,
@@ -474,12 +536,14 @@ std::string ErrorMessages::PresentError(const HazardResult& hazard, const QueueB
     AdditionalMessageInfo additional_info;
     additional_info.access_action = "presents";
     additional_info.properties.Add(kPropertySwapchainIndex, swapchain_index);
-    return Error(hazard, batch_context, command, resource_description, "PresentError", additional_info);
+    return Error(batch_context.GetSyncEnvironment(), hazard, command, resource_description, "PresentError", additional_info);
 }
 
-std::string ErrorMessages::VideoError(const HazardResult& hazard, const CommandBufferAccessContext& cb_context, vvl::Func command,
+std::string ErrorMessages::VideoError(const SyncEnvironment& env, const HazardResult& hazard, const ErrorReporter& reporter,
                                       const std::string& resource_description) const {
-    return Error(hazard, cb_context, command, resource_description, "VideoError");
+    AdditionalMessageInfo additional_info;
+    const vvl::Func command = AddReplayInfo(env, hazard, reporter, additional_info);
+    return Error(env, hazard, command, resource_description, "VideoError", additional_info);
 }
 
 }  // namespace syncval

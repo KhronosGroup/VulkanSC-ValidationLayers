@@ -589,7 +589,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, StoreBarrierCoopMatLoad) {
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatStoreBarrierLoad) {
@@ -622,7 +622,70 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatStoreBarrierLoad) {
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
+}
+
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13098
+TEST_F(PositiveGpuAVSharedMemoryDataRace, StoreBarrierCoopMatLoadRuntimeStride) {
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::cooperativeMatrix);
+    AddRequiredExtensions(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_KHR_cooperative_matrix : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
+        layout(local_size_x = 128) in;
+        shared float16_t arr[16*16];
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> mat;
+        void main() {
+            for (uint i = gl_LocalInvocationIndex; i < 16*16; i += gl_WorkGroupSize.x) {
+                arr[i] = float16_t(i);
+            }
+            barrier();
+            uint stride = gl_LocalInvocationIndex < gl_WorkGroupSize.x ? 16 : 32;
+            coopMatLoad(mat, arr, 0, stride, gl_CooperativeMatrixLayoutRowMajor);
+        }
+    )glsl";
+
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
+}
+
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13098
+TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatStoreBarrierLoadRuntimeStride) {
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    AddRequiredFeature(vkt::Feature::cooperativeMatrix);
+    AddRequiredExtensions(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+
+    const char* shader_source = R"glsl(
+        #version 450
+        #extension GL_KHR_cooperative_matrix : enable
+        #extension GL_KHR_memory_scope_semantics : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+        #extension GL_KHR_shader_subgroup_basic : enable
+
+        layout(local_size_x = 128) in;
+        shared float16_t arr[32*32];
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> mat;
+        void main() {
+            if (gl_SubgroupID < 4) {
+                uint sx = gl_SubgroupID % 2;
+                uint sy = gl_SubgroupID / 2;
+                uint stride = gl_LocalInvocationIndex < gl_WorkGroupSize.x ? 32 : 16;
+                coopMatStore(mat, arr, sx * 16 + sy * 32 * 16, stride, gl_CooperativeMatrixLayoutRowMajor);
+            }
+            barrier();
+            float16_t sum = float16_t(0);
+            for (uint i = gl_LocalInvocationIndex; i < 32*32; i += gl_WorkGroupSize.x) {
+                sum += arr[i];
+            }
+        }
+    )glsl";
+
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjoint) {
@@ -655,7 +718,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjoint) {
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, StoreBarrierCoopMatLoadWorkgroup) {
@@ -684,7 +747,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, StoreBarrierCoopMatLoadWorkgroup) {
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_WORKGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_WORKGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatStoreBarrierLoadWorkgroup) {
@@ -714,7 +777,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatStoreBarrierLoadWorkgroup) {
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_WORKGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_WORKGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointVector) {
@@ -747,7 +810,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointVector)
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointFloat) {
@@ -780,7 +843,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointFloat) 
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointVec4) {
@@ -813,7 +876,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointVec4) {
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointUint8) {
@@ -848,7 +911,7 @@ TEST_F(PositiveGpuAVSharedMemoryDataRace, CoopMatLoadCoopMatStoreDisjointUint8) 
         }
     )glsl";
 
-    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_2, VK_SCOPE_SUBGROUP_KHR);
+    TestHelper(shader_source, SPV_SOURCE_GLSL, SPV_ENV_VULKAN_1_3, VK_SCOPE_SUBGROUP_KHR);
 }
 
 // The SharedMemoryDataRace was early returning when gpuav_debug_max_instrumentations_count was reached,

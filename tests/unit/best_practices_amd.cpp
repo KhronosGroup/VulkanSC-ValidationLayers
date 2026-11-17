@@ -366,12 +366,7 @@ TEST_F(NegativeBestPracticesAMD, Barriers) {
     vkt::Image image(*m_device, image_ci);
 
     m_command_buffer.Begin();
-    // check for read-to-read barrier
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-PipelineBarrier-readToReadBarrier");
-    image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    m_command_buffer.TransitionLayout(image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-    m_errorMonitor->VerifyFound();
+    image.SetLayout(m_command_buffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     m_errorMonitor->SetUnexpectedError("VUID-VkImageMemoryBarrier-oldLayout-01197");
 
@@ -421,7 +416,9 @@ TEST_F(NegativeBestPracticesAMD, NumSyncPrimitives) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
 
-    constexpr int fence_warn_limit = 5;
+    // Recommended max is 3 fences, so the warning is expected on creating the 4th
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8469
+    constexpr int fence_warn_limit = 4;
     std::vector<vkt::Fence> test_fences;
     for (int i = 0; i < fence_warn_limit - 1; ++i) {
         test_fences.emplace_back(*m_device);
@@ -430,7 +427,8 @@ TEST_F(NegativeBestPracticesAMD, NumSyncPrimitives) {
     test_fences.emplace_back(*m_device);
     m_errorMonitor->VerifyFound();
 
-    constexpr int semaphore_warn_limit = 12;
+    // Recommended max is 10 semaphores, so the warning is expected on creating the 11th
+    constexpr int semaphore_warn_limit = 11;
     const VkSemaphoreCreateInfo semaphore_ci = vku::InitStructHelper();
     std::vector<vkt::Semaphore> test_semaphores(semaphore_warn_limit);
     for (int i = 0; i < semaphore_warn_limit - 1; ++i) {
@@ -580,4 +578,23 @@ TEST_F(NegativeBestPracticesAMD, ComputeWorkgroupSizeMaintenance5) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-LocalWorkgroup-Multiple64");
     pipe.CreateComputePipeline(false);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeBestPracticesAMD, SortAndBind) {
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe0(*this);
+    pipe0.CreateGraphicsPipeline();
+    CreatePipelineHelper pipe1(*this);
+    pipe1.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1);
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Pipeline-SortAndBind");
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
 }

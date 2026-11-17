@@ -17,8 +17,10 @@
  */
 
 #include "error_message/error_location.h"
+#include "generated/error_location_helper.h"
 #include "stateless/stateless_validation.h"
 #include "sl_vuid_maps.h"
+#include "containers/small_vector.h"
 
 namespace stateless {
 bool Instance::CheckPromotedApiAgainstVulkanVersion(VkInstance instance, const Location& loc,
@@ -26,7 +28,7 @@ bool Instance::CheckPromotedApiAgainstVulkanVersion(VkInstance instance, const L
     bool skip = false;
     if (api_version < promoted_version) {
         skip |= LogError("UNASSIGNED-API-Version-Violation", instance, loc,
-                         "Attempted to call with an effective API version of %s"
+                         "Attempted to call with an effective API version of %s, "
                          "but this API was not promoted until version %s.",
                          StringAPIVersion(api_version).c_str(), StringAPIVersion(promoted_version).c_str());
     }
@@ -41,7 +43,7 @@ bool Instance::CheckPromotedApiAgainstVulkanVersion(VkPhysicalDevice pdev, const
         auto effective_api_version = std::min(APIVersion(target_pdev->second->apiVersion), api_version);
         if (effective_api_version < promoted_version) {
             skip |= LogError(
-                "UNASSIGNED-API-Version-Violation", instance, loc,
+                "UNASSIGNED-API-Version-Violation", pdev, loc,
                 "Attempted to call with an effective API version of %s, "
                 "which is the minimum of version requested in pApplicationInfo (%s) and supported by this physical device (%s), "
                 "but this API was not promoted until version %s.",
@@ -161,15 +163,14 @@ bool Context::ValidateAllocationCallbacks(const VkAllocationCallbacks& callback,
                                     "VUID-VkAllocationCallbacks-pfnFree-00634");
 
     if (callback.pfnInternalAllocation) {
-        skip |=
-            ValidateRequiredPointer(loc.dot(Field::pfnInternalAllocation), reinterpret_cast<const void*>(callback.pfnInternalFree),
-                                    "VUID-VkAllocationCallbacks-pfnInternalAllocation-00635");
+        skip |= ValidateRequiredPointer(loc.dot(Field::pfnInternalFree), reinterpret_cast<const void*>(callback.pfnInternalFree),
+                                        "VUID-VkAllocationCallbacks-pfnInternalAllocation-00635");
     }
 
     if (callback.pfnInternalFree) {
-        skip |=
-            ValidateRequiredPointer(loc.dot(Field::pfnInternalFree), reinterpret_cast<const void*>(callback.pfnInternalAllocation),
-                                    "VUID-VkAllocationCallbacks-pfnInternalAllocation-00635");
+        skip |= ValidateRequiredPointer(loc.dot(Field::pfnInternalAllocation),
+                                        reinterpret_cast<const void*>(callback.pfnInternalAllocation),
+                                        "VUID-VkAllocationCallbacks-pfnInternalAllocation-00635");
     }
     return skip;
 }
@@ -220,7 +221,7 @@ bool Context::ValidatePnextStructExtension(const Location& loc, const VkBaseOutS
                 skip |= log.LogWarning(
                     "WARNING-VkPipelineCreateFlags2CreateInfo-Extension", error_obj.handle, loc.dot(Field::pNext),
                     "points to a VkPipelineCreateFlags2CreateInfo struct but VK_KHR_maintenance5 has not been enabled. "
-                    "Without checking for and enabling the extension, you might have a situation where your buffer usage "
+                    "Without checking for and enabling the extension, you might have a situation where your pipeline create "
                     "flags are ignored if the driver doesn't support VK_KHR_maintenance5");
             }
         } break;
@@ -241,11 +242,16 @@ bool Context::ValidateStructPnext(const Location& loc, const void* next, size_t 
     }
 
     if (next != nullptr) {
-        vvl::unordered_set<const void*> cycle_check;
-        vvl::unordered_set<VkStructureType, vvl::hash<int>> unique_stype_check;
+        // We assume pNext chains are small and normally have 1 or 2 pNext at most and can do a simple linear search.
+        // This also keeps the allocation on the stack (instead of using an unorderd_set)
+        small_vector<VkStructureType, 16> unique_stype_check;
+        if (loc.function == vvl::Func::vkCreateDevice) {
+            unique_stype_check.reserve(128);  // exception, pass all the feature structs
+        }
+
         const char* disclaimer =
             "This error is based on the Valid Usage documentation for version %" PRIu32
-            " of the Vulkan header.  It is possible that "
+            " of the Vulkan header.\nIt is possible that "
             "you are using a struct from a private extension or an extension that was added to a later version of the Vulkan "
             "header, in which case the use of %s is undefined and may not work correctly with validation enabled";
 
@@ -263,13 +269,16 @@ bool Context::ValidateStructPnext(const Location& loc, const void* next, size_t 
             while (current != nullptr) {
                 if ((loc.function != Func::vkCreateInstance || (current->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO)) &&
                     (loc.function != Func::vkCreateDevice || (current->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO))) {
-                    if (unique_stype_check.find(current->sType) != unique_stype_check.end() && !IsDuplicatePnext(current->sType)) {
+                    const bool is_duplicate =
+                        std::find(unique_stype_check.begin(), unique_stype_check.end(), current->sType) != unique_stype_check.end();
+                    if (is_duplicate && !IsDuplicatePnext(current->sType)) {
                         // stype_vuid will only be null if there are no listed pNext and will hit disclaimer check
                         skip |= log.LogError(stype_vuid, error_obj.handle, pNext_loc,
                                              "chain contains duplicate structure types: %s appears multiple times.\n%s",
                                              string_VkStructureName(current->sType), PrintPNextChain(loc.structure, next).c_str());
-                    } else {
-                        unique_stype_check.insert(current->sType);
+                        break;  // stop looping (since a circular cycle might have been hit)
+                    } else if (!is_duplicate) {
+                        unique_stype_check.emplace_back(current->sType);
                     }
 
                     if (std::find(start, end, current->sType) == end) {
@@ -281,9 +290,13 @@ bool Context::ValidateStructPnext(const Location& loc, const void* next, size_t 
                                                  PrintPNextChain(Struct::Empty, next).c_str(), header_version,
                                                  pNext_loc.Fields().c_str());
                         } else {
-                            std::string message = "chain includes a structure with unexpected VkStructureType %s.\n%s\n";
+                            const bool likley_null = current->sType == VK_STRUCTURE_TYPE_APPLICATION_INFO;
+                            std::string message = "chain includes a structure with unexpected VkStructureType %s.%s\n%s\n";
                             message += disclaimer;
                             skip |= log.LogError(pnext_vuid, error_obj.handle, pNext_loc, message.c_str(), type_name.c_str(),
+                                                 likley_null ? "\nHint: You likely forgot to set the sType in the struct as "
+                                                               "VK_STRUCTURE_TYPE_APPLICATION_INFO is the value zero."
+                                                             : "",
                                                  PrintPNextChain(Struct::Empty, next).c_str(), header_version,
                                                  pNext_loc.Fields().c_str());
                         }
@@ -364,7 +377,8 @@ bool Context::ValidateFlagsImplementation(const Location& loc, vvl::FlagBitmask 
     bool skip = false;
 
     const bool required = flag_type == kRequiredFlags || flag_type == kRequiredSingleBit;
-    const char* zero_vuid = flag_type == kRequiredFlags ? flags_zero_vuid : vuid;
+    // Normally zero is invalid already, but a few cases still pass an explicit |flags_zero_vuid| in
+    const char* zero_vuid = (flag_type == kRequiredFlags && flags_zero_vuid) ? flags_zero_vuid : vuid;
     if (required && value == 0) {
         skip |= log.LogError(zero_vuid, error_obj.handle, loc, "is zero.");
     }
@@ -377,8 +391,9 @@ bool Context::ValidateFlagsImplementation(const Location& loc, vvl::FlagBitmask 
 
     const bool is_bits_type = flag_type == kRequiredSingleBit || flag_type == kOptionalSingleBit;
     if (is_bits_type && !HasMaxOneBitSet(value)) {
-        skip |= log.LogError(vuid, error_obj.handle, loc, "contains multiple members of %s when only a single value is allowed.",
-                             String(flag_bitmask));
+        skip |= log.LogError(vuid, error_obj.handle, loc,
+                             "(0x%" PRIx64 ") contains multiple members of %s when only a single value is allowed.",
+                             static_cast<uint64_t>(value), String(flag_bitmask));
     }
 
     return skip;
@@ -407,7 +422,7 @@ bool Context::ValidateFlags(const Location& loc, vvl::FlagBitmask flag_bitmask, 
             // This is a quick fix, without adding yet another ValidateFlags overload, to give better info around WSI
             const bool image_usage_hint = loc.field == Field::imageUsage;
             skip |=
-                log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that requires the extensions %s.%s",
+                log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that require the extensions %s.%s",
                              String(flag_bitmask), DescribeFlagBitmaskValue(flag_bitmask, value).c_str(), String(required).c_str(),
                              image_usage_hint ? "\nHint: Make sure to filter the supportedUsageFlags from "
                                                 "vkGetPhysicalDeviceSurfaceCapabilitiesKHR to only use what is desired."
@@ -435,7 +450,7 @@ bool Context::ValidateFlags(const Location& loc, vvl::FlagBitmask flag_bitmask, 
     if (!skip && value != 0) {
         vvl::Extensions required = IsValidFlag64Value(flag_bitmask, value, instance_function);
         if (!required.empty()) {
-            skip |= log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that requires the extensions %s.",
+            skip |= log.LogError(vuid, error_obj.handle, loc, "has %s values (%s) that require the extensions %s.",
                                  String(flag_bitmask), DescribeFlagBitmaskValue64(flag_bitmask, value).c_str(),
                                  String(required).c_str());
         }
@@ -456,7 +471,8 @@ bool Context::ValidateFlagsArray(const Location& count_loc, const Location& arra
         for (uint32_t i = 0; i < count; ++i) {
             if ((array[i] & (~all_flags)) != 0) {
                 skip |= log.LogError(array_required_vuid, error_obj.handle, array_loc.dot(i),
-                                     "contains flag bits that are not recognized members of %s.", String(flag_bitmask));
+                                     "contains flag bits (0x%" PRIx32 ") which are not recognized members of %s.", array[i],
+                                     String(flag_bitmask));
             }
         }
     }

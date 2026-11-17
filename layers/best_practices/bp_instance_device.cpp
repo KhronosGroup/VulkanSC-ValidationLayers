@@ -20,9 +20,7 @@
 #include "best_practices/best_practices_validation.h"
 #include "generated/dispatch_functions.h"
 #include "best_practices/bp_state.h"
-#include "state_tracker/event_state.h"
 #include "state_tracker/queue_state.h"
-#include "state_tracker/device_state.h"
 
 bool bp_state::Instance::ValidateSpecialUseExtensions(const Location& loc, vvl::Extension extension) const {
     bool skip = false;
@@ -132,11 +130,11 @@ bool bp_state::Instance::PreCallValidateCreateDevice(VkPhysicalDevice physicalDe
             pCreateInfo->pEnabledFeatures->robustBufferAccess) {
             skip |= LogPerformanceWarning(
                 "BestPractices-vkCreateDevice-RobustBufferAccess", instance, error_obj.location,
-                "%s %s %s: called with enabled robustBufferAccess. Use robustBufferAccess as a debugging tool during "
+                "%s: called with enabled robustBufferAccess. Use robustBufferAccess as a debugging tool during "
                 "development. Enabling it causes loss in performance for accesses to uniform buffers and shader storage "
                 "buffers. Disable robustBufferAccess in release builds. Only leave it enabled if the application use-case "
                 "requires the additional level of reliability due to the use of unverified user-supplied draw parameters.",
-                VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorIMG));
+                VendorSpecificTag(kBPVendorArm | kBPVendorAMD | kBPVendorIMG).c_str());
         }
     }
 
@@ -203,19 +201,11 @@ bool bp_state::Instance::PreCallValidateGetPhysicalDeviceQueueFamilyProperties2K
 }
 
 ReadLockGuard BestPractices::ReadLock() const {
-    if (global_settings.fine_grained_locking) {
-        return ReadLockGuard(validation_object_mutex, std::defer_lock);
-    } else {
-        return ReadLockGuard(validation_object_mutex);
-    }
+    return ReadLockGuard(validation_object_mutex, std::defer_lock);
 }
 
 WriteLockGuard BestPractices::WriteLock() {
-    if (global_settings.fine_grained_locking) {
-        return WriteLockGuard(validation_object_mutex, std::defer_lock);
-    } else {
-        return WriteLockGuard(validation_object_mutex);
-    }
+    return WriteLockGuard(validation_object_mutex, std::defer_lock);
 }
 
 void BestPractices::PreCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
@@ -257,7 +247,7 @@ struct EventValidator {
                         "BestPractices-Event-SignalSignaledEvent", objlist, cb_loc,
                         "%s sets event %s which is already in the signaled state (set by previously submitted command buffers or "
                         "from the host). If this is not the desired behavior, the event must be reset before it is set again.",
-                        bp.FormatHandle(cb.VkHandle()).c_str(), bp.FormatHandle(event).c_str());
+                        bp.FormatHandle(cb.Handle()).c_str(), bp.FormatHandle(event).c_str());
                 }
             }
             signaling_state[event] = info.signaled;

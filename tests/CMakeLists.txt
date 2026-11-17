@@ -28,12 +28,49 @@ endif()
 
 add_subdirectory(framework)
 
+# Compiles the sources in <target>_objects which, unlike <target>, does not depend on vvl,
+# so that VS can build them in parallel with vvl.
+# <target> still lists them, uncompiled, for VS Solution Explorer.
+function(vvl_add_test_sources target)
+    set(OBJECTS_TARGET ${target}_objects)
+    set(OBJECTS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    list(TRANSFORM ARGN PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/" OUTPUT_VARIABLE OBJECTS_SOURCES)
+    # Source file properties are per directory, so add the object library from its own (generated) one
+    file(CONFIGURE OUTPUT objects/CMakeLists.txt @ONLY CONTENT [[
+        add_library(${OBJECTS_TARGET} OBJECT ${OBJECTS_SOURCES})
+        target_link_libraries(${OBJECTS_TARGET} PRIVATE vk_test_framework)
+        source_group(TREE "${OBJECTS_SOURCE_DIR}" FILES ${OBJECTS_SOURCES})
+        set_target_properties(${OBJECTS_TARGET} PROPERTIES FOLDER "TestObjects")
+    ]])
+    add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/objects ${CMAKE_CURRENT_BINARY_DIR}/objects)
+
+    target_sources(${target} PRIVATE ${OBJECTS_SOURCES})
+    set_source_files_properties(${OBJECTS_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+    source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${OBJECTS_SOURCES})
+
+    if(CMAKE_GENERATOR MATCHES "Visual Studio")
+        # Give the objects to the linker at build time, so Solution Explorer does not list them
+        file(GENERATE OUTPUT ${target}_objects_$<CONFIG>.targets CONTENT
+            "<Project><Target Name='LinkTestObjects' AfterTargets='ComputeLinkInputsFromProject'>
+                <ItemGroup><Link Include='$<TARGET_OBJECTS:${OBJECTS_TARGET}>'/></ItemGroup>
+            </Target></Project>")
+        set_target_properties(${target} PROPERTIES
+            VS_GLOBAL_ForceImportAfterCppTargets ${CMAKE_CURRENT_BINARY_DIR}/${target}_objects_$(Configuration).targets)
+        add_dependencies(${target} ${OBJECTS_TARGET})
+        target_link_libraries(${target} PRIVATE vk_test_framework)
+        target_include_directories(${target} PRIVATE $<TARGET_PROPERTY:${OBJECTS_TARGET},INCLUDE_DIRECTORIES>)
+    else()
+        target_link_libraries(${target} PRIVATE ${OBJECTS_TARGET})
+    endif()
+endfunction()
+
 if (ANDROID)
     add_library(vk_layer_validation_tests MODULE)
 else()
     add_executable(vk_layer_validation_tests)
 endif()
-target_sources(vk_layer_validation_tests PRIVATE
+
+set(TEST_SOURCES
     unit/android_hardware_buffer.cpp
     unit/android_hardware_buffer_positive.cpp
     unit/android_external_resolve.cpp
@@ -64,10 +101,10 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/legacy_positive.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
-    unit/descriptor_heap.cpp
-    unit/descriptor_heap_positive.cpp
-    unit/descriptor_heap_untyped.cpp
-    unit/descriptor_heap_untyped_positive.cpp
+    unit/descriptor_heap_ext.cpp
+    unit/descriptor_heap_ext_positive.cpp
+    unit/descriptor_heap_untyped_ext.cpp
+    unit/descriptor_heap_untyped_ext_positive.cpp
     unit/descriptor_indexing.cpp
     unit/descriptor_indexing_positive.cpp
     unit/descriptors.cpp
@@ -116,8 +153,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_descriptor_class_general_buffer_coop_mat_positive.cpp
     unit/gpu_av_descriptor_class_texel_buffer.cpp
     unit/gpu_av_descriptor_class_texel_buffer_positive.cpp
-    unit/gpu_av_descriptor_heap.cpp
-    unit/gpu_av_descriptor_heap_positive.cpp
+    unit/gpu_av_descriptor_heap_ext.cpp
+    unit/gpu_av_descriptor_heap_ext_positive.cpp
     unit/gpu_av_descriptor_indexing.cpp
     unit/gpu_av_descriptor_indexing_positive.cpp
     unit/gpu_av_descriptor_post_process.cpp
@@ -129,7 +166,9 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_mesh.cpp
     unit/gpu_av_mesh_positive.cpp
     unit/gpu_av_positive.cpp
-    unit/gpu_av_shader_object_positive.cpp
+    unit/gpu_av_scoped.cpp
+    unit/gpu_av_scoped_positive.cpp
+    unit/gpu_av_shader_object_ext_positive.cpp
     unit/gpu_av_shader_debug_info.cpp
     unit/gpu_av_shader_sanitizer.cpp
     unit/gpu_av_shader_sanitizer_positive.cpp
@@ -192,13 +231,10 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/push_descriptor_positive.cpp
     unit/query_positive.cpp
     unit/ray_tracing.cpp
-    unit/ray_tracing_nv.cpp
     unit/ray_tracing_micromap.cpp
     unit/ray_tracing_micromap_positive.cpp
     unit/ray_tracing_pipeline.cpp
     unit/ray_tracing_pipeline_positive.cpp
-    unit/ray_tracing_pipeline_nv.cpp
-    unit/ray_tracing_pipeline_positive_nv.cpp
     unit/ray_tracing_positive.cpp
     unit/render_pass_positive.cpp
     unit/render_pass.cpp
@@ -225,8 +261,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/shader_limits_positive.cpp
     unit/shader_mesh.cpp
     unit/shader_mesh_positive.cpp
-    unit/shader_object.cpp
-    unit/shader_object_positive.cpp
+    unit/shader_object_ext.cpp
+    unit/shader_object_ext_positive.cpp
     unit/shader_push_constants.cpp
     unit/shader_push_constants_positive.cpp
     unit/shader_spirv.cpp
@@ -296,6 +332,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/video_encode_feedback2_positive.cpp
     unit/video_encode_quantization_map.cpp
     unit/video_encode_quantization_map_positive.cpp
+    unit/video_encode_rgb_conversion.cpp
     unit/viewport_inheritance.cpp
     unit/wsi.cpp
     unit/wsi_positive.cpp
@@ -306,19 +343,33 @@ target_sources(vk_layer_validation_tests PRIVATE
     vvl_utils/small_vector.cpp
     vvl_utils/pnext_chain_extraction.cpp
 )
+vvl_add_test_sources(vk_layer_validation_tests ${TEST_SOURCES})
 
-target_include_directories(vk_layer_validation_tests PRIVATE
+target_include_directories(vk_layer_validation_tests_objects PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
-get_target_property(TEST_SOURCES vk_layer_validation_tests SOURCES)
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${TEST_SOURCES})
+# Precompiled headers drastically improves compilation time
+#
+# Note: If using ccache, you will want:
+#       export CCACHE_SLOPPINESS="pch_defines,time_macros"
+# - |pch_defines| covers the one call that generates the .pch
+# - |time_macros| covers the calls that consume the .pch
+#
+# Use CMAKE_DISABLE_PRECOMPILE_HEADERS to turn off
+target_precompile_headers(vk_layer_validation_tests_objects PRIVATE
+    # Included a lot, costly
+	<algorithm>
+    # Those files end up being included by every TU,
+    # so we already paid the cost of modifying them
+    <glslang/Public/ShaderLang.h>
+    <vulkan/vulkan_core.h>
+    <vulkan/utility/vk_struct_helper.hpp>
+    framework/layer_validation_tests.h
+    framework/test_common.h
+)
 
 add_dependencies(vk_layer_validation_tests vvl)
-
-target_link_libraries(vk_layer_validation_tests PRIVATE
-    vk_test_framework
-)
 
 # More details in tests/android/mock/README.md
 option(VVL_MOCK_ANDROID "Enable building for Android on desktop for testing with MockICD setup")
@@ -345,13 +396,14 @@ if(SLANG_INSTALL_DIR)
 endif()
 
 include(GoogleTest)
-# If cross-compiling, discovery will use an executable with the wrong architecture and stop execution here.
+# Discover the tests when running ctest (PRE_TEST), not after every link (POST_BUILD): listing the tests
+# costs ~11 s after each link of vk_layer_validation_tests.
+# If cross-compiling, discovery will use an executable with the wrong architecture and fail.
 # Set env. variable VVL_SKIP_GTEST_DISCOVERY to skip discovery.
 if(NOT VVL_SKIP_GTEST_DISCOVERY)
-    gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
+    gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100 DISCOVERY_MODE PRE_TEST)
 endif()
 
 add_subdirectory(stress)
 add_subdirectory(undefined)
-add_subdirectory(layers)
 add_subdirectory(icd)

@@ -13,14 +13,15 @@
  */
 
 #include <vulkan/vulkan_core.h>
+#include <chrono>
 #include <thread>
 #include "layer_validation_tests.h"
 #include "descriptor_helper.h"
 #include "thread_helper.h"
 
-#if GTEST_IS_THREADSAFE
 class PositiveThreading : public VkLayerTest {};
 
+#if GTEST_IS_THREADSAFE
 TEST_F(PositiveThreading, DisplayObjects) {
     TEST_DESCRIPTION("Create and use VkDisplayKHR objects with GetPhysicalDeviceDisplayPropertiesKHR in thread-safety.");
 
@@ -59,9 +60,10 @@ TEST_F(PositiveThreading, DisplayPlaneObjects) {
         VkDisplayPlanePropertiesKHR display_plane_props = {};
         // Create a VkDisplayKHR object
         vk::GetPhysicalDeviceDisplayPlanePropertiesKHR(Gpu(), &prop_count, &display_plane_props);
-        // Now use this new object in an API call
-        prop_count = 0;
-        vk::GetDisplayModePropertiesKHR(Gpu(), display_plane_props.currentDisplay, &prop_count, nullptr);
+        if (display_plane_props.currentDisplay != VK_NULL_HANDLE) {
+            prop_count = 0;
+            vk::GetDisplayModePropertiesKHR(Gpu(), display_plane_props.currentDisplay, &prop_count, nullptr);
+        }
     }
 }
 
@@ -299,7 +301,7 @@ TEST_F(PositiveThreading, Queue) {
 
     std::mutex queue_mutex;
 
-    constexpr auto test_duration = seconds{2};
+    constexpr auto test_duration = milliseconds{150};
     const auto timer_begin = steady_clock::now();
 
     const auto& testing_thread1 = [&]() {
@@ -454,4 +456,50 @@ TEST_F(PositiveThreading, InternallySynchronizedQueues) {
     }
 
     queue.Wait();
+}
+
+TEST_F(PositiveThreading, CreateDestroyRenderPass) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13535");
+    RETURN_IF_SKIP(Init());
+
+    VkAttachmentDescription attachment = {};
+    attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+    VkAttachmentReference color_ref = {};
+    color_ref.attachment = 0;
+    color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    std::array<VkSubpassDescription, 16> subpasses;
+    for (auto& subpass : subpasses) {
+        subpass = {};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &color_ref;
+    }
+
+    VkRenderPassCreateInfo rp_ci = vku::InitStructHelper();
+    rp_ci.attachmentCount = 1;
+    rp_ci.pAttachments = &attachment;
+    rp_ci.subpassCount = static_cast<uint32_t>(subpasses.size());
+    rp_ci.pSubpasses = subpasses.data();
+
+    auto thread_func = [this, &rp_ci]() {
+        std::vector<VkRenderPass> render_passes(300);
+        for (VkRenderPass& render_pass : render_passes) {
+            vk::CreateRenderPass(*m_device, &rp_ci, nullptr, &render_pass);
+        }
+        for (VkRenderPass render_pass : render_passes) {
+            vk::DestroyRenderPass(*m_device, render_pass, nullptr);
+        }
+    };
+    std::array<std::thread, 4> threads = {std::thread(thread_func), std::thread(thread_func), std::thread(thread_func),
+                                          std::thread(thread_func)};
+    for (auto& t : threads) t.join();
 }

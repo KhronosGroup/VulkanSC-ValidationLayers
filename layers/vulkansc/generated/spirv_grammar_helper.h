@@ -30,13 +30,6 @@
 #include <vector>
 #include <spirv/unified1/spirv.hpp>
 
-const char* string_SpvOpcode(uint32_t opcode);
-const char* string_SpvStorageClass(uint32_t storage_class);
-const char* string_SpvExecutionModel(uint32_t execution_model);
-const char* string_SpvExecutionMode(uint32_t execution_mode);
-const char* string_SpvDecoration(uint32_t decoration);
-const char* string_SpvBuiltIn(spv::BuiltIn built_in);
-const char* string_SpvDim(uint32_t dim);
 std::string string_SpvCooperativeMatrixOperands(uint32_t mask);
 std::string string_SpvRayFlagsMask(uint32_t mask);
 const char* string_SpvFPEncoding(spv::FPEncoding value);
@@ -65,6 +58,7 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpInBoundsAccessChain:
         case spv::OpPtrAccessChain:
         case spv::OpArrayLength:
+        case spv::OpGenericPtrMemSemantics:
         case spv::OpInBoundsPtrAccessChain:
         case spv::OpVectorExtractDynamic:
         case spv::OpVectorInsertDynamic:
@@ -103,6 +97,9 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpQuantizeToF16:
         case spv::OpConvertPtrToU:
         case spv::OpConvertUToPtr:
+        case spv::OpPtrCastToGeneric:
+        case spv::OpGenericCastToPtr:
+        case spv::OpGenericCastToPtrExplicit:
         case spv::OpBitcast:
         case spv::OpSNegate:
         case spv::OpFNegate:
@@ -270,6 +267,7 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpGraphConstantARM:
         case spv::OpGraphARM:
         case spv::OpGraphInputARM:
+        case spv::OpBitcastExtractEXT:
         case spv::OpUntypedVariableKHR:
         case spv::OpUntypedAccessChainKHR:
         case spv::OpUntypedInBoundsAccessChainKHR:
@@ -310,9 +308,11 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpImageBlockMatchWindowSADQCOM:
         case spv::OpImageBlockMatchGatherSSDQCOM:
         case spv::OpImageBlockMatchGatherSADQCOM:
+        case spv::OpBFloat16MulAddQCOM:
         case spv::OpCompositeConstructCoopMatQCOM:
         case spv::OpCompositeExtractCoopMatQCOM:
         case spv::OpExtractSubArrayQCOM:
+        case spv::OpImageGatherQCOM:
         case spv::OpGroupIAddNonUniformAMD:
         case spv::OpGroupFAddNonUniformAMD:
         case spv::OpGroupFMinNonUniformAMD:
@@ -353,7 +353,7 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpImageSampleFootprintNV:
         case spv::OpCooperativeVectorMatrixMulNV:
         case spv::OpCooperativeVectorMatrixMulAddNV:
-        case spv::OpCooperativeMatrixConvertNV:
+        case spv::OpCooperativeMatrixConvertUseEXT:
         case spv::OpGroupNonUniformPartitionEXT:
         case spv::OpFetchMicroTriangleVertexPositionNV:
         case spv::OpFetchMicroTriangleVertexBarycentricNV:
@@ -386,9 +386,10 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpCooperativeMatrixLoadNV:
         case spv::OpCooperativeMatrixMulAddNV:
         case spv::OpCooperativeMatrixLengthNV:
-        case spv::OpCooperativeMatrixReduceNV:
+        case spv::OpCooperativeMatrixGetCoordinateEXT:
+        case spv::OpCooperativeMatrixReduceEXT:
         case spv::OpCooperativeMatrixLoadTensorNV:
-        case spv::OpCooperativeMatrixPerElementOpNV:
+        case spv::OpCooperativeMatrixPerElementOpEXT:
         case spv::OpCreateTensorLayoutNV:
         case spv::OpTensorLayoutSetDimensionNV:
         case spv::OpTensorLayoutSetStrideNV:
@@ -459,6 +460,7 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpRayQueryGetIntersectionWorldToObjectKHR:
         case spv::OpAtomicFAddEXT:
         case spv::OpArithmeticFenceEXT:
+        case spv::OpSubgroupBitcastShuffleINTEL:
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
         case spv::OpBitwiseFunctionINTEL:
         case spv::OpUntypedVariableLengthArrayINTEL:
@@ -536,6 +538,7 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpInBoundsAccessChain:
         case spv::OpPtrAccessChain:
         case spv::OpArrayLength:
+        case spv::OpGenericPtrMemSemantics:
         case spv::OpInBoundsPtrAccessChain:
         case spv::OpDecorationGroup:
         case spv::OpVectorExtractDynamic:
@@ -575,6 +578,9 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpQuantizeToF16:
         case spv::OpConvertPtrToU:
         case spv::OpConvertUToPtr:
+        case spv::OpPtrCastToGeneric:
+        case spv::OpGenericCastToPtr:
+        case spv::OpGenericCastToPtrExplicit:
         case spv::OpBitcast:
         case spv::OpSNegate:
         case spv::OpFNegate:
@@ -745,6 +751,7 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpGraphARM:
         case spv::OpGraphInputARM:
         case spv::OpTypeGraphARM:
+        case spv::OpBitcastExtractEXT:
         case spv::OpTypeUntypedPointerKHR:
         case spv::OpUntypedVariableKHR:
         case spv::OpUntypedAccessChainKHR:
@@ -788,9 +795,11 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpImageBlockMatchWindowSADQCOM:
         case spv::OpImageBlockMatchGatherSSDQCOM:
         case spv::OpImageBlockMatchGatherSADQCOM:
+        case spv::OpBFloat16MulAddQCOM:
         case spv::OpCompositeConstructCoopMatQCOM:
         case spv::OpCompositeExtractCoopMatQCOM:
         case spv::OpExtractSubArrayQCOM:
+        case spv::OpImageGatherQCOM:
         case spv::OpGroupIAddNonUniformAMD:
         case spv::OpGroupFAddNonUniformAMD:
         case spv::OpGroupFMinNonUniformAMD:
@@ -834,7 +843,7 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpTypeVectorIdEXT:
         case spv::OpCooperativeVectorMatrixMulNV:
         case spv::OpCooperativeVectorMatrixMulAddNV:
-        case spv::OpCooperativeMatrixConvertNV:
+        case spv::OpCooperativeMatrixConvertUseEXT:
         case spv::OpGroupNonUniformPartitionEXT:
         case spv::OpFetchMicroTriangleVertexPositionNV:
         case spv::OpFetchMicroTriangleVertexBarycentricNV:
@@ -870,9 +879,10 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpCooperativeMatrixLoadNV:
         case spv::OpCooperativeMatrixMulAddNV:
         case spv::OpCooperativeMatrixLengthNV:
-        case spv::OpCooperativeMatrixReduceNV:
+        case spv::OpCooperativeMatrixGetCoordinateEXT:
+        case spv::OpCooperativeMatrixReduceEXT:
         case spv::OpCooperativeMatrixLoadTensorNV:
-        case spv::OpCooperativeMatrixPerElementOpNV:
+        case spv::OpCooperativeMatrixPerElementOpEXT:
         case spv::OpTypeTensorLayoutNV:
         case spv::OpTypeTensorViewNV:
         case spv::OpCreateTensorLayoutNV:
@@ -945,6 +955,7 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpRayQueryGetIntersectionWorldToObjectKHR:
         case spv::OpAtomicFAddEXT:
         case spv::OpArithmeticFenceEXT:
+        case spv::OpSubgroupBitcastShuffleINTEL:
         case spv::OpSubgroupMatrixMultiplyAccumulateINTEL:
         case spv::OpBitwiseFunctionINTEL:
         case spv::OpUntypedVariableLengthArrayINTEL:
@@ -1066,6 +1077,7 @@ static constexpr bool ImageGatherOperation(uint32_t opcode) {
         case spv::OpImageSparseDrefGather:
         case spv::OpImageBlockMatchGatherSSDQCOM:
         case spv::OpImageBlockMatchGatherSADQCOM:
+        case spv::OpImageGatherQCOM:
             return true;
         default:
             return false;
@@ -1279,6 +1291,7 @@ static constexpr uint32_t OpcodeImageOperandsPosition(uint32_t opcode) {
         case spv::OpImageSparseGather:
         case spv::OpImageSparseDrefGather:
             return 6;
+        case spv::OpImageGatherQCOM:
         case spv::OpImageSampleFootprintNV:
             return 7;
 
@@ -1325,9 +1338,41 @@ static constexpr uint32_t OpcodeImageAccessPosition(uint32_t opcode) {
         case spv::OpImageSparseGather:
         case spv::OpImageSparseDrefGather:
         case spv::OpImageSparseRead:
+        case spv::OpImageGatherQCOM:
         case spv::OpFragmentMaskFetchAMD:
         case spv::OpFragmentFetchAMD:
         case spv::OpImageSampleFootprintNV:
+            return 3;
+
+        default:
+            break;
+    }
+    return position;
+}
+
+// Return operand position of the 'Acceleration Structure' IdRef or zero if there is none.
+static constexpr uint32_t OpcodeAccelerationStructureAccessPosition(uint32_t opcode) {
+    uint32_t position = 0;
+    switch (opcode) {
+        case spv::OpTraceRayKHR:
+        case spv::OpTraceNV:
+        case spv::OpTraceMotionNV:
+        case spv::OpTraceRayMotionNV:
+            return 1;
+        case spv::OpRayQueryInitializeKHR:
+        case spv::OpHitObjectRecordHitMotionNV:
+        case spv::OpHitObjectRecordHitWithIndexMotionNV:
+        case spv::OpHitObjectTraceRayMotionNV:
+        case spv::OpHitObjectTraceRayNV:
+        case spv::OpHitObjectRecordHitNV:
+        case spv::OpHitObjectRecordHitWithIndexNV:
+        case spv::OpHitObjectTraceReorderExecuteEXT:
+        case spv::OpHitObjectTraceMotionReorderExecuteEXT:
+        case spv::OpHitObjectTraceRayEXT:
+        case spv::OpHitObjectTraceRayMotionEXT:
+            return 2;
+        case spv::OpFetchMicroTriangleVertexPositionNV:
+        case spv::OpFetchMicroTriangleVertexBarycentricNV:
             return 3;
 
         default:

@@ -18,7 +18,7 @@
 #include "stateless/stateless_validation.h"
 #include <spirv/unified1/spirv.hpp>
 #include "utils/math_utils.h"
-#include "utils/vk_api_utils.h"
+#include "utils/shader_utils.h"
 
 namespace stateless {
 
@@ -124,7 +124,9 @@ bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t cr
                                  "is VK_SHADER_CODE_TYPE_SPIRV_EXT, but pCode (%p) is not aligned to 4 bytes.", create_info.pCode);
             } else if (!IsIntegerMultipleOf(create_info.codeSize, 4)) {
                 skip |= LogError("VUID-VkShaderCreateInfoEXT-codeSize-08735", device, create_info_loc.dot(Field::codeSize),
-                                 "(%" PRIu64 ") is not a multiple of 4. You might have forgot to multiply by sizeof(uint32_t).",
+                                 "(%" PRIu64
+                                 ") is not a multiple of 4. You might have forgotten to multiply by "
+                                 "sizeof(uint32_t).",
                                  static_cast<uint64_t>(create_info.codeSize));
             } else {
                 // Can't cast this until we know it is aligned to 4 bytes or USAN will catch it
@@ -225,19 +227,30 @@ bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t cr
                                  string_VkShaderCreateFlagsEXT(create_info.flags).c_str(), create_info.setLayoutCount);
             } else if (create_info.pSetLayouts) {
                 skip |= LogError("VUID-VkShaderCreateInfoEXT-flags-11291", device, create_info_loc.dot(Field::flags),
-                                 "includes VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT (%s), but pSetLayouts is not NULL (0x%p).",
+                                 "includes VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT (%s), but pSetLayouts is not NULL (%p).",
                                  string_VkShaderCreateFlagsEXT(create_info.flags).c_str(), create_info.pSetLayouts);
             }
             if (create_info.pushConstantRangeCount != 0) {
-                skip |=
-                    LogError("VUID-VkShaderCreateInfoEXT-flags-11370", device, create_info_loc.dot(Field::flags),
-                             "includes VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT (%s), but pushConstantRangeCount is %" PRIu32 ".",
-                             string_VkShaderCreateFlagsEXT(create_info.flags).c_str(), create_info.pushConstantRangeCount);
+                skip |= LogError("VUID-VkShaderCreateInfoEXT-flags-11370", device, create_info_loc.dot(Field::flags),
+                                 "includes VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT (%s), but pushConstantRangeCount is %" PRIu32
+                                 ".\nHint: When using Descriptor Heaps instead of Push Constants you now use Push Data. The shader "
+                                 "code is the EXACT same, but on the API side you now just call vkCmdPushDataEXT and do not need "
+                                 "to deal with ranges or layouts.",
+                                 string_VkShaderCreateFlagsEXT(create_info.flags).c_str(), create_info.pushConstantRangeCount);
             } else if (create_info.pPushConstantRanges) {
-                skip |=
-                    LogError("VUID-VkShaderCreateInfoEXT-flags-11371", device, create_info_loc.dot(Field::flags),
-                             "includes VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT (%s), but pPushConstantRanges is not NULL (0x%p).",
-                             string_VkShaderCreateFlagsEXT(create_info.flags).c_str(), create_info.pPushConstantRanges);
+                skip |= LogError(
+                    "VUID-VkShaderCreateInfoEXT-flags-11371", device, create_info_loc.dot(Field::flags),
+                    "includes VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT (%s), but pPushConstantRanges is not NULL (%p).\nHint: "
+                    "When using Descriptor Heaps instead of Push Constants you now use Push Data. The shader code is the EXACT "
+                    "same, but on the API side you now just call vkCmdPushDataEXT and do not need to deal with ranges or layouts.",
+                    string_VkShaderCreateFlagsEXT(create_info.flags).c_str(), create_info.pPushConstantRanges);
+            }
+
+            if ((create_info.flags & VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR) != 0) {
+                skip |= LogError("VUID-VkShaderCreateInfoEXT-flags-12490", device, create_info_loc.dot(Field::flags),
+                                 "includes both VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT and "
+                                 "VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR\nflags = %s",
+                                 string_VkShaderCreateFlagsEXT(create_info.flags).c_str());
             }
         }
 
@@ -259,17 +272,17 @@ bool Device::manual_PreCallValidateCreateShadersEXT(VkDevice device, uint32_t cr
 
         if (const VkShaderDescriptorSetAndBindingMappingInfoEXT* mapping_info =
                 vku::FindStructInPNextChain<VkShaderDescriptorSetAndBindingMappingInfoEXT>(create_info.pNext)) {
-            skip |= ValidateShaderDescriptorSetAndBindingMappingInfo(*mapping_info, error_obj.location);
+            skip |= ValidateShaderDescriptorSetAndBindingMappingInfo(*mapping_info, create_info_loc);
         }
     }
 
     if (linked_heap_stage < createInfoCount && linked_non_heap_stage < createInfoCount) {
-        skip |= LogError(
-            "VUID-vkCreateShadersEXT-flags-11472", device,
-            error_obj.location.dot(Field::pCreateInfos, linked_heap_stage).dot(Field::flags),
-            "has both VK_SHADER_CREATE_LINK_STAGE_BIT_EXT and VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT, but pCreateInfos[%" PRIu32
-            "].flags has VK_SHADER_CREATE_LINK_STAGE_BIT_EXT, but not VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT.",
-            linked_non_heap_stage);
+        skip |= LogError("VUID-vkCreateShadersEXT-flags-11472", device,
+                         error_obj.location.dot(Field::pCreateInfos, linked_heap_stage).dot(Field::flags),
+                         "includes both VK_SHADER_CREATE_LINK_STAGE_BIT_EXT and VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT, while "
+                         "pCreateInfos[%" PRIu32
+                         "].flags includes VK_SHADER_CREATE_LINK_STAGE_BIT_EXT without VK_SHADER_CREATE_DESCRIPTOR_HEAP_BIT_EXT.",
+                         linked_non_heap_stage);
     }
 
     return skip;

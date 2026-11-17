@@ -86,8 +86,7 @@ TEST_F(NegativeImageLayout, Blit) {
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     m_errorMonitor->SetDesiredError("VUID-vkCmdBlitImage-srcImageLayout-00221");
     vk::CmdBlitImage(m_command_buffer, img_general, VK_IMAGE_LAYOUT_GENERAL, img_dst_transfer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                      1, &blit_region, VK_FILTER_LINEAR);
@@ -100,13 +99,119 @@ TEST_F(NegativeImageLayout, Blit) {
     img_barrier.image = img_dst_transfer;
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     m_errorMonitor->SetDesiredError("VUID-vkCmdBlitImage-dstImageLayout-00226");
     vk::CmdBlitImage(m_command_buffer, img_src_transfer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, img_dst_transfer,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit_region, VK_FILTER_LINEAR);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
+}
+
+TEST_F(NegativeImageLayout, LayoutTransitionSecondaryCommandBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    const VkImageSubresourceRange subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange = subresource_range;
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary.Begin();
+    secondary.Barrier(barrier);
+    secondary.End();
+
+    m_command_buffer.Begin();
+    m_command_buffer.TransitionLayout(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    m_command_buffer.ExecuteCommands(secondary);
+
+    VkClearColorValue clear_color{};
+    m_errorMonitor->SetDesiredError("VUID-vkCmdClearColorImage-imageLayout-00004");
+    vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &clear_color, 1, &subresource_range);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeImageLayout, SubmitTimeDebugRegion) {
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkFormat fmt = VK_FORMAT_R8G8B8A8_UNORM;
+    vkt::Image img_src_transfer(*m_device, 64, 64, fmt, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image img_color(*m_device, 64, 64, fmt,
+                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+    img_src_transfer.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    img_color.SetLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkImageBlit blit_region = {};
+    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.srcOffsets[0] = {0, 0, 0};
+    blit_region.srcOffsets[1] = {32, 32, 1};
+    blit_region.dstOffsets[0] = {32, 32, 0};
+    blit_region.dstOffsets[1] = {64, 64, 1};
+
+    VkDebugUtilsLabelEXT label = vku::InitStructHelper();
+
+    m_command_buffer.Begin();
+    label.pLabelName = "FrameWork";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    label.pLabelName = "BlitPass";
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    vk::CmdBlitImage(m_command_buffer, img_src_transfer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, img_color, VK_IMAGE_LAYOUT_GENERAL,
+                     1, &blit_region, VK_FILTER_LINEAR);
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDraw-None-09600", "Debug region: FrameWork::BlitPass");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImageLayout, SubmitTimeFrameID) {
+    AddRequiredExtensions(VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkFormat fmt = VK_FORMAT_R8G8B8A8_UNORM;
+    vkt::Image img_src_transfer(*m_device, 64, 64, fmt, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image img_color(*m_device, 64, 64, fmt,
+                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+    img_src_transfer.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    img_color.SetLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkImageBlit blit_region = {};
+    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.srcOffsets[1] = {64, 64, 1};
+    blit_region.dstOffsets[1] = {64, 64, 1};
+
+    m_command_buffer.Begin();
+    vk::CmdBlitImage(m_command_buffer, img_src_transfer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, img_color, VK_IMAGE_LAYOUT_GENERAL,
+                     1, &blit_region, VK_FILTER_LINEAR);
+    m_command_buffer.End();
+
+    VkFrameBoundaryEXT frame_boundary = vku::InitStructHelper();
+    frame_boundary.frameID = 42;
+    VkSubmitInfo submit_info = vku::InitStructHelper(&frame_boundary);
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_command_buffer.handle();
+
+    m_errorMonitor->SetDesiredErrorRegex("VUID-vkCmdDraw-None-09600", "frameID 42");
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
 }
 
 TEST_F(NegativeImageLayout, Compute) {
@@ -149,8 +254,7 @@ TEST_F(NegativeImageLayout, Compute) {
         cmd.End();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09600");
-        m_default_queue->Submit(cmd);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(cmd);
         m_errorMonitor->VerifyFound();
     }
 
@@ -164,8 +268,7 @@ TEST_F(NegativeImageLayout, Compute) {
         cmd.End();
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09600");
-        m_default_queue->Submit(cmd);
-        m_default_queue->Wait();
+        m_default_queue->SubmitAndWait(cmd);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -753,8 +856,7 @@ TEST_F(NegativeImageLayout, ArrayLayers) {
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     img_barrier.image = image;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
 
@@ -803,8 +905,7 @@ TEST_F(NegativeImageLayout, MultiArrayLayers) {
     img_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     img_barrier.image = image;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
 
@@ -937,9 +1038,8 @@ TEST_F(NegativeImageLayout, LayoutTransitionRenderPassObject) {
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(rp, fb);
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-oldLayout-01181");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &render_pass_barrier);
+    m_command_buffer.Barrier(render_pass_barrier, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT);
     m_errorMonitor->VerifyFound();
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();

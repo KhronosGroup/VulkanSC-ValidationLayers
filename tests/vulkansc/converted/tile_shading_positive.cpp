@@ -600,7 +600,7 @@ TEST_F(PositiveTileShading, LaunchTransformFeedbackOutsidePerTileExecutionModelS
     RETURN_IF_SKIP(InitBasicTileShading());
     InitTileShadingRenderTarget();
 
-    const char *vs_source = R"glsl(
+    const char* vs_source = R"glsl(
         #version 460
 
         layout(xfb_buffer = 0, xfb_stride = 16) out;
@@ -618,7 +618,7 @@ TEST_F(PositiveTileShading, LaunchTransformFeedbackOutsidePerTileExecutionModelS
             gl_Position = out_position;
         }
     )glsl";
-    const char *fs_source = R"glsl(
+    const char* fs_source = R"glsl(
         #version 460
 
         layout(location = 0) out vec4 out_color;
@@ -791,7 +791,7 @@ TEST_F(PositiveTileShading, DispatchReadImageBackingOfTileAttachmentAfterDrawWri
     tile_shading_graphics_pipe.gp_ci_.renderPass = m_tile_shading_render_pass;
     tile_shading_graphics_pipe.CreateGraphicsPipeline();
 
-    const char *cs_source = R"glsl(
+    const char* cs_source = R"glsl(
         #version 460
 
         #extension GL_QCOM_tile_shading : require

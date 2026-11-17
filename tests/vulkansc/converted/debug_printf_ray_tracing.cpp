@@ -161,7 +161,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenShaderRecordDescriptorHeap) {
     AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     AddRequiredFeature(vkt::Feature::accelerationStructure);
-    vkt::DescriptorHeap::AddDescriptorHeapRequirements(*this);
+    vkt::DescriptorHeapEXT::AddDescriptorHeapRequirements(*this);
     RETURN_IF_SKIP(InitDebugPrintfFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -187,15 +187,14 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenShaderRecordDescriptorHeap) {
 
     vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
 
-    vkt::DescriptorHeap desc_heap(*this);
+    vkt::DescriptorHeapEXT desc_heap(*this);
     desc_heap.CreateResourceHeap(1024, true);
     const VkDeviceSize as_heap_offset = desc_heap.WriteAccelerationStructureDescriptor(*tlas.GetDstAS());
 
     const VkDeviceSize as_descriptor_size =
         vk::GetPhysicalDeviceDescriptorSizeEXT(m_device->Physical(), VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR);
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping = MakeSetAndBindingMapping(0, 0);
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMappingEXT(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT;
     mapping.sourceData.shaderRecordIndex = {};
     mapping.sourceData.shaderRecordIndex.heapOffset = (uint32_t)as_heap_offset;
@@ -407,7 +406,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
     AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     AddRequiredFeature(vkt::Feature::accelerationStructure);
-    vkt::DescriptorHeap::AddDescriptorHeapRequirements(*this);
+    vkt::DescriptorHeapEXT::AddDescriptorHeapRequirements(*this);
     RETURN_IF_SKIP(InitFrameworkWithPrintfBufferSize(1024 * 1024));
     RETURN_IF_SKIP(InitState());
 
@@ -432,7 +431,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
 
     vkt::Buffer dummy_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vkt::device_address);
 
-    vkt::DescriptorHeap desc_heap(*this);
+    vkt::DescriptorHeapEXT desc_heap(*this);
     desc_heap.CreateResourceHeap(1024, true);
     const VkDeviceSize buffer_heap_offset = desc_heap.WriteBufferDescriptor(dummy_buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     const VkDeviceSize as_heap_offset = desc_heap.WriteAccelerationStructureDescriptor(*tlas.GetDstAS());
@@ -440,8 +439,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
     const VkDeviceSize as_descriptor_size =
         vk::GetPhysicalDeviceDescriptorSizeEXT(m_device->Physical(), VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR);
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping = MakeSetAndBindingMapping(0, 0);
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMappingEXT(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT;
     mapping.sourceData.shaderRecordIndex = {};
     mapping.sourceData.shaderRecordIndex.heapOffset = (uint32_t)buffer_heap_offset;
@@ -572,7 +570,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    vkt::DescriptorHeap::AddDescriptorHeapRequirements(*this);
+    vkt::DescriptorHeapEXT::AddDescriptorHeapRequirements(*this);
     RETURN_IF_SKIP(InitFrameworkWithPrintfBufferSize(1024 * 1024));
     RETURN_IF_SKIP(InitState());
 
@@ -595,8 +593,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
     m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping = MakeSetAndBindingMapping(0, 0);
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMappingEXT(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_DATA_EXT;
     mapping.sourceData.shaderRecordDataOffset = 0;
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
@@ -727,7 +724,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::shaderInt64);
-    vkt::DescriptorHeap::AddDescriptorHeapRequirements(*this);
+    vkt::DescriptorHeapEXT::AddDescriptorHeapRequirements(*this);
     RETURN_IF_SKIP(InitFrameworkWithPrintfBufferSize(1024 * 1024));
     RETURN_IF_SKIP(InitState());
 
@@ -750,8 +747,7 @@ TEST_F(NegativeDebugPrintfRayTracing, RaygenOneMissShaderOneClosestHitShaderDesc
     m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 
-    VkDescriptorSetAndBindingMappingEXT mapping = vku::InitStructHelper();
-    mapping = MakeSetAndBindingMapping(0, 0);
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMappingEXT(0, 0);
     mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_SHADER_RECORD_ADDRESS_EXT;
     mapping.sourceData.shaderRecordAddressOffset = 0;
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
@@ -1768,4 +1764,55 @@ TEST_F(NegativeDebugPrintfRayTracing, OneMultiEntryPointsShader2CmdTraceRaysIndi
     ASSERT_EQ(debug_buffer_ptr[3], (1 * ray_gen_1_rays_count + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[4], (1 * ray_gen_1_rays_count + 1) * frames_count);
     ASSERT_EQ(debug_buffer_ptr[5], (1 * ray_gen_1_rays_count + 2) * frames_count);
+}
+
+TEST_F(NegativeDebugPrintfRayTracing, LibraryDestroyLinkedPipeline) {
+    TEST_DESCRIPTION("libraries are instrumented when created, destroying a linked pipeline must not affect the next link");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(InitDebugPrintfFramework());
+    RETURN_IF_SKIP(InitState());
+
+    const char* ray_gen = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_tracing : require
+        #extension GL_EXT_debug_printf : enable
+        void main() {
+            debugPrintfEXT("raygen from the library");
+        }
+    )glsl";
+
+    vkt::rt::Pipeline pipeline_lib(*this, m_device);
+    pipeline_lib.InitLibraryInfo(sizeof(float), false);
+    pipeline_lib.SetGlslRayGenShader(ray_gen);
+    pipeline_lib.BuildPipeline();
+
+    auto trace_rays = [&](vkt::rt::Pipeline& pipeline) {
+        m_command_buffer.Begin();
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+        vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
+        vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+                            &trace_rays_sbt.callable_sbt, 1, 1, 1);
+        m_command_buffer.End();
+        m_errorMonitor->SetDesiredInfo("raygen from the library");
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    };
+
+    {
+        vkt::rt::Pipeline pipeline(*this, m_device);
+        pipeline.InitLibraryInfo(sizeof(float), true);
+        pipeline.AddLibrary(pipeline_lib);
+        pipeline.Build();
+        trace_rays(pipeline);
+    }
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.InitLibraryInfo(sizeof(float), true);
+    pipeline.AddLibrary(pipeline_lib);
+    pipeline.Build();
+    trace_rays(pipeline);
 }

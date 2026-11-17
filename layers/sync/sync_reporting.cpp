@@ -119,15 +119,13 @@ static std::string FormatAccessProperty(const SyncAccessInfo& access) {
     return ss.str();
 }
 
-static void GetAccessProperties(const HazardResult& hazard_result, const SyncValidator& device, VkQueueFlags allowed_queue_flags,
+static void GetAccessProperties(const SyncValidator& validator, const HazardResult& hazard_result, VkQueueFlags allowed_queue_flags,
                                 ReportProperties& properties) {
     const HazardResult::HazardState& hazard = hazard_result.State();
     const SyncAccessInfo& access_info = GetAccessInfo(hazard.access_index);
     const SyncAccessInfo& prior_access_info = GetAccessInfo(hazard.prior_access_index);
 
-    if (!hazard.recorded_access.get()) {
-        properties.Add(kPropertyAccess, FormatAccessProperty(access_info));
-    }
+    properties.Add(kPropertyAccess, FormatAccessProperty(access_info));
     properties.Add(kPropertyPriorAccess, FormatAccessProperty(prior_access_info));
 
     if (IsHazardVsRead(hazard.hazard)) {
@@ -136,7 +134,7 @@ static void GetAccessProperties(const HazardResult& hazard_result, const SyncVal
         properties.Add(kPropertyReadBarriers, barriers ? barriers_str : "0");
     } else {
         const SyncAccessFlags barriers = hazard.access_state->GetWriteBarriers();
-        const std::string property_barriers_str = FormatSyncAccesses(barriers, device, allowed_queue_flags, true);
+        const std::string property_barriers_str = FormatSyncAccesses(validator, barriers, allowed_queue_flags, true);
         properties.Add(kPropertyWriteBarriers, property_barriers_str);
     }
 }
@@ -212,15 +210,15 @@ static void ReplaceExpandBitsWithMetaMask(VkFlags64& mask, VkFlags64 expand_bits
 }
 
 static std::vector<std::pair<VkPipelineStageFlags2, VkAccessFlags2>> ConvertSyncAccessesToCompactVkForm(
-    const SyncAccessFlags& sync_accesses, const SyncValidator& device, VkQueueFlags allowed_queue_flags) {
+    const SyncValidator& validator, const SyncAccessFlags& sync_accesses, VkQueueFlags allowed_queue_flags) {
     if (sync_accesses.none()) {
         return {};
     }
 
-    const VkPipelineStageFlags2 disabled_stages = sync_utils::DisabledPipelineStages(device.enabled_features, device.extensions);
+    const VkPipelineStageFlags2 disabled_stages = sync_utils::DisabledPipelineStages(validator.enabled_features);
     const VkPipelineStageFlags2 all_transfer_expand_bits = kAllTransferExpandBits & ~disabled_stages;
 
-    const VkAccessFlags2 disabled_accesses = sync_utils::DisabledAccesses(device.extensions);
+    const VkAccessFlags2 disabled_accesses = sync_utils::DisabledAccesses(validator.extensions);
     const VkAccessFlags2 all_shader_read_bits = kShaderReadExpandBits & ~disabled_accesses;
 
     // Build stage -> accesses mapping. OR-merge accesses that happen on the same stage.
@@ -279,7 +277,7 @@ static std::vector<std::pair<VkPipelineStageFlags2, VkAccessFlags2>> ConvertSync
             all_accesses_supported_by_stages &= ~VK_ACCESS_2_SHADER_WRITE_BIT;
             // Remove unsupported accesses, otherwise the access mask won't be detected as the one that covers ALL accesses
             // TODO: ideally this should be integrated into utilities logic (need to revisit all use cases)
-            if (!IsExtEnabled(device.extensions.vk_ext_blend_operation_advanced)) {
+            if (!IsExtEnabled(validator.extensions.vk_ext_blend_operation_advanced)) {
                 all_accesses_supported_by_stages &= ~VK_ACCESS_2_COLOR_ATTACHMENT_READ_NONCOHERENT_BIT_EXT;
             }
         }
@@ -314,10 +312,9 @@ static std::vector<std::pair<VkPipelineStageFlags2, VkAccessFlags2>> ConvertSync
 // Given that access is hazardous, we check if at least stage or access part of it is covered
 // by the synchronization. If applied synchronization covers at least stage or access component
 // then we can provide more precise message by focusing on the other component.
-static std::pair<bool, bool> GetPartialProtectedInfo(const SyncAccessInfo& access, const SyncAccessFlags& write_barriers,
-                                                     const CommandExecutionContext& context) {
-    const auto protected_stage_access_pairs =
-        ConvertSyncAccessesToCompactVkForm(write_barriers, context.GetSyncState(), context.GetQueueFlags());
+static std::pair<bool, bool> GetPartialProtectedInfo(const SyncEnvironment& env, const SyncAccessInfo& access,
+                                                     const SyncAccessFlags& write_barriers) {
+    const auto protected_stage_access_pairs = ConvertSyncAccessesToCompactVkForm(env.validator, write_barriers, env.queue_flags);
     bool is_stage_protected = false;
     bool is_access_protected = false;
     for (const auto& protected_stage_access : protected_stage_access_pairs) {
@@ -331,29 +328,49 @@ static std::pair<bool, bool> GetPartialProtectedInfo(const SyncAccessInfo& acces
     return std::make_pair(is_stage_protected, is_access_protected);
 }
 
-static void ReportLayoutTransitionSynchronizationInsight(std::ostringstream& ss, bool needs_execution_dependency,
-                                                         VkPipelineStageFlags2 read_barriers = 0) {
-    // TODO: analyse exact form of API is used (render pass layout transition, image barrier layout transition) and
-    // print instructions for specific situation. Now we describe all possibilities.
+static void ReportLayoutTransitionSynchronizationHint(std::ostringstream& ss, bool needs_execution_dependency,
+                                                      VkPipelineStageFlags2 read_barriers = 0) {
     const std::string barrier_src_stage = string_VkPipelineStageFlags2(read_barriers);
+    ss << "\n\nHint:\n";
     if (needs_execution_dependency) {
-        ss << "\nHint: If the layout transition is done via an image barrier, consider including " << barrier_src_stage
-           << " in srcStageMask. If the transition occurs as part of the render pass begin operation, consider specifying an "
-              "external subpass dependency (VK_SUBPASS_EXTERNAL) with srcStageMask that includes "
-           << barrier_src_stage << ", or perform the transition in a separate image barrier before the render pass begins.";
+        ss << "a) Image barrier layout transition:\n";
+        ss << "  Include " << barrier_src_stage << " in srcStageMask.\n\n";
+
+        ss << "b) Render pass begin layout transition:\n";
+        ss << "  Either specify an external subpass dependency (VK_SUBPASS_EXTERNAL) with srcStageMask that includes "
+           << barrier_src_stage << ", or move the layout transition before the render pass by using a separate image barrier.\n\n";
     } else {
-        ss << "\nHint: If the layout transition is done via an image barrier, ensure srcStageMask and srcAccessMask "
-              "synchronize with the accesses mentioned above. If the transition occurs as part of the render pass begin operation, "
-              "consider specifying an external subpass dependency (VK_SUBPASS_EXTERNAL) with srcStageMask and srcAccessMask that "
-              "synchronize with those accesses, or perform the transition in a separate image barrier before the render pass "
-              "begins.";
+        ss << "a) Image barrier layout transition:\n";
+        ss << "  Ensure srcStageMask and srcAccessMask synchronize with the accesses mentioned above.\n\n";
+
+        ss << "b) Render pass begin layout transition:\n";
+        ss << "  Either specify an external subpass dependency (VK_SUBPASS_EXTERNAL) with srcStageMask and srcAccessMask that "
+              "synchronize with those accesses, or move the layout transition before the render pass by using a separate image "
+              "barrier.\n\n";
     }
+    ss << "c) Separate synchronization barrier before layout transition:\n";
+    ss << "  Use VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT in dstStageMask to include layout transitions.\n";
 }
 
 static void ReportAcquireImageSynchronizationInsight(std::ostringstream& ss) {
     ss << "\nHint: If a submit command waits on a semaphore signaled by AcquireNextImage command at specific pipeline stages, this "
           "error can occur if the layout transition barrier does not create an execution dependency with those stages (for "
           "example, by including them in the barrier's srcStageMask).";
+}
+
+LogObjectList BaseObjectList(const SyncEnvironment& env, const ErrorReporter& reporter, const VulkanTypedHandle& resource) {
+    LogObjectList objlist;
+    const VulkanTypedHandle& cb_handle = reporter.cb_context.GetCBState().Handle();
+
+    // During recording, env.handle is the command buffer handle. Skip to avoid duplication.
+    if (env.handle != cb_handle) {
+        // During replay, env.handle is the handle of the replayer (queue or primary command buffer).
+        objlist.add(env.handle);
+    }
+
+    objlist.add(cb_handle);
+    objlist.add(resource);
+    return objlist;
 }
 
 void ReportProperties::Add(std::string_view property_name, std::string_view value) {
@@ -382,17 +399,17 @@ std::string ReportProperties::FormatExtraPropertiesSection() const {
     return ss.str();
 }
 
-ReportProperties GetErrorMessageProperties(const HazardResult& hazard, const CommandExecutionContext& context, vvl::Func command,
+ReportProperties GetErrorMessageProperties(const SyncEnvironment& env, const HazardResult& hazard, vvl::Func command,
                                            const char* message_type, const AdditionalMessageInfo& additional_info) {
     ReportProperties properties;
     properties.Add(kPropertyMessageType, message_type);
     properties.Add(kPropertyHazardType, string_SyncHazard(hazard.Hazard()));
     properties.Add(kPropertyCommand, vvl::String(command));
 
-    GetAccessProperties(hazard, context.GetSyncState(), context.GetQueueFlags(), properties);
+    GetAccessProperties(env.validator, hazard, env.queue_flags, properties);
 
-    if (hazard.Tag() != kInvalidTag) {
-        ResourceUsageInfo prior_usage_info = context.GetResourceUsageInfo(hazard.TagEx());
+    if (hazard.PriorTag() != kInvalidTag) {
+        ResourceUsageInfo prior_usage_info = env.usage_info_provider.GetResourceUsageInfo(hazard.PriorTagEx());
         GetPriorUsageProperties(prior_usage_info, properties);
     }
     for (const auto& property : additional_info.properties.name_values) {
@@ -401,7 +418,7 @@ ReportProperties GetErrorMessageProperties(const HazardResult& hazard, const Com
     return properties;
 }
 
-std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutionContext& context, vvl::Func command,
+std::string FormatErrorMessage(const SyncEnvironment& env, const HazardResult& hazard, vvl::Func command,
                                const std::string& resouce_description, const AdditionalMessageInfo& additional_info) {
     const SyncHazard hazard_type = hazard.Hazard();
     const SyncHazardInfo hazard_info = GetSyncHazardInfo(hazard_type);
@@ -448,12 +465,12 @@ std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutio
     } else {
         ss << "read ";
     }
-    if (hazard.Tag() == kInvalidTag) {
+    if (hazard.PriorTag() == kInvalidTag) {
         // Invalid tag for prior access means the same command performed ILT before loadOp,
         // resolve before ILT or ILT after storeOp.
         ss << "by the same command";
     } else {
-        const ResourceUsageInfo prior_usage_info = context.GetResourceUsageInfo(hazard.TagEx());
+        const ResourceUsageInfo prior_usage_info = env.usage_info_provider.GetResourceUsageInfo(hazard.PriorTagEx());
         const vvl::Func prior_command = prior_usage_info.command;
         if (prior_usage_info.sub_command_type == SubCommandType::kLoadOp) {
             if (prior_usage_info.subpass != vvl::kNoIndex32) {
@@ -502,11 +519,11 @@ std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutio
     }
 
     // Synchronization information
-    const bool cross_queue_racing_hazard = hazard_info.IsRacingHazard() && context.GetQueueId() != kQueueIdInvalid;
+    const bool cross_queue_racing_hazard = hazard_info.IsRacingHazard() && hazard.PriorQueue() != env.queue_id;
     ss << "\n";
     if (cross_queue_racing_hazard) {
-        ss << "The RACING hazard means the two submissions on different queues are not synchronized with each other, so the order "
-              "of their accesses is undefined. Synchronize the submissions so that one runs before the other.";
+        ss << "\nThe RACING hazard means the two submissions on different queues are not synchronized with each other, so the "
+              "order of their accesses is undefined. Synchronize the submissions so that one runs before the other.\n";
     } else if (missing_synchronization) {
         const char* access_type = hazard_info.IsWrite() ? "write" : "read";
         const char* prior_access_type = hazard_info.IsPriorWrite() ? "write" : "read";
@@ -556,8 +573,8 @@ std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutio
         ss << ".";
     } else if (hazard_info.IsPriorWrite()) {  // RAW/WAW hazards
         ss << "The current synchronization allows ";
-        ss << FormatSyncAccesses(write_barriers, context.GetSyncState(), context.GetQueueFlags(), false);
-        auto [is_stage_protected, is_access_protected] = GetPartialProtectedInfo(access, write_barriers, context);
+        ss << FormatSyncAccesses(env.validator, write_barriers, env.queue_flags, false);
+        auto [is_stage_protected, is_access_protected] = GetPartialProtectedInfo(env, access, write_barriers);
         if (is_access_protected) {
             ss << ", but to prevent this hazard, it must allow these accesses at ";
             ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
@@ -567,7 +584,7 @@ std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutio
             ss << string_VkPipelineStageFlagBits2(access.stage_mask) << ".";
         } else {
             ss << ", but layout transition does not synchronize with these accesses.";
-            ReportLayoutTransitionSynchronizationInsight(ss, false);
+            ReportLayoutTransitionSynchronizationHint(ss, false);
         }
     } else {  // WAR hazard
         ss << "The current synchronization defines the destination stage mask as ";
@@ -580,7 +597,7 @@ std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutio
             if (prior_access.access_index == SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_ACQUIRE_READ_SYNCVAL) {
                 ReportAcquireImageSynchronizationInsight(ss);
             }
-            ReportLayoutTransitionSynchronizationInsight(ss, true, read_barriers);
+            ReportLayoutTransitionSynchronizationHint(ss, true, read_barriers);
         }
     }
 
@@ -603,15 +620,21 @@ std::string FormatErrorMessage(const HazardResult& hazard, const CommandExecutio
               "cannot introduce this specific hazard.";
     }
 
+    if (hazard.PriorQueue() == env.queue_id && prior_access.access_index == SYNC_IMAGE_LAYOUT_TRANSITION &&
+        (hazard.State().access_state->LastWrite().flags & SyncFlag::kExternalDependenciesMissFinalTransition)) {
+        ss << "\nHint: None of the explicit dependencies to VK_SUBPASS_EXTERNAL starts from a subpass that uses this attachment, "
+              "so they do not synchronize its final layout transition. Check their srcSubpass.";
+    }
+
     if (!additional_info.message_end_text.empty()) {
         ss << additional_info.message_end_text;
     }
     return ss.str();
 }
 
-std::string FormatSyncAccesses(const SyncAccessFlags& sync_accesses, const SyncValidator& device, VkQueueFlags allowed_queue_flags,
-                               bool format_as_extra_property) {
-    const auto report_accesses = ConvertSyncAccessesToCompactVkForm(sync_accesses, device, allowed_queue_flags);
+std::string FormatSyncAccesses(const SyncValidator& validator, const SyncAccessFlags& sync_accesses,
+                               VkQueueFlags allowed_queue_flags, bool format_as_extra_property) {
+    const auto report_accesses = ConvertSyncAccessesToCompactVkForm(validator, sync_accesses, allowed_queue_flags);
     if (report_accesses.empty()) {
         return "0";
     }
@@ -639,7 +662,7 @@ std::string FormatSyncAccesses(const SyncAccessFlags& sync_accesses, const SyncV
     return out.str();
 }
 
-void FormatVideoPictureResouce(const Logger& logger, const VkVideoPictureResourceInfoKHR& video_picture, std::ostringstream& ss) {
+void FormatVideoPictureResource(const Logger& logger, const VkVideoPictureResourceInfoKHR& video_picture, std::ostringstream& ss) {
     ss << "{";
     ss << logger.FormatHandle(video_picture.imageViewBinding);
     ss << ", codedOffset (" << string_VkOffset2D(video_picture.codedOffset) << ")";
@@ -671,14 +694,14 @@ static ResourceUsageInfo GetResourceUsageInfoFromRecord(ResourceUsageTagEx tag_e
         // Associated resource
         if (tag_ex.handle_index != vvl::kNoIndex32) {
             auto& cb_context = SubState(*record.cb_state);
-            const auto& handle_records = cb_context.access_context.GetHandleRecords();
+            const auto& handle_records = cb_context.cb_context.GetHandleRecords();
 
             // Command buffer can be in inconsistent state due to unhandled core validation error (core validation is disabled).
             // In this case the goal is not to crash, no guarantees that reported information (handle index) makes sense.
             const bool valid_handle_index = tag_ex.handle_index < handle_records.size();
             if (valid_handle_index) {
                 info.resource_handle = handle_records[tag_ex.handle_index].TypedHandle();
-                // TODO: also extract optional index or get rid of index
+                info.image_barrier = cb_context.cb_context.GetImageBarrier(record, tag_ex.handle_index);
             }
         }
         // Debug region name. Empty name means that we are not inside any debug region.
@@ -690,7 +713,7 @@ static ResourceUsageInfo GetResourceUsageInfoFromRecord(ResourceUsageTagEx tag_e
     return info;
 }
 
-ResourceUsageInfo CommandBufferAccessContext::GetResourceUsageInfo(ResourceUsageTagEx tag_ex) const {
+ResourceUsageInfo CommandBufferContext::GetResourceUsageInfo(ResourceUsageTagEx tag_ex) const {
     const ResourceUsageRecord& record = (*access_log_)[tag_ex.tag];
     const auto debug_name_provider = (record.label_command_index == vvl::kNoIndex32) ? nullptr : this;
     return GetResourceUsageInfoFromRecord(tag_ex, record, debug_name_provider);

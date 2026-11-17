@@ -19,6 +19,7 @@
 
 import argparse
 import filecmp
+import importlib.util
 import os
 import re
 import shutil
@@ -62,6 +63,10 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
             print(f'Found {reg_path}, but failed to import it:')
             print(f'{type(e).__name__}: {e}')
         sys.exit(1) # Return without call stack so easy to spot error
+
+    # Used by the Vulkan-Headers dependencyBNF, fail with a clear message instead of a call stack
+    if importlib.util.find_spec('pyparsing') is None:
+        sys.exit('error: the python "pyparsing" module is not installed (pip install pyparsing)')
 
     from base_generator import BaseGeneratorOptions
     from generators.thread_safety_generator import ThreadSafetyOutputGenerator
@@ -242,6 +247,10 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
             'genCombined': True,
         },
         'dispatch_object.cpp' : {
+            'generator' : DispatchObjectGenerator,
+            'genCombined': True,
+        },
+        'dispatch_object_init.cpp' : {
             'generator' : DispatchObjectGenerator,
             'genCombined': True,
         },
@@ -442,10 +451,9 @@ def main(argv):
     verify_exclude = [
         '.clang-format',
         'gpuav_offline_spirv.h',
-        'gpuav_offline_spirv.cpp',
-        'feature_requirements_helper.h', # https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8969
-        'feature_requirements_helper.cpp',
-        'feature_not_present.cpp', # this single funciton really fails with various clang-format versions
+        'gpuav_offline_spirv_glsl.cpp',
+        'gpuav_offline_spirv_slang.cpp',
+        'feature_not_present.cpp', # this single function really fails with various clang-format versions
     ]
 
     parser = argparse.ArgumentParser(description='Generate source code for this repository')
@@ -484,7 +492,6 @@ def main(argv):
             json_files.append(repo_relative('layers/VkSCLayer_khronos_validation.json.in'))
         else:
             json_files.append(repo_relative('layers/VkLayer_khronos_validation.json.in'))
-        json_files.append(repo_relative('tests/layers/VkLayer_device_profile_api.json.in'))
         for json_file in json_files:
             with open(json_file, 'r') as file:
                 json_str = file.read()

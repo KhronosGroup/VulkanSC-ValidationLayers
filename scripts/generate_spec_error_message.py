@@ -161,6 +161,9 @@ class ValidationJSON:
 oversized_vus = {
     'VUID-VkColorBlendEquationEXT-colorBlendOp-07361' : 'colorBlendOp and alphaBlendOp must not be a VkBlendOp from VK_EXT_blend_operation_advanced',
     'VUID-VkDeviceCreateInfo-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkDeviceCreateInfo',
+    'VUID-VkImageCreateInfo-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkImageCreateInfo',
+    'VUID-VkGraphicsPipelineCreateInfo-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkGraphicsPipelineCreateInfo',
+    'VUID-VkMemoryAllocateInfo-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkMemoryAllocateInfo',
     'VUID-VkPhysicalDeviceProperties2-pNext-pNext' : 'Each pNext member of any structure (including this one) in the pNext chain must be either NULL or a pointer to a valid struct for extending VkPhysicalDeviceProperties2',
     'VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060' : 'For OpCooperativeMatrixMulAddKHR, the operands must match a supported VkCooperativeMatrixPropertiesKHR',
     'VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-10163' : 'For OpTypeCooperativeMatrixKHR, if the cooperativeMatrixFlexibleDimensions feature is not enabled, the component type, scope, number of rows, and number of columns must match one of the matrices in any of the supported VkCooperativeMatrixPropertiesKHR',
@@ -169,6 +172,27 @@ oversized_vus = {
     'VUID-RuntimeSpirv-cooperativeMatrixFlexibleDimensions-10166' : 'For OpCooperativeMatrixMulAddKHR, if the cooperativeMatrixFlexibleDimensions feature is enabled, the operands must match either one of the supported VkCooperativeMatrixPropertiesKHR or VkCooperativeMatrixFlexibleDimensionsPropertiesNV',
     'VUID-RuntimeSpirv-pNext-09921' : 'The pConstants in the data graph pipeline must satisfy all constraints',
     'VUID-RuntimeSpirv-pNext-09923' : 'The pResourceInfos in the data graph pipeline must satisfy all constraints',
+    'VUID-RuntimeSpirv-cooperativeMatrixProperties2-13382' : 'For OpTypeCooperativeMatrixKHR, the component type, scope, number of rows, and number of columns do not match the values returned from vkGetPhysicalDeviceCooperativeMatrixProperties2EXT',
+    'VUID-RuntimeSpirv-cooperativeMatrixProperties2-13383' : 'For OpCooperativeMatrixMulAddKHR the operands do not match the values returned from vkGetPhysicalDeviceCooperativeMatrixProperties2EXT',
+    'VUID-vkCmdBuildAccelerationStructuresIndirectKHR-micromap-11629' : 'When updating an acceleration structure that was neither deserialized nor built with micromap update flags, any triangle geometry originally using an opacity micromap must include that exact same micromap handle in its update configuration',
+    'VUID-vkCmdBuildAccelerationStructuresKHR-micromap-11629' : 'When updating an acceleration structure that was neither deserialized nor built with micromap update flags, any triangle geometry originally using an opacity micromap must include that exact same micromap handle in its update configuration',
+    'VUID-VkBindImageMemoryInfo-memory-02629' : 'Dedicated memory bound to an image with aliasing enabled must start at offset zero and belong to the original image or a dimensionally smaller clone with matching parameters',
+    'VUID-vkBindImageMemory-memory-02629' : 'Dedicated memory bound to an image with aliasing enabled must start at offset zero and belong to the original image or a dimensionally smaller clone with matching parameters',
+    'VUID-VkClusterAccelerationStructureCommandsInfoNV-input-12317' : 'For triangle cluster build operations, all destination buffer addresses (implicit or array-based, direct or indirect) must be aligned to clusterByteAlignment',
+    'VUID-VkClusterAccelerationStructureCommandsInfoNV-input-12318' : 'For triangle cluster template build operations, all destination buffer addresses (implicit or array-based, direct or indirect) must be aligned to clusterTemplateByteAlignment',
+    'VUID-VkClusterAccelerationStructureCommandsInfoNV-input-12319' : 'For triangle cluster instantiation operations, all destination buffer addresses (implicit or array-based, direct or indirect) must be aligned to clusterByteAlignment',
+    'VUID-vkCmdBuildAccelerationStructuresIndirectKHR-micromap-11628' : 'When updating a deserialized acceleration structure built without the micromap update flag, any triangle geometry originally using an opacity micromap must include a micromap handle deserialized from the original build data',
+    'VUID-vkCmdBuildAccelerationStructuresKHR-micromap-11628' : 'When updating a deserialized acceleration structure built without the micromap update flag, any triangle geometry originally using an opacity micromap must include a micromap handle deserialized from the original build data',
+    'VUID-VkPipelineColorBlendAttachmentState-advancedBlendAllOperations-01409' : 'If VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT::advancedBlendAllOperations is VK_FALSE, then colorBlendOp must not be invalid',
+    'VUID-VkRenderPassPerformanceCountersByRegionBeginInfoARM-pCounterAddresses-11817' : 'Each address in pCounterAddresses must point to a buffer with enough contiguous space to hold the region-aligned, row-strided performance counter data for the given rendering area',
+    'VUID-VkSubmitInfo-pCommandBufferInfos-09942' : 'When submitting command buffers created for foreign data graph engines, all wait and signal semaphores must use external handle types explicitly supported by those engines for the command pool queue family',
+    'VUID-VkSubmitInfo2-pCommandBufferInfos-09933' : 'When submitting command buffers created for foreign data graph engines, all wait and signal semaphores must use external handle types explicitly supported by those engines for the command pool queue family',
+    'VUID-vkCmdDecodeVideoKHR-None-10403' : 'If the bound video session was created with the video codec operation VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR, then there must be a bound video session parameters object if any of the conditions are not met',
+    'VUID-vkCmdDecodeVideoKHR-StdVideoH265SequenceParameterSet-07161' : 'For H.265 decoding, the bound session parameters must include a Sequence Parameter Set (SPS) matching the VPS and SPS IDs in pDecodeInfo, unless valid inline SPS parameters are provided',
+    'VUID-vkCmdDecodeVideoKHR-StdVideoH265PictureParameterSet-07162' : 'For H.265 decoding, the bound session parameters must include a Picture Parameter Set (PPS) matching the VPS, SPS, and PPS IDs in pDecodeInfo, unless valid inline PPS parameters are provided',
+    'VUID-vkCmdDispatchDataGraphARM-nodeType-09981' : 'Optical flow data graph pipelines require all accessed image subresources to be in their connection-specified layout, unless unifiedImageLayouts is enabled (allowing GENERAL layout)',
+    'VUID-vkCmdDispatchDataGraphARM-pNext-09952' : 'For foreign data graph processing pipelines, all session-bound memory must use export handle types supported by the foreign engines for the command pool queue family',
+    'VUID-vkCmdDispatchDataGraphARM-pipeline-09940' : 'For foreign data graph processing pipelines, all accessed tensor descriptors must be bound to memory allocated with export handle types supported by the foreign engines for the command pool queue family',
 }
 
 def GenerateSpecErrorMessage(api : str, valid_usage_json : str, out_dir : str):
@@ -239,24 +263,45 @@ const vvl::unordered_map<std::string_view, vuid_info>& GetVuidMap();
  ****************************************************************************/
 
 #include "vk_validation_error_messages.h"
-#include <array>
+#include <cstdint>
+#include <iterator>
 
 // clang-format off
 ''')
 
     vuid_list = list(val_json.all_vuids)
     vuid_list.sort()
+    pages = sorted({val_json.vuid_db[vuid][0]['page'] for vuid in vuid_list})
+    page_index = {page: index for index, page in enumerate(pages)}
 
-    out.append(f'''
-const vvl::unordered_map<std::string_view, vuid_info> &GetVuidMap() {{
-    static const std::array<std::pair<std::string_view, vuid_info>, {len(vuid_list)}> vuid_array = {{{{
+    # The table is plain C data on purpose. It used to be a std::array<std::pair<std::string_view, vuid_info>>, whose
+    # ~27k initializers (constructor overload resolution and constant evaluation for every element) took the compiler
+    # ~18 seconds, making this the slowest file of the project.
+    out.append('''
+namespace {
+
+// Spec page each VUID is documented on
+constexpr std::string_view kVuidPages[] = {
+''')
+    for page in pages:
+        out.append(f'    "{page}",\n')
+    out.append('''};
+
+struct VuidEntry {
+    const char* vuid;
+    const char* spec_text;
+    uint16_t vuid_length;
+    uint16_t spec_text_length;
+    uint8_t page;  // index into kVuidPages
+};
+
+const VuidEntry kVuidEntries[] = {
 ''')
     for vuid in vuid_list:
         db_entry = val_json.vuid_db[vuid][0]
         html_page = db_entry['page']
 
-        # Escape quotes and backslashes when generating C strings for source code
-        db_text = db_entry['text'].replace('\\', '\\\\').replace('"', '\\"').strip()
+        db_text = db_entry['text'].strip()
         html_remove_tags = re.compile(r'<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
         db_text = re.sub(html_remove_tags, '', db_text)
         # In future we could use the `/n` to add new lines to a pretty print in the console
@@ -268,16 +313,30 @@ const vvl::unordered_map<std::string_view, vuid_info> &GetVuidMap() {{
             db_text = oversized_vus[vuid]
 
         # If hit this warning, likely should be added to oversized_vus
-        if (len(db_text) > 1000):
+        if (len(db_text) > 800):
             print(f'Warning: {vuid} has a large message ({len(db_text)})')
 
-        out.append(f'        {{ {{"{vuid}", {len(vuid)}}}, {{ {{"{db_text}", {len(db_text)}}}, {{ "{html_page}", {len(html_page)}}} }} }},\n')
+        # Escape quotes and backslashes when generating C strings for source code (after measuring the real length)
+        escaped_text = db_text.replace('\\', '\\\\').replace('"', '\\"')
+        out.append(f'    {{"{vuid}", "{escaped_text}", {len(vuid)}, {len(db_text)}, {page_index[html_page]}}},\n')
         # For multiply-defined VUIDs, include versions with extension appended
         if len(val_json.vuid_db[vuid]) > 1:
             print(f'Warning: Found a duplicate VUID: {vuid}')
 
-    out.append('''    }};
-    static const vvl::unordered_map<std::string_view, vuid_info> vuid_map(std::begin(vuid_array), std::end(vuid_array));
+    out.append('''};
+
+}  // namespace
+
+const vvl::unordered_map<std::string_view, vuid_info>& GetVuidMap() {
+    static const vvl::unordered_map<std::string_view, vuid_info> vuid_map = [] {
+        vvl::unordered_map<std::string_view, vuid_info> map;
+        map.reserve(std::size(kVuidEntries));
+        for (const VuidEntry& entry : kVuidEntries) {
+            map.emplace(std::string_view(entry.vuid, entry.vuid_length),
+                        vuid_info{std::string_view(entry.spec_text, entry.spec_text_length), kVuidPages[entry.page]});
+        }
+        return map;
+    }();
     return vuid_map;
 }
 ''')

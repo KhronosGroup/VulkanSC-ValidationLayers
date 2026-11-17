@@ -234,6 +234,13 @@ TEST_F(NegativeVideoEncodeIntraRefresh, BlockBasedInvalidIntraRefreshInfo) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-10844");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
+
+        encode_info->flags &= ~VK_VIDEO_ENCODE_INTRA_REFRESH_BIT_KHR;
+        ir_info.intraRefreshCycleDuration = 1;
+
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-10844");
+        cb.EncodeVideo(encode_info);
+        m_errorMonitor->VerifyFound();
     }
 
     cb.EndVideoCoding(context.End());
@@ -719,6 +726,7 @@ TEST_F(NegativeVideoEncodeIntraRefresh, PerPicturePartitionSliceTypeH265) {
     }
 
     config.SetVideoEncodeIntraRefreshMode(VK_VIDEO_ENCODE_INTRA_REFRESH_MODE_PER_PICTURE_PARTITION_BIT_KHR);
+    config.UpdateMaxCodedExtent(config.Caps()->maxCodedExtent);
 
     VideoContext context(DeviceObj(), config);
     context.CreateAndBindSessionMemory();
@@ -782,6 +790,8 @@ TEST_F(NegativeVideoEncodeIntraRefresh, PerPicturePartitionNonRectTooManySliceSe
 
     if ((config.EncodeCapsH265()->flags & VK_VIDEO_ENCODE_H265_CAPABILITY_ROW_UNALIGNED_SLICE_SEGMENT_BIT_KHR) == 0) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
+    } else if (slice_segment_count > config.MaxEncodeH265CTBCount()) {
+        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
     }
     if (slice_segment_count > config.EncodeCapsH265()->maxSliceSegmentCount) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-naluSliceSegmentEntryCount-08306");

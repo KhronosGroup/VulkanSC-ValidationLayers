@@ -19,14 +19,7 @@
 
 #include "binding.h"
 
-#include <string.h>  // memset(), memcmp()
-#include <cassert>
 #include <algorithm>
-#include <iterator>
-#include <spirv-tools/libspirv.hpp>
-
-#include <vulkan/utility/vk_format_utils.h>
-#include <vulkan/utility/vk_struct_helper.hpp>
 
 #include "shader_helper.h"
 #include "sync_helper.h"
@@ -1073,7 +1066,7 @@ NON_DISPATCHABLE_HANDLE_DTOR(Event, vk::DestroyEvent)
 void Event::Init(const Device& dev, const VkEventCreateInfo& info) { NON_DISPATCHABLE_HANDLE_INIT(vk::CreateEvent, dev, &info); }
 
 VkResult Event::GetStatus() const { return vk::GetEventStatus(device(), handle()); }
-void Event::Set() { ASSERT_EQ(VK_SUCCESS, vk::SetEvent(device(), handle())); }
+void Event::Set() { vk::SetEvent(device(), handle()); }
 void Event::Reset() { vk::ResetEvent(device(), handle()); }
 
 NON_DISPATCHABLE_HANDLE_DTOR(QueryPool, vk::DestroyQueryPool)
@@ -1115,26 +1108,6 @@ void Buffer::Init(const Device& dev, const VkBufferCreateInfo& info, VkMemoryPro
     internal_mem_.Init(dev, alloc_info);
 
     BindMemory(internal_mem_, 0);
-}
-
-void Buffer::InitHostVisibleWithData(const Device& dev, VkBufferUsageFlags usage, const void* data, size_t data_size,
-                                     const vvl::span<uint32_t>& queue_families) {
-    const auto create_info = CreateInfo(static_cast<VkDeviceSize>(data_size), usage, queue_families);
-    InitNoMemory(dev, create_info);
-
-    // According to the specification there is always a host visible coherent memory type.
-    // It can always be bound to a buffer created without SPARSE_BINDING/PROTECTED flags.
-    const VkMemoryPropertyFlags memory_properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    const VkMemoryRequirements memory_requirements = MemoryRequirements();
-    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
-    alloc_info.allocationSize = memory_requirements.size;
-    dev.Physical().SetMemoryType(memory_requirements.memoryTypeBits, &alloc_info, memory_properties);
-    internal_mem_.Init(dev, alloc_info);
-    BindMemory(internal_mem_, 0);
-
-    void* ptr = internal_mem_.Map();
-    std::memcpy(ptr, data, data_size);
-    internal_mem_.Unmap();
 }
 
 void Buffer::InitNoMemory(const Device& dev, const VkBufferCreateInfo& info) {
@@ -1312,7 +1285,10 @@ void DataGraphPipelineSession::GetMemoryReqs() {
     vk::GetDataGraphPipelineSessionBindPointRequirementsARM(*device_, &bind_info, &count, bind_point_reqs_.data());
 
     mem_reqs_.resize(count);
+    num_bind_objects_ = 0;
     for (uint32_t i = 0; i < count; i++) {
+        num_bind_objects_ += bind_point_reqs_[i].numObjects;
+
         if (bind_point_reqs_[i].bindPointType != VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM) {
             continue;
         }
@@ -1600,98 +1576,6 @@ void ImageView::Init(const Device& dev, const VkImageViewCreateInfo& info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateImageView, dev, &info);
 }
 
-void AccelerationStructureNV::Destroy() noexcept {
-    if (!initialized()) {
-        return;
-    }
-    PFN_vkDestroyAccelerationStructureNV vkDestroyAccelerationStructureNV =
-        (PFN_vkDestroyAccelerationStructureNV)vk::GetDeviceProcAddr(device(), "vkDestroyAccelerationStructureNV");
-    assert(vkDestroyAccelerationStructureNV != nullptr);
-
-    vkDestroyAccelerationStructureNV(device(), handle(), nullptr);
-    handle_ = VK_NULL_HANDLE;
-}
-AccelerationStructureNV::~AccelerationStructureNV() noexcept { Destroy(); }
-
-VkMemoryRequirements2 AccelerationStructureNV::MemoryRequirements() const {
-    PFN_vkGetAccelerationStructureMemoryRequirementsNV vkGetAccelerationStructureMemoryRequirementsNV =
-        (PFN_vkGetAccelerationStructureMemoryRequirementsNV)vk::GetDeviceProcAddr(device(),
-                                                                                  "vkGetAccelerationStructureMemoryRequirementsNV");
-    assert(vkGetAccelerationStructureMemoryRequirementsNV != nullptr);
-    VkMemoryRequirements2 memory_requirements = vku::InitStructHelper();
-    VkAccelerationStructureMemoryRequirementsInfoNV memory_requirements_info = vku::InitStructHelper();
-    memory_requirements_info.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
-    memory_requirements_info.accelerationStructure = handle();
-    vkGetAccelerationStructureMemoryRequirementsNV(device(), &memory_requirements_info, &memory_requirements);
-    return memory_requirements;
-}
-
-VkMemoryRequirements2 AccelerationStructureNV::BuildScratchMemoryRequirements() const {
-    PFN_vkGetAccelerationStructureMemoryRequirementsNV vkGetAccelerationStructureMemoryRequirementsNV =
-        (PFN_vkGetAccelerationStructureMemoryRequirementsNV)vk::GetDeviceProcAddr(device(),
-                                                                                  "vkGetAccelerationStructureMemoryRequirementsNV");
-    assert(vkGetAccelerationStructureMemoryRequirementsNV != nullptr);
-
-    VkAccelerationStructureMemoryRequirementsInfoNV memory_requirements_info = vku::InitStructHelper();
-    memory_requirements_info.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
-    memory_requirements_info.accelerationStructure = handle();
-
-    VkMemoryRequirements2 memory_requirements = vku::InitStructHelper();
-    vkGetAccelerationStructureMemoryRequirementsNV(device(), &memory_requirements_info, &memory_requirements);
-    return memory_requirements;
-}
-
-void AccelerationStructureNV::Init(const Device& dev, const VkAccelerationStructureCreateInfoNV& info, bool init_memory) {
-    PFN_vkCreateAccelerationStructureNV vkCreateAccelerationStructureNV =
-        (PFN_vkCreateAccelerationStructureNV)vk::GetDeviceProcAddr(dev, "vkCreateAccelerationStructureNV");
-    assert(vkCreateAccelerationStructureNV != nullptr);
-
-    NON_DISPATCHABLE_HANDLE_INIT(vkCreateAccelerationStructureNV, dev, &info);
-
-    info_ = info.info;
-
-    if (init_memory) {
-        memory_.Init(dev, DeviceMemory::GetResourceAllocInfo(dev, MemoryRequirements().memoryRequirements,
-                                                             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-
-        PFN_vkBindAccelerationStructureMemoryNV vkBindAccelerationStructureMemoryNV =
-            (PFN_vkBindAccelerationStructureMemoryNV)vk::GetDeviceProcAddr(dev, "vkBindAccelerationStructureMemoryNV");
-        assert(vkBindAccelerationStructureMemoryNV != nullptr);
-
-        VkBindAccelerationStructureMemoryInfoNV bind_info = vku::InitStructHelper();
-        bind_info.accelerationStructure = handle();
-        bind_info.memory = memory_;
-        ASSERT_EQ(VK_SUCCESS, vkBindAccelerationStructureMemoryNV(dev, 1, &bind_info));
-
-        PFN_vkGetAccelerationStructureHandleNV vkGetAccelerationStructureHandleNV =
-            (PFN_vkGetAccelerationStructureHandleNV)vk::GetDeviceProcAddr(dev, "vkGetAccelerationStructureHandleNV");
-        assert(vkGetAccelerationStructureHandleNV != nullptr);
-        ASSERT_EQ(VK_SUCCESS, vkGetAccelerationStructureHandleNV(dev, handle(), sizeof(uint64_t), &opaque_handle_));
-    }
-}
-
-Buffer AccelerationStructureNV::CreateScratchBuffer(const Device& device, VkBufferCreateInfo* pCreateInfo /*= nullptr*/,
-                                                    bool buffer_device_address /*= false*/) const {
-    VkMemoryRequirements scratch_buffer_memory_requirements = BuildScratchMemoryRequirements().memoryRequirements;
-    VkBufferCreateInfo create_info = vku::InitStructHelper();
-    create_info.size = scratch_buffer_memory_requirements.size;
-    if (pCreateInfo) {
-        create_info.usage = pCreateInfo->usage;
-    } else {
-        create_info.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
-        if (buffer_device_address) create_info.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    }
-
-    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    void* pNext = nullptr;
-    if (buffer_device_address) {
-        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-        pNext = &alloc_flags;
-    }
-
-    return Buffer(device, create_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, pNext);
-}
-
 NON_DISPATCHABLE_HANDLE_DTOR(ShaderModule, vk::DestroyShaderModule)
 
 ShaderModule& ShaderModule::operator=(ShaderModule&& rhs) noexcept {
@@ -1713,13 +1597,13 @@ VkResult ShaderModule::InitTry(const Device& dev, const VkShaderModuleCreateInfo
     return err;
 }
 
-NON_DISPATCHABLE_HANDLE_DTOR(Shader, vk::DestroyShaderEXT)
+NON_DISPATCHABLE_HANDLE_DTOR(ShaderEXT, vk::DestroyShaderEXT)
 
-void Shader::Init(const Device& dev, const VkShaderCreateInfoEXT& info) {
+void ShaderEXT::Init(const Device& dev, const VkShaderCreateInfoEXT& info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateShadersEXT, dev, 1u, &info);
 }
 
-VkResult Shader::InitTry(const Device& dev, const VkShaderCreateInfoEXT& info) {
+VkResult ShaderEXT::InitTry(const Device& dev, const VkShaderCreateInfoEXT& info) {
     VkShaderEXT mod;
 
     VkResult err = vk::CreateShadersEXT(dev, 1u, &info, NULL, &mod);
@@ -1728,8 +1612,8 @@ VkResult Shader::InitTry(const Device& dev, const VkShaderCreateInfoEXT& info) {
     return err;
 }
 
-Shader::Shader(const Device& dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t>& spv,
-               const VkDescriptorSetLayout* descriptorSetLayout, const VkPushConstantRange* pushConstRange) {
+ShaderEXT::ShaderEXT(const Device& dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t>& spv,
+                     const VkDescriptorSetLayout* descriptorSetLayout, const VkPushConstantRange* pushConstRange) {
     VkShaderCreateInfoEXT createInfo = vku::InitStructHelper();
     createInfo.stage = stage;
     SetNextStage(createInfo, dev.GetFeatures().tessellationShader, dev.GetFeatures().geometryShader);
@@ -1748,8 +1632,8 @@ Shader::Shader(const Device& dev, const VkShaderStageFlagBits stage, const std::
     Init(dev, createInfo);
 }
 
-Shader::Shader(const Device& dev, const VkShaderStageFlagBits stage, const char* code,
-               const VkDescriptorSetLayout* descriptorSetLayout, const VkPushConstantRange* pushConstRange) {
+ShaderEXT::ShaderEXT(const Device& dev, const VkShaderStageFlagBits stage, const char* code,
+                     const VkDescriptorSetLayout* descriptorSetLayout, const VkPushConstantRange* pushConstRange) {
     spv_target_env spv_env = SPV_ENV_VULKAN_1_0;
     if (stage == VK_SHADER_STAGE_TASK_BIT_EXT || stage == VK_SHADER_STAGE_MESH_BIT_EXT || stage == VK_SHADER_STAGE_TASK_BIT_NV ||
         stage == VK_SHADER_STAGE_MESH_BIT_NV) {
@@ -1776,8 +1660,8 @@ Shader::Shader(const Device& dev, const VkShaderStageFlagBits stage, const char*
     Init(dev, createInfo);
 }
 
-Shader::Shader(const Device& dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t>& binary,
-               const VkDescriptorSetLayout* descriptorSetLayout, const VkPushConstantRange* pushConstRange) {
+ShaderEXT::ShaderEXT(const Device& dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t>& binary,
+                     const VkDescriptorSetLayout* descriptorSetLayout, const VkPushConstantRange* pushConstRange) {
     VkShaderCreateInfoEXT createInfo = vku::InitStructHelper();
     createInfo.stage = stage;
     SetNextStage(createInfo, dev.GetFeatures().tessellationShader, dev.GetFeatures().geometryShader);
@@ -1803,6 +1687,19 @@ void PipelineCache::Init(const Device& dev, const VkPipelineCacheCreateInfo& inf
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(Pipeline, vk::DestroyPipeline)
+
+Pipeline::Pipeline(const Device& dev, const std::vector<VkPipeline>& libraries, VkPipelineLayout layout, VkRenderPass render_pass,
+                   VkPipelineCreateFlags flags) {
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = static_cast<uint32_t>(libraries.size());
+    link_info.pLibraries = libraries.data();
+
+    VkGraphicsPipelineCreateInfo create_info = vku::InitStructHelper(&link_info);
+    create_info.flags = flags;
+    create_info.layout = layout;
+    create_info.renderPass = render_pass;
+    Init(dev, create_info);
+}
 
 void Pipeline::Init(const Device& dev, const VkGraphicsPipelineCreateInfo& info) {
     VkPipelineCache cache;
@@ -2058,7 +1955,7 @@ void CommandBuffer::BeginRenderPass(const VkRenderPassBeginInfo& info, VkSubpass
 }
 
 void CommandBuffer::BeginRenderPass(VkRenderPass rp, VkFramebuffer fb, uint32_t render_area_width, uint32_t render_area_height,
-                                    uint32_t clear_count, const VkClearValue* clear_values) {
+                                    uint32_t clear_count, const VkClearValue* clear_values, VkSubpassContents contents) {
     VkRenderPassBeginInfo render_pass_begin_info = vku::InitStructHelper();
     render_pass_begin_info.renderPass = rp;
     render_pass_begin_info.framebuffer = fb;
@@ -2066,7 +1963,7 @@ void CommandBuffer::BeginRenderPass(VkRenderPass rp, VkFramebuffer fb, uint32_t 
     render_pass_begin_info.renderArea.extent.height = render_area_height;
     render_pass_begin_info.clearValueCount = clear_count;
     render_pass_begin_info.pClearValues = clear_values;
-    vk::CmdBeginRenderPass(handle(), &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(handle(), &render_pass_begin_info, contents);
 }
 
 void CommandBuffer::NextSubpass(VkSubpassContents contents) { vk::CmdNextSubpass(handle(), contents); }
@@ -2103,7 +2000,7 @@ void CommandBuffer::EndRendering() {
     }
 }
 
-void CommandBuffer::PushData(uint32_t offset, size_t size, const void* address) {
+void CommandBuffer::PushDataEXT(uint32_t offset, size_t size, const void* address) {
     VkPushDataInfoEXT push_data = vku::InitStructHelper();
     push_data.offset = offset;
     push_data.data.address = address;
@@ -2111,21 +2008,22 @@ void CommandBuffer::PushData(uint32_t offset, size_t size, const void* address) 
     vk::CmdPushDataEXT(handle(), &push_data);
 }
 
-void CommandBuffer::BindShaders(const vkt::Shader& vert_shader, const vkt::Shader& frag_shader) {
+void CommandBuffer::BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
     vk::CmdBindShadersEXT(handle(), 1u, &stages[1], &frag_shader.handle());
 }
 
-void CommandBuffer::BindShaders(const vkt::Shader& vert_shader, const vkt::Shader& geom_shader, const vkt::Shader& frag_shader) {
+void CommandBuffer::BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& geom_shader,
+                                   const vkt::ShaderEXT& frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_GEOMETRY_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
     vk::CmdBindShadersEXT(handle(), 1u, &stages[1], &geom_shader.handle());
     vk::CmdBindShadersEXT(handle(), 1u, &stages[2], &frag_shader.handle());
 }
 
-void CommandBuffer::BindShaders(const vkt::Shader& vert_shader, const vkt::Shader& tesc_shader, const vkt::Shader& tese_shader,
-                                const vkt::Shader& frag_shader) {
+void CommandBuffer::BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& tesc_shader,
+                                   const vkt::ShaderEXT& tese_shader, const vkt::ShaderEXT& frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
                                             VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
     vk::CmdBindShadersEXT(handle(), 1u, &stages[0], &vert_shader.handle());
@@ -2134,8 +2032,9 @@ void CommandBuffer::BindShaders(const vkt::Shader& vert_shader, const vkt::Shade
     vk::CmdBindShadersEXT(handle(), 1u, &stages[3], &frag_shader.handle());
 }
 
-void CommandBuffer::BindShaders(const vkt::Shader& vert_shader, const vkt::Shader& tesc_shader, const vkt::Shader& tese_shader,
-                                const vkt::Shader& geom_shader, const vkt::Shader& frag_shader) {
+void CommandBuffer::BindShadersEXT(const vkt::ShaderEXT& vert_shader, const vkt::ShaderEXT& tesc_shader,
+                                   const vkt::ShaderEXT& tese_shader, const vkt::ShaderEXT& geom_shader,
+                                   const vkt::ShaderEXT& frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
                                             VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
                                             VK_SHADER_STAGE_FRAGMENT_BIT};
@@ -2146,21 +2045,21 @@ void CommandBuffer::BindShaders(const vkt::Shader& vert_shader, const vkt::Shade
     vk::CmdBindShadersEXT(handle(), 1u, &stages[4], &frag_shader.handle());
 }
 
-void CommandBuffer::BindCompShader(const vkt::Shader& comp_shader) {
+void CommandBuffer::BindCompShaderEXT(const vkt::ShaderEXT& comp_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
     const VkShaderEXT shaders[] = {comp_shader};
     vk::CmdBindShadersEXT(handle(), 1u, stages, shaders);
 }
 
-void CommandBuffer::BindMeshShaders(const vkt::Shader& mesh_shader, const vkt::Shader& frag_shader) {
+void CommandBuffer::BindMeshShadersEXT(const vkt::ShaderEXT& mesh_shader, const vkt::ShaderEXT& frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
                                             VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_VERTEX_BIT};
     const VkShaderEXT shaders[] = {VK_NULL_HANDLE, mesh_shader, frag_shader, VK_NULL_HANDLE};
     vk::CmdBindShadersEXT(handle(), 4u, stages, shaders);
 }
 
-void CommandBuffer::BindMeshShaders(const vkt::Shader& task_shader, const vkt::Shader& mesh_shader,
-                                    const vkt::Shader& frag_shader) {
+void CommandBuffer::BindMeshShadersEXT(const vkt::ShaderEXT& task_shader, const vkt::ShaderEXT& mesh_shader,
+                                       const vkt::ShaderEXT& frag_shader) {
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
                                             VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_VERTEX_BIT};
     const VkShaderEXT shaders[] = {task_shader, mesh_shader, frag_shader, VK_NULL_HANDLE};
@@ -2234,6 +2133,25 @@ void CommandBuffer::Copy(const Buffer& src, const Buffer& dst) {
 
 void CommandBuffer::ExecuteCommands(const CommandBuffer& secondary) { vk::CmdExecuteCommands(handle(), 1, &secondary.handle()); }
 
+void CommandBuffer::ExecuteCommands(const std::vector<VkCommandBuffer>& secondaries) {
+    vk::CmdExecuteCommands(handle(), static_cast<uint32_t>(secondaries.size()), secondaries.data());
+}
+
+void CommandBuffer::Barrier(VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                            const VkBufferMemoryBarrier& buffer_barrier, VkDependencyFlags dependency_flags) {
+    vk::CmdPipelineBarrier(handle(), src_stage_mask, dst_stage_mask, dependency_flags, 0, nullptr, 1, &buffer_barrier, 0, nullptr);
+}
+
+void CommandBuffer::Barrier(VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                            const VkMemoryBarrier& barrier, VkDependencyFlags dependency_flags) {
+    vk::CmdPipelineBarrier(handle(), src_stage_mask, dst_stage_mask, dependency_flags, 1, &barrier, 0, nullptr, 0, nullptr);
+}
+
+void CommandBuffer::ExecutionBarrier(VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
+                                     VkDependencyFlags dependency_flags) {
+    vk::CmdPipelineBarrier(handle(), src_stage_mask, dst_stage_mask, dependency_flags, 0, nullptr, 0, nullptr, 0, nullptr);
+}
+
 void CommandBuffer::Barrier(const VkMemoryBarrier2& barrier, VkDependencyFlags dependency_flags) {
     VkDependencyInfo dep_info = DependencyInfo(barrier, dependency_flags);
     vk::CmdPipelineBarrier2(handle(), &dep_info);
@@ -2241,7 +2159,6 @@ void CommandBuffer::Barrier(const VkMemoryBarrier2& barrier, VkDependencyFlags d
 
 void CommandBuffer::Barrier(const VkBufferMemoryBarrier2& buffer_barrier, VkDependencyFlags dependency_flags) {
     VkDependencyInfo dep_info = DependencyInfo(buffer_barrier, dependency_flags);
-    dep_info.dependencyFlags = dependency_flags;
     vk::CmdPipelineBarrier2(handle(), &dep_info);
 }
 
@@ -2504,6 +2421,7 @@ IndirectExecutionSet::IndirectExecutionSet(const Device& dev, const VkIndirectEx
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
 VkResult Surface::Init(VkInstance instance, const VkWin32SurfaceCreateInfoKHR& info) {
+    type_ = vvl::SurfaceType::Win32;
     VkResult result = vk::CreateWin32SurfaceKHR(instance, &info, nullptr, &handle_);
     instance_ = instance;
     return result;
@@ -2511,6 +2429,7 @@ VkResult Surface::Init(VkInstance instance, const VkWin32SurfaceCreateInfoKHR& i
 #endif
 #if defined(VK_USE_PLATFORM_METAL_EXT)
 VkResult Surface::Init(VkInstance instance, const VkMetalSurfaceCreateInfoEXT& info) {
+    type_ = vvl::SurfaceType::Metal;
     VkResult result = vk::CreateMetalSurfaceEXT(instance, &info, nullptr, &handle_);
     instance_ = instance;
     return result;
@@ -2518,6 +2437,7 @@ VkResult Surface::Init(VkInstance instance, const VkMetalSurfaceCreateInfoEXT& i
 #endif
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 VkResult Surface::Init(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR& info) {
+    type_ = vvl::SurfaceType::Android;
     VkResult result = vk::CreateAndroidSurfaceKHR(instance, &info, nullptr, &handle_);
     instance_ = instance;
     return result;
@@ -2525,6 +2445,7 @@ VkResult Surface::Init(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR&
 #endif
 #if defined(VK_USE_PLATFORM_XLIB_KHR)
 VkResult Surface::Init(VkInstance instance, const VkXlibSurfaceCreateInfoKHR& info) {
+    type_ = vvl::SurfaceType::Xlib;
     VkResult result = vk::CreateXlibSurfaceKHR(instance, &info, nullptr, &handle_);
     instance_ = instance;
     return result;
@@ -2532,6 +2453,7 @@ VkResult Surface::Init(VkInstance instance, const VkXlibSurfaceCreateInfoKHR& in
 #endif
 #if defined(VK_USE_PLATFORM_XCB_KHR)
 VkResult Surface::Init(VkInstance instance, const VkXcbSurfaceCreateInfoKHR& info) {
+    type_ = vvl::SurfaceType::Xcb;
     VkResult result = vk::CreateXcbSurfaceKHR(instance, &info, nullptr, &handle_);
     instance_ = instance;
     return result;
@@ -2539,6 +2461,7 @@ VkResult Surface::Init(VkInstance instance, const VkXcbSurfaceCreateInfoKHR& inf
 #endif
 #if defined(VK_USE_PLATFORM_WAYLAND_KHR)
 VkResult Surface::Init(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR& info) {
+    type_ = vvl::SurfaceType::Wayland;
     VkResult result = vk::CreateWaylandSurfaceKHR(instance, &info, nullptr, &handle_);
     instance_ = instance;
     return result;

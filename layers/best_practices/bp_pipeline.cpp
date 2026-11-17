@@ -19,10 +19,9 @@
 
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/bp_state.h"
-#include "generated/spirv_grammar_helper.h"
+#include "error_message/error_strings.h"
 #include "state_tracker/render_pass_state.h"
 #include "state_tracker/pipeline_state.h"
-#include "chassis/chassis_modification_state.h"
 #include "utils/math_utils.h"
 
 static inline bool FormatHasFullThroughputBlendingArm(VkFormat format) {
@@ -48,8 +47,8 @@ bool BestPractices::ValidateMultisampledBlendingArm(const vvl::Pipeline& pipelin
 
     const auto* color_blend_state = pipeline.ColorBlendState();
     const auto* ms_state = pipeline.MultisampleState();
-    if (!color_blend_state || !ms_state || ms_state->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT ||
-        ms_state->sampleShadingEnable) {
+    if (!color_blend_state || pipeline.ignore_color_attachments || !ms_state ||
+        ms_state->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT || ms_state->sampleShadingEnable) {
         return skip;
     }
 
@@ -96,6 +95,46 @@ void BestPractices::ManualPostCallRecordCreateComputePipelines(VkDevice device, 
     pipeline_cache_ = pipelineCache;
 }
 
+// If sample shading is enabled, the implementation sets the final shading rate to {1,1}
+// https://docs.vulkan.org/spec/latest/chapters/primsrast.html#primsrast-fragment-shading-rate-combining
+bool BestPractices::ValidateSampleShadingFragmentShadingRate(const VkGraphicsPipelineCreateInfo& create_info,
+                                                             const vvl::Pipeline& pipeline, const Location& create_info_loc) const {
+    bool skip = false;
+    const auto* fsr_state = vku::FindStructInPNextChain<VkPipelineFragmentShadingRateStateCreateInfoKHR>(create_info.pNext);
+    if (!fsr_state || !pipeline.fragment_shader_state || pipeline.IsDynamic(CB_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR)) {
+        return skip;
+    }
+
+    const bool uses_shading_rate = fsr_state->fragmentSize.width != 1 || fsr_state->fragmentSize.height != 1 ||
+                                   fsr_state->combinerOps[0] != VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR ||
+                                   fsr_state->combinerOps[1] != VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR;
+    if (!uses_shading_rate) {
+        return skip;
+    }
+
+    const auto* ms_state = pipeline.MultisampleState();
+    const auto& entry_point = pipeline.fragment_shader_state->fragment_entry_point;
+    const char* sample_shading_reason = nullptr;
+    if (ms_state && ms_state->sampleShadingEnable) {
+        sample_shading_reason = "pMultisampleState->sampleShadingEnable is VK_TRUE";
+    } else if (entry_point && entry_point->HasBuiltIn(spv::BuiltInSampleId)) {
+        sample_shading_reason = "the fragment shader uses the SampleId built-in";
+    } else if (entry_point && entry_point->HasBuiltIn(spv::BuiltInSamplePosition)) {
+        sample_shading_reason = "the fragment shader uses the SamplePosition built-in";
+    }
+
+    if (sample_shading_reason) {
+        skip |= LogWarning("BestPractices-vkCreateGraphicsPipelines-SampleShadingFragmentShadingRate", device,
+                           create_info_loc.pNext(Struct::VkPipelineFragmentShadingRateStateCreateInfoKHR),
+                           "has fragmentSize (%s) and combinerOps (%s, %s), but %s. Sample shading is enabled, so the "
+                           "implementation will set the fragment shading rate to {1,1} and the requested shading rate is ignored.",
+                           string_VkExtent2D(fsr_state->fragmentSize).c_str(),
+                           string_VkFragmentShadingRateCombinerOpKHR(fsr_state->combinerOps[0]),
+                           string_VkFragmentShadingRateCombinerOpKHR(fsr_state->combinerOps[1]), sample_shading_reason);
+    }
+    return skip;
+}
+
 bool BestPractices::ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo& create_info, const vvl::Pipeline& pipeline,
                                                    const Location create_info_loc) const {
     bool skip = false;
@@ -131,15 +170,27 @@ bool BestPractices::ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreat
                                   VendorSpecificTag(kBPVendorArm));
     }
 
-    const auto* graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
     if (create_info.renderPass == VK_NULL_HANDLE &&
-        !vku::FindStructInPNextChain<VkPipelineRenderingCreateInfo>(create_info.pNext) &&
-        (!graphics_lib_info ||
-         (graphics_lib_info->flags & (VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT |
-                                      VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT)) != 0)) {
-        skip |= LogWarning(
-            "BestPractices-Pipeline-NoRendering", device, create_info_loc,
-            "renderPass is VK_NULL_HANDLE and pNext chain does not contain an instance of VkPipelineRenderingCreateInfo.");
+        !vku::FindStructInPNextChain<VkPipelineRenderingCreateInfo>(create_info.pNext)) {
+        const auto* graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
+        const VkGraphicsPipelineLibraryFlagsEXT rendering_flags = VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT |
+                                                                  VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT |
+                                                                  VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT;
+        bool missing_rendering_info = !graphics_lib_info || (graphics_lib_info->flags & rendering_flags) != 0;
+        if (pipeline.library_create_info) {
+            for (uint32_t i = 0; i < pipeline.library_create_info->libraryCount; ++i) {
+                const auto lib_state = Get<vvl::Pipeline>(pipeline.library_create_info->pLibraries[i]);
+                if (lib_state && (lib_state->graphics_lib_type & rendering_flags) && lib_state->rendering_create_info) {
+                    missing_rendering_info = false;
+                    break;
+                }
+            }
+        }
+        if (missing_rendering_info) {
+            skip |= LogWarning(
+                "BestPractices-Pipeline-NoRendering", device, create_info_loc,
+                "renderPass is VK_NULL_HANDLE and pNext chain does not contain an instance of VkPipelineRenderingCreateInfo.");
+        }
     }
 
     if (VendorCheckEnabled(kBPVendorArm)) {
@@ -161,6 +212,8 @@ bool BestPractices::ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreat
                                           VendorSpecificTag(kBPVendorAMD));
         }
     }
+
+    skip |= ValidateSampleShadingFragmentShadingRate(create_info, pipeline, create_info_loc);
 
     for (uint32_t i = 0; i < pipeline.stage_states.size(); i++) {
         auto& stage_state = pipeline.stage_states[i];
@@ -200,9 +253,9 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
         auto prev_pipeline = pipeline_cache_.load();
         if (pipelineCache && prev_pipeline && pipelineCache != prev_pipeline) {
             skip |= LogPerformanceWarning("BestPractices-vkCreatePipelines-multiple-pipelines-caches", device, error_obj.location,
-                                          "%s %s A second pipeline cache is in use. "
+                                          "%s A second pipeline cache is in use. "
                                           "Consider using only one pipeline cache to improve cache hit rate.",
-                                          VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA));
+                                          VendorSpecificTag(kBPVendorAMD | kBPVendorNVIDIA).c_str());
         }
     }
     if (VendorCheckEnabled(kBPVendorAMD)) {
@@ -467,18 +520,18 @@ bool BestPractices::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer
     bool skip = false;
 
     if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+        auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
+        auto& sub_state = bp_state::SubState(*cb_state);
         if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
-            if (IsPipelineUsedInFrame(pipeline)) {
+            if (sub_state.bound_graphics_pipelines.count(pipeline) != 0) {
                 skip |= LogPerformanceWarning(
                     "BestPractices-Pipeline-SortAndBind", commandBuffer, error_obj.location,
-                    "%s %s Pipeline %s was bound twice in the frame. "
+                    "%s Pipeline %s was bound twice in the command buffer. "
                     "Keep pipeline state changes to a minimum, for example, by sorting draw calls by pipeline.",
-                    VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA), FormatHandle(pipeline).c_str());
+                    VendorSpecificTag(kBPVendorAMD | kBPVendorNVIDIA).c_str(), FormatHandle(pipeline).c_str());
             }
         }
         if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-            auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
-            auto& sub_state = bp_state::SubState(*cb_state);
             const auto& tgm = sub_state.nv.tess_geometry_mesh;
             if (tgm.num_switches >= kNumBindPipelineTessGeometryMeshSwitchesThresholdNVIDIA && !tgm.threshold_signaled) {
                 LogPerformanceWarning("BestPractices-NVIDIA-BindPipeline-SwitchTessGeometryMesh", commandBuffer, error_obj.location,

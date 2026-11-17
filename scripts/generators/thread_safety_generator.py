@@ -54,6 +54,7 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
             'vkGetDeviceQueue',
             'vkGetDeviceQueue2',
             'vkCreateDescriptorSetLayout',
+            'vkDestroyDescriptorSetLayout',
             'vkUpdateDescriptorSets',
             'vkUpdateDescriptorSetWithTemplate',
             'vkUpdateDescriptorSetWithTemplateKHR',
@@ -68,6 +69,8 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
             'vkCreateRayTracingPipelinesKHR',
             'vkQueuePresentKHR',
             'vkWaitForPresentKHR',
+            'vkWaitForPresent2KHR',
+            'vkSetLatencyMarkerNV',
             'vkCreatePipelineBinariesKHR',
         ]
 
@@ -212,7 +215,8 @@ class ThreadSafetyOutputGenerator(BaseGenerator):
                         out.append('}\n')
             else:
                 if param.type in self.vk.handles and param.type != 'VkPhysicalDevice':
-                    if param.length and ('pPipelines' != param.name) and ('pShaders' != param.name or 'Create' not in command.name):
+                    # Non-const arrays are output handles being created, there is nothing to read yet
+                    if param.length and param.const:
                         # Add pointer dereference for array counts that are pointer values
                         dereference = ''
                         for candidate in command.params:

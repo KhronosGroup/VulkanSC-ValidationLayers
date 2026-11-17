@@ -15,10 +15,7 @@
  * limitations under the License.
  */
 
-#include <vulkan/vulkan_core.h>
-#include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
 #include "gpu_av_helper.h"
 
 // If on Mesa, also suggest using MESA_SHADER_CACHE_DISABLE=1
@@ -367,7 +364,7 @@ TEST_F(StressGpuAV, DescriptorIndexingGeneralBufferOOB) {
     // };
     // void main() {
     //     vec4 b = vec4(1.0, 2.0, 1.0, 2.0);
-    //     // Note - This is generated as 4 seperate OpLoads here
+    //     // Note - This is generated as 4 separate OpLoads here
     //     a += dot(vec4(m[0].x, m[0].y, m[0].z, m[0].w), b);
     //     a += dot(vec4(m[31].x, m[31].y, m[31].z, m[31].w), b);
     // }

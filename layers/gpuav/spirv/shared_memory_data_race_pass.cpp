@@ -14,6 +14,7 @@
  */
 
 #include "shared_memory_data_race_pass.h"
+#include "access_path.h"
 #include "containers/container_utils.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "module.h"
@@ -85,15 +86,30 @@ void SharedMemoryDataRacePass::CreateFunctionCall(const Function& function, Basi
                 uint32_t rows_id = type_manager_.GetConstantUInt32FromId(coopmat_type->inst_.Word(4));
                 uint32_t cols_id = type_manager_.GetConstantUInt32FromId(coopmat_type->inst_.Word(5));
                 const uint32_t memory_layout_id = type_manager_.GetConstantUInt32FromId(inst.Word(store ? 3 : 4));
-                uint32_t stride_id = type_manager_.GetConstantUInt32FromId(inst.Word(store ? 4 : 5));
+
+                const Type& uint32_type = type_manager_.GetTypeInt(32, false);
+
+                // MemoryLayout must be a constant, but Stride can be any integer value
+                const uint32_t stride_operand_id = inst.Word(store ? 4 : 5);
+                uint32_t stride_id = stride_operand_id;
+                if (type_manager_.FindConstantById(stride_operand_id)) {
+                    stride_id = type_manager_.GetConstantUInt32FromId(stride_operand_id);
+                } else {
+                    const Type* stride_type = type_manager_.FindTypeGlobal(function, stride_operand_id);
+                    assert(stride_type && stride_type->spv_type_ == SpvType::kInt);
+                    if (stride_type->meta_.scalar.bit_width != 32) {
+                        stride_id = module_.TakeNextId();
+                        block.CreateInstruction(spv::OpUConvert, {uint32_type.Id(), stride_id, stride_operand_id}, inst_it);
+                    } else if (stride_type->IsSignedInt()) {
+                        stride_id = module_.TakeNextId();
+                        block.CreateInstruction(spv::OpBitcast, {uint32_type.Id(), stride_id, stride_operand_id}, inst_it);
+                    }
+                }
 
                 const uint32_t ptr_id = inst.Operand(0);  // works with both store and loads
 
-                // get type of pointee
-                const Type* ptr_type = type_manager_.FindTypeGlobal(function, ptr_id);
-                const Type* scalar_elem_type = type_manager_.FindChildType(*ptr_type, 0);
-
-                const Type& uint32_type = type_manager_.GetTypeInt(32, false);
+                const Type* scalar_elem_type = type_manager_.FindPointeeType(function, ptr_id);
+                assert(scalar_elem_type);
 
                 // if the pointer is to a vector type, scale stride_id by the vector size
                 if (scalar_elem_type->VectorSize() > 0) {
@@ -151,12 +167,24 @@ void SharedMemoryDataRacePass::CreateFunctionCall(const Function& function, Basi
     }
 }
 
+static bool IsSharedMemoryCandidate(uint32_t opcode) {
+    switch (opcode) {
+        case spv::OpLoad:
+        case spv::OpStore:
+        case spv::OpControlBarrier:
+        case spv::OpCooperativeMatrixLoadKHR:
+        case spv::OpCooperativeMatrixStoreKHR:
+            return true;
+        default:
+            return AtomicOperation(opcode);
+    }
+}
+
 bool SharedMemoryDataRacePass::RequiresInstrumentation(const Function& function, BasicBlock& block, InstructionIt& inst_it,
                                                        const Instruction& inst, InstructionMeta& meta) {
     const spv::Op opcode = (spv::Op)inst.Opcode();
 
-    if (!AtomicOperation(opcode) && !IsValueIn(opcode, {spv::OpLoad, spv::OpStore, spv::OpControlBarrier,
-                                                        spv::OpCooperativeMatrixLoadKHR, spv::OpCooperativeMatrixStoreKHR})) {
+    if (!IsSharedMemoryCandidate(opcode)) {
         return false;
     }
     meta.target_instruction = &inst;
@@ -175,10 +203,8 @@ bool SharedMemoryDataRacePass::RequiresInstrumentation(const Function& function,
         return true;
     }
 
-    const AccessPath access_path = type_manager_.BuildAccessPath(function, inst);
-    if (!access_path.IsValid()) {
-        return false;
-    } else if (access_path.variable->StorageClass() != spv::StorageClassWorkgroup) {
+    const AccessPath* access_path = module_.GetAccessPath(function, inst);
+    if (!access_path || !access_path->IsValid(spv::StorageClassWorkgroup)) {
         return false;
     }
 
@@ -187,8 +213,8 @@ bool SharedMemoryDataRacePass::RequiresInstrumentation(const Function& function,
 
     // ptr_elem_type will point to the portion of the variable being accessed. Initialize it
     // to the variable's pointee type in case of no access chains.
-    const Type* ptr_elem_type = type_manager_.FindChildType(*type_manager_.FindTypeById(access_path.variable->inst_.Word(1)), 0);
-    for (auto ac : access_path.ac_list) {
+    const Type* ptr_elem_type = type_manager_.FindChildType(*type_manager_.FindTypeById(access_path->variable->inst_.Word(1)), 0);
+    for (auto ac : access_path->ac_list) {
         const Type* base_ptr_type = type_manager_.FindTypeGlobal(function, ac->Word(3));
 
         // Get the base pointer pointee type.
@@ -242,9 +268,9 @@ bool SharedMemoryDataRacePass::RequiresInstrumentation(const Function& function,
     }
 
     meta.access_chain_idx_id = offset_id;
-    meta.start = slot_start_[access_path.variable->Id()];
+    meta.start = slot_start_[access_path->variable->Id()];
     meta.element_count = type_manager_.GetScalarElementCount(*ptr_elem_type);
-    meta.variable_idx = access_path.variable->Id();
+    meta.variable_idx = access_path->variable->Id();
 
     switch (opcode) {
         case spv::OpLoad:

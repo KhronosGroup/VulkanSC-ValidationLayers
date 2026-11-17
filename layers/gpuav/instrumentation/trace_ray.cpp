@@ -17,6 +17,7 @@
 #include "generated/gpuav_offline_spirv.h"
 #include "gpuav/core/gpuav.h"
 #include "gpuav/core/gpuav_validation_pipeline.h"
+#include "gpuav/instrumentation/register_validation.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
 #include "gpuav/shaders/gpuav_error_codes.h"
 #include "gpuav/shaders/gpuav_error_header.h"
@@ -51,82 +52,82 @@ void RegisterTraceRayValidation(Validator& gpuav, CommandBufferSubState& cb) {
                     std::ostringstream strm;
 
                     const uint32_t error_sub_code = GetSubError(error_record);
-                    const uint32_t opcode = error_record[kInst_LogError_ParameterOffset_2];
+                    const spv::Op opcode = static_cast<spv::Op>(error_record[kInst_LogError_ParameterOffset_2]);
 
                     switch (error_sub_code) {
                         case kErrorSubCode_RayHitObject_NegativeMin: {
                             // Should use std::bit_cast but requires c++20
                             const float tmin = *(float*)(error_record + kInst_LogError_ParameterOffset_0);
-                            strm << string_SpvOpcode(opcode) << " operand Ray Tmin value (" << tmin << ") is negative. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Tmin value (" << tmin << ") is negative. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11879";
                         } break;
                         case kErrorSubCode_RayHitObject_NegativeMax: {
                             const float tmax = *(float*)(error_record + kInst_LogError_ParameterOffset_0);
-                            strm << string_SpvOpcode(opcode) << " operand Ray Tmax value (" << tmax << ") is negative. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Tmax value (" << tmax << ") is negative. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11879";
                         } break;
                         case kErrorSubCode_RayHitObject_MinMax: {
                             const float tmin = *(float*)(error_record + kInst_LogError_ParameterOffset_0);
                             const float tmax = *(float*)(error_record + kInst_LogError_ParameterOffset_1);
-                            strm << string_SpvOpcode(opcode) << " operand Ray Tmax (" << tmax << ") is less than Ray Tmin (" << tmin
+                            strm << spv::OpToString(opcode) << " operand Ray Tmax (" << tmax << ") is less than Ray Tmin (" << tmin
                                  << "). ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11880";
                         } break;
                         case kErrorSubCode_RayHitObject_MinNaN: {
-                            strm << string_SpvOpcode(opcode) << " operand Ray Tmin is NaN. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Tmin is NaN. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11881";
                         } break;
                         case kErrorSubCode_RayHitObject_MaxNaN: {
-                            strm << string_SpvOpcode(opcode) << " operand Ray Tmax is NaN. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Tmax is NaN. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11881";
                         } break;
                         case kErrorSubCode_RayHitObject_OriginNaN: {
-                            strm << string_SpvOpcode(opcode) << " operand Ray Origin contains a NaN. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Origin contains a NaN. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11881";
                         } break;
                         case kErrorSubCode_RayHitObject_DirectionNaN: {
-                            strm << string_SpvOpcode(opcode) << " operand Ray Direction contains a NaN. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Direction contains a NaN. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11881";
                         } break;
                         case kErrorSubCode_RayHitObject_OriginFinite: {
-                            strm << string_SpvOpcode(opcode) << " operand Ray Origin contains a non-finite value. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Origin contains a non-finite value. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11878";
                         } break;
                         case kErrorSubCode_RayHitObject_DirectionFinite: {
-                            strm << string_SpvOpcode(opcode) << " operand Ray Direction contains a non-finite value. ";
+                            strm << spv::OpToString(opcode) << " operand Ray Direction contains a non-finite value. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11878";
                         } break;
                         case kErrorSubCode_RayHitObject_BothSkip: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags is 0x" << std::hex << value << ". ";
+                            strm << spv::OpToString(opcode) << " operand Ray Flags is 0x" << std::hex << value << ". ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11883";
                         } break;
                         case kErrorSubCode_RayHitObject_SkipCull: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags is 0x" << std::hex << value << ". ";
+                            strm << spv::OpToString(opcode) << " operand Ray Flags is 0x" << std::hex << value << ". ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11884";
                         } break;
                         case kErrorSubCode_RayHitObject_Opaque: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags is 0x" << std::hex << value << ". ";
+                            strm << spv::OpToString(opcode) << " operand Ray Flags is 0x" << std::hex << value << ". ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11885";
                         } break;
                         case kErrorSubCode_RayHitObject_SkipTrianglesWithPipelineSkipAABBs: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags (0x" << std::hex << value
+                            strm << spv::OpToString(opcode) << " operand Ray Flags (0x" << std::hex << value
                                  << ") contains SkipTrianglesKHR, but pipeline was created with "
                                     "VK_PIPELINE_CREATE_RAY_TRACING_SKIP_AABBS_BIT_KHR. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11886";
                         } break;
                         case kErrorSubCode_RayHitObject_SkipAABBsWithPipelineSkipTriangles: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags (0x" << std::hex << value
+                            strm << spv::OpToString(opcode) << " operand Ray Flags (0x" << std::hex << value
                                  << ") contains SkipAABBsKHR, but pipeline was created with "
                                     "VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11887";
                         } break;
                         case kErrorSubCode_RayHitObject_TimeOutOfRange: {
-                            strm << string_SpvOpcode(opcode) << " operand time is not between 0.0 and 1.0. ";
+                            strm << spv::OpToString(opcode) << " operand time is not between 0.0 and 1.0. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpHitObjectTraceRayEXT-11882";
                         } break;
                         case kErrorSubCode_RayHitObject_SBTIndexExceedsLimit: {
@@ -221,10 +222,10 @@ void RegisterTraceRayValidation(Validator& gpuav, CommandBufferSubState& cb) {
                             strm << "(set = " << set_num << ", binding = " << binding_num << ", index " << desc_index << ") ";
                             if (error_sub_code == kErrorSubCode_RayQuery_TlasNotBuilt) {
                                 strm << "OpRayQueryInitializeKHR operand Acceleration structure ("
-                                     << gpuav.FormatHandle(as_state->VkHandle()) << ") has not been built.";
+                                     << gpuav.FormatHandle(as_state->Handle()) << ") has not been built.";
                                 out_vuid_msg = "VUID-RuntimeSpirv-OpRayQueryInitializeKHR-06352";
                             } else {
-                                strm << "OpTraceRayKHR operand Acceleration structure (" << gpuav.FormatHandle(as_state->VkHandle())
+                                strm << "OpTraceRayKHR operand Acceleration structure (" << gpuav.FormatHandle(as_state->Handle())
                                      << ") has not been built.";
                                 out_vuid_msg = "VUID-RuntimeSpirv-OpTraceRayKHR-06359";
                             }
@@ -232,14 +233,14 @@ void RegisterTraceRayValidation(Validator& gpuav, CommandBufferSubState& cb) {
                         }
                         case kErrorSubCode_TraceRay_SkipTrianglesWithPipelineSkipAABBs: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags (0x" << std::hex << value
+                            strm << spv::OpToString(opcode) << " operand Ray Flags (0x" << std::hex << value
                                  << ") contains SkipTrianglesKHR, but pipeline was created with "
                                     "VK_PIPELINE_CREATE_RAY_TRACING_SKIP_AABBS_BIT_KHR. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpTraceRayKHR-06553";
                         } break;
                         case kErrorSubCode_TraceRay_SkipAABBsWithPipelineSkipTriangles: {
                             const uint32_t value = error_record[kInst_LogError_ParameterOffset_0];
-                            strm << string_SpvOpcode(opcode) << " operand Ray Flags (0x" << std::hex << value
+                            strm << spv::OpToString(opcode) << " operand Ray Flags (0x" << std::hex << value
                                  << ") contains SkipAABBsKHR, but pipeline was created with "
                                     "VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR. ";
                             out_vuid_msg = "VUID-RuntimeSpirv-OpTraceRayKHR-06554";
@@ -319,29 +320,35 @@ void RegisterTraceRayValidation(Validator& gpuav, CommandBufferSubState& cb) {
 }
 
 struct AccelerationStructureGpuStateUpdateShader {
-    static size_t GetSpirvSize() { return setup_acceleration_structure_gpu_state_update_comp_size * sizeof(uint32_t); }
-    static const uint32_t* GetSpirv() { return setup_acceleration_structure_gpu_state_update_comp; }
+    static size_t GetSpirvSize() { return setup_acceleration_structure_gpu_state_update_slang_size * sizeof(uint32_t); }
+    static const uint32_t* GetSpirv() { return setup_acceleration_structure_gpu_state_update_slang; }
 
-    glsl::AccelerationStructureGpuStateUpdateShaderPushData push_constants{};
+    shader::AccelerationStructureGpuStateUpdateShaderPushData push_constants{};
 
     static std::vector<VkDescriptorSetLayoutBinding> GetDescriptorSetLayoutBindings() { return {}; }
 
     std::vector<VkWriteDescriptorSet> GetDescriptorWrites() const { return {}; }
 };
 
-void UpdateAccelerationStructureGpuState(Validator& gpuav, CommandBufferSubState& cb, const Location& loc, uint32_t info_count,
-                                         const VkAccelerationStructureBuildGeometryInfoKHR* infos) {
+void UpdateAccelerationStructureGpuState(Validator& gpuav, CommandBufferSubState& cb, const Location& loc,
+                                         vvl::span<const AccelerationStructureGpuStateUpdate> updates) {
+    if (!gpuav.gpuav_settings.shader_instrumentation.trace_ray && !gpuav.gpuav_settings.validate_acceleration_structures_builds) {
+        return;
+    }
+
+    if (updates.empty()) {
+        return;
+    }
+
     valpipe::ComputePipeline<AccelerationStructureGpuStateUpdateShader>& as_gpu_state_update_pipeline =
         cb.gpuav_.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<AccelerationStructureGpuStateUpdateShader>>(
             cb.gpuav_, Location(vvl::Func::Empty));
 
-    if (!as_gpu_state_update_pipeline.valid) {
+    if (!as_gpu_state_update_pipeline.Valid()) {
         return;
     }
 
     valpipe::RestorablePipelineState restorable_state(cb, VK_PIPELINE_BIND_POINT_COMPUTE);
-
-    DispatchCmdBindPipeline(cb.VkHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, as_gpu_state_update_pipeline.pipeline);
 
     VkPipelineStageFlags all_shaders_stage_mask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
     if (gpuav.enabled_features.rayTracingPipeline) {
@@ -356,12 +363,12 @@ void UpdateAccelerationStructureGpuState(Validator& gpuav, CommandBufferSubState
                                    &barrier_write_after_read, 0, nullptr, 0, nullptr);
     }
 
-    for (uint32_t info_i = 0; info_i < info_count; ++info_i) {
-        const VkAccelerationStructureBuildGeometryInfoKHR& info = infos[info_i];
+    ASSERT_AND_RETURN(as_gpu_state_update_pipeline.BindComputePipeline(gpuav, cb));
 
-        auto dst_as_state = gpuav.Get<vvl::AccelerationStructureKHR>(info.dstAccelerationStructure);
+    for (const AccelerationStructureGpuStateUpdate& update : updates) {
+        auto dst_as_state = gpuav.Get<vvl::AccelerationStructureKHR>(update.dst);
         if (!dst_as_state) {
-            gpuav.InternalError(info.dstAccelerationStructure, loc,
+            gpuav.InternalError(update.dst, loc,
                                 "gpuav::UpdateAccelerationStructureGpuState(): Unrecognized destination acceleration structure.");
             return;
         }
@@ -369,15 +376,26 @@ void UpdateAccelerationStructureGpuState(Validator& gpuav, CommandBufferSubState
         AccelerationStructureKHRSubState& dst_as_gpuav_state = SubState(*dst_as_state);
 
         AccelerationStructureGpuStateUpdateShader shader_resources;
-        shader_resources.push_constants.gpu_state_ptr = dst_as_gpuav_state.gpu_state.offset_address;
-        shader_resources.push_constants.state = 0;
-        shader_resources.push_constants.state |= 1u << glsl::kAsGpuStateValidShift;
-        shader_resources.push_constants.state |= (uint32_t)info.mode << glsl::kBuildModeShift;
-        VkAccelerationStructureTypeKHR type = dst_as_state->GetType();
-        shader_resources.push_constants.state |= (uint32_t)type << glsl::kAsTypeShift;
-        if (!as_gpu_state_update_pipeline.BindShaderResources(gpuav, cb, shader_resources)) {
-            return;
+        shader_resources.push_constants.dst_gpu_state_ptr = (shader::AsGpuStatePtr)dst_as_gpuav_state.gpu_state.offset_address;
+
+        if (update.src != VK_NULL_HANDLE) {
+            auto src_as_state = gpuav.Get<vvl::AccelerationStructureKHR>(update.src);
+            if (!src_as_state) {
+                gpuav.InternalError(update.src, loc,
+                                    "gpuav::UpdateAccelerationStructureGpuState(): Unrecognized source acceleration structure.");
+                return;
+            }
+            AccelerationStructureKHRSubState& src_as_gpuav_state = SubState(*src_as_state);
+            shader_resources.push_constants.src_gpu_state_ptr = (shader::AsGpuStatePtr)src_as_gpuav_state.gpu_state.offset_address;
+        } else {
+            shader_resources.push_constants.src_gpu_state_ptr = nullptr;
+            shader_resources.push_constants.state = 0;
+            shader_resources.push_constants.state |= 1u << shader::kAsGpuStateBuiltShift;
+            shader_resources.push_constants.state |= (uint32_t)update.mode << shader::kBuildModeShift;
+            VkAccelerationStructureTypeKHR type = dst_as_state->GetType();
+            shader_resources.push_constants.state |= (uint32_t)type << shader::kAsTypeShift;
         }
+        ASSERT_AND_RETURN(as_gpu_state_update_pipeline.BindShaderResources(gpuav, cb, shader_resources));
 
         DispatchCmdDispatch(cb.VkHandle(), 1, 1, 1);
     }

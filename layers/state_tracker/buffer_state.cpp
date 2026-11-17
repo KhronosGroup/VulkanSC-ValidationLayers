@@ -73,9 +73,10 @@ Buffer::Buffer(DeviceState& dev_data, VkBuffer handle, const VkBufferCreateInfo*
       supported_video_profiles(dev_data.video_profile_cache_.Get(
           dev_data.physical_device, vku::FindStructInPNextChain<VkVideoProfileListInfoKHR>(pCreateInfo->pNext))) {
     if (pCreateInfo->flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT) {
-        tracker_.emplace<BindableSparseMemoryTracker>(&requirements,
-                                                      (pCreateInfo->flags & VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT) != 0);
-        SetMemoryTracker(&std::get<BindableSparseMemoryTracker>(tracker_));
+        auto& sparse_tracker =
+            tracker_.emplace<std::unique_ptr<BindableSparseMemoryTracker>>(std::make_unique<BindableSparseMemoryTracker>(
+                &requirements, (pCreateInfo->flags & VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT) != 0));
+        SetMemoryTracker(sparse_tracker.get());
     } else {
         tracker_.emplace<BindableLinearMemoryTracker>(&requirements);
         SetMemoryTracker(&std::get<BindableLinearMemoryTracker>(tracker_));
@@ -205,7 +206,7 @@ void BufferAddressRange::NotifyInvalidate(const StateObject::NodeList& invalid_n
             StateObject::NotifyInvalidate(invalid_nodes, unlink);
         } else {
             // Shift non-null elements to the front and truncate the vector
-            // There is no erase() helpe in small_vector, but this still does the same thing with the memory in-place
+            // There is no erase() helper in small_vector, but this still does the same thing with the memory in-place
             auto new_end = std::remove(buffer_states.begin(), buffer_states.end(), nullptr);
             uint32_t new_size = (uint32_t)std::distance(buffer_states.begin(), new_end);
             buffer_states.resize(new_size);

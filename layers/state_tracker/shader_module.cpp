@@ -16,8 +16,11 @@
  */
 
 #include "state_tracker/shader_module.h"
+#include "containers/custom_containers.h"
 #include "state_tracker/shader_instruction.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <sstream>
 #include <string>
 #include <queue>
@@ -27,6 +30,7 @@
 #include "utils/assert_utils.h"
 #include "utils/hash_util.h"
 #include "utils/shader_utils.h"
+#include "utils/descriptor_utils.h"
 #include "generated/spirv_grammar_helper.h"
 #include "generated/spirv_validation_helper.h"
 
@@ -85,8 +89,17 @@ void DecorationBase::Add(uint32_t decoration, uint32_t value) {
         case spv::DecorationPerPrimitiveEXT:  // VK_EXT_mesh_shader
             flags |= per_primitive_ext;
             break;
+        case spv::DecorationFlat:
+            flags |= flat_bit;
+            break;
+        case spv::DecorationNoPerspective:
+            flags |= no_perspective_bit;
+            break;
         case spv::DecorationOffset:
             offset = value;
+            break;
+        case spv::DecorationArrayStride:
+            array_stride = value;
             break;
         default:
             break;
@@ -96,23 +109,45 @@ void DecorationBase::Add(uint32_t decoration, uint32_t value) {
 void DecorationBase::AddId(uint32_t decoration, uint32_t id) {
     switch (decoration) {
         case spv::DecorationOffsetIdEXT:
-            offset_id = id;
+            offset = id;
+            is_offset_id = true;
             break;
         case spv::DecorationArrayStrideIdEXT:
-            array_stride_id = id;
+            array_stride = id;
+            is_array_stride_id = true;
             break;
         default:
             break;
     }
 }
 
+uint32_t DecorationBase::GetOffset(const Module& module_state, const CachedDescriptorSize& descriptor_sizes) const {
+    if (!is_offset_id) {
+        return offset;  // Offset
+    }
+    // Using OffsetIdEXT
+    const spirv::Instruction* inst = module_state.FindDef(offset);
+    return module_state.GetHeapUntypedSize(descriptor_sizes, *inst);
+}
+
+uint32_t DecorationBase::GetArrayStride(const Module& module_state, const CachedDescriptorSize& descriptor_sizes) const {
+    if (!is_array_stride_id) {
+        return array_stride;  // ArrayStride
+    }
+    // Using ArrayStrideIdEXT
+    const spirv::Instruction* inst = module_state.FindDef(array_stride);
+    return module_state.GetHeapUntypedSize(descriptor_sizes, *inst);
+}
+
 // Some decorations are only avaiable for variables, so can't be in OpMemberDecorate
 void DecorationSet::Add(uint32_t decoration, uint32_t value) {
     switch (decoration) {
         case spv::DecorationDescriptorSet:
+            flags |= descriptor_set_bit;
             set = value;
             break;
         case spv::DecorationBinding:
+            flags |= binding_bit;
             binding = value;
             break;
         case spv::DecorationInputAttachmentIndex:
@@ -434,6 +469,9 @@ static void FindPointersAndObjects(const Instruction& insn, vvl::unordered_set<u
             // This is not an access of memory, but counts as static usage of the variable
             result.insert(insn.Word(3));
             break;
+        case spv::OpUntypedArrayLengthKHR:
+            result.insert(insn.Word(4));  // ptr
+            break;
         case spv::OpFunctionCall:
             for (uint32_t i = 3; i < insn.Length(); i++) {
                 result.insert(insn.Word(i));  // fn itself, and all args
@@ -679,22 +717,31 @@ std::vector<StageInterfaceVariable> EntryPoint::GetStageInterfaceVariables(const
 
 std::vector<ResourceInterfaceVariable> EntryPoint::GetResourceInterfaceVariables(const Module& module_state, EntryPoint& entrypoint,
                                                                                  const ParsedInfo& parsed) {
-    std::vector<ResourceInterfaceVariable> variables;
+    std::vector<ResourceInterfaceVariable> interface_variables;
+
+    // Ensure deterministic iteration order for interface variables. This order is used to compare
+    // syncval error messages, and it is also good UX: the first reported error is the same between runs.
+    // Sort a vector of instruction pointers (8-byte elements) instead of sorting interface_variables,
+    // whose ResourceInterfaceVariable elements are large
+    std::vector<const Instruction*> ordered_variables(entrypoint.accessible.variables.begin(),
+                                                      entrypoint.accessible.variables.end());
+    std::sort(ordered_variables.begin(), ordered_variables.end(),
+              [](const Instruction* a, const Instruction* b) { return a->ResultId() < b->ResultId(); });
 
     // Now that the accessible list is known, fill in any information that can be statically known per EntryPoint
-    for (const Instruction* insn : entrypoint.accessible.variables) {
+    for (const Instruction* insn : ordered_variables) {
         const uint32_t storage_class = insn->StorageClass();
         // These are the only storage classes that interface with a descriptor
         // see vkspec.html#interfaces-resources-descset
         if (storage_class == spv::StorageClassUniform || storage_class == spv::StorageClassUniformConstant ||
             storage_class == spv::StorageClassStorageBuffer || storage_class == spv::StorageClassTileAttachmentQCOM) {
-            variables.emplace_back(module_state, entrypoint, *insn, parsed);
+            interface_variables.emplace_back(module_state, entrypoint, *insn, parsed);
         } else if (storage_class == spv::StorageClassPushConstant) {
             entrypoint.push_constant_variable =
                 std::make_shared<PushConstantVariable>(module_state, *insn, entrypoint.stage, parsed);
         }
     }
-    return variables;
+    return interface_variables;
 }
 
 StaticImageAccess::StaticImageAccess(const Module& module_state, const Instruction& insn,
@@ -709,7 +756,7 @@ StaticImageAccess::StaticImageAccess(const Module& module_state, const Instructi
     // There is only one way to write to images, everything else is considered a read access
     access_mask |= (image_opcode == spv::OpImageWrite) ? AccessBit::image_write : AccessBit::image_read;
 
-    // Do sampler searching as seperate walk to not have the "visited" loop protection be falsly triggered
+    // Do sampler searching as separate walk to not have the "visited" loop protection be falsely triggered
     std::vector<const Instruction*> sampler_insn_to_search;
 
     auto walk_to_variables = [this, &module_state, &func_parameter_map, &sampler_insn_to_search](const Instruction* find_insn,
@@ -846,6 +893,10 @@ EntryPoint::EntryPoint(const Module& module_state, const Instruction& entrypoint
     // Tried to just create this map in GetResourceInterfaceVariables() but ran into errors because the function is static
     for (const auto& variable : resource_interface_variables) {
         resource_interface_variable_map[variable.id] = &variable;
+
+        if (stage == VK_SHADER_STAGE_FRAGMENT_BIT && variable.decorations.Has(spirv::DecorationSet::input_attachment_bit)) {
+            has_input_attachment = true;
+        }
     }
 
     // After all variables are made, can get references from them
@@ -894,6 +945,7 @@ EntryPoint::EntryPoint(const Module& module_state, const Instruction& entrypoint
             for (const auto& slot : variable.interface_slots) {
                 if (variable.storage_class == spv::StorageClassInput) {
                     input_interface_slots[slot] = &variable;
+                    input_interface_locations.insert(slot.Location());
                     if (!max_input_slot || slot.slot > max_input_slot->slot) {
                         max_input_slot = &slot;
                         max_input_slot_variable = &variable;
@@ -924,9 +976,13 @@ Module::StaticData::StaticData(const Module& module_state, bool parse, Stateless
     {
         std::vector<uint32_t>::const_iterator it = module_state.words_.cbegin();
         it += 5;  // skip first 5 word of header
-        instructions.reserve(module_state.words_.size() * 4);
+        // We can never have more instructions than word, so this should be less... but how much less?
+        // Using a _LARGE_ shader database, found the average dwords-per-instruction
+        // is around 4.5 where 95% of shaders had over 4.0
+        // The absolute the lowest of any of the shaders the average was 3 (dwords-per-instruction)
+        instructions.reserve(module_state.words_.size() / 3);
         while (it != module_state.words_.cend()) {
-            auto new_insn = instructions.emplace_back(it);
+            const Instruction& new_insn = instructions.emplace_back(it);
             const uint32_t opcode = new_insn.Opcode();
 
             // Check for opcodes that would require reparsing of the words
@@ -962,6 +1018,7 @@ Module::StaticData::StaticData(const Module& module_state, bool parse, Stateless
     uint32_t last_func_id = 0;
     // < Function ID, OpFunctionParameter Ids >
     vvl::unordered_map<uint32_t, std::vector<uint32_t>> func_parameter_list;
+    vvl::unordered_set<uint32_t> func_parameter_types;
 
     // Loop through once and build up the static data
     // Also process the entry points
@@ -1027,6 +1084,12 @@ Module::StaticData::StaticData(const Module& module_state, bool parse, Stateless
             case spv::OpEndStreamPrimitive:
                 if (stateless_data) {
                     stateless_data->transform_feedback_stream_inst.push_back(&insn);
+                }
+                break;
+
+            case spv::OpLoopMerge:
+                if (stateless_data) {
+                    stateless_data->loop_merge_inst.push_back(&insn);
                 }
                 break;
 
@@ -1215,7 +1278,7 @@ Module::StaticData::StaticData(const Module& module_state, bool parse, Stateless
                 emit_mesh_tasks_inst.push_back(&insn);
                 break;
             case spv::OpConstantSizeOfEXT:
-                constant_size_of_inst.push_back(&insn);
+                constant_heap_inst.push_back(&insn);
                 break;
 
             case spv::OpExtInst: {
@@ -1272,6 +1335,7 @@ Module::StaticData::StaticData(const Module& module_state, bool parse, Stateless
                 break;
             case spv::OpFunctionParameter:
                 func_parameter_list[last_func_id].push_back(insn.ResultId());
+                func_parameter_types.insert(insn.TypeId());
                 break;
             case spv::OpFunctionCall:
                 func_call_instructions.push_back(&insn);
@@ -1330,6 +1394,15 @@ Module::StaticData::StaticData(const Module& module_state, bool parse, Stateless
                 const uint32_t arg = func_call->Word(first_arg_word + i);
                 const uint32_t param = func_def.second[i];
                 func_parameter_map[param].push_back(arg);
+            }
+        }
+    }
+
+    if (module_state.HasCapability(spv::CapabilityUntypedPointersKHR)) {
+        for (uint32_t param_type : func_parameter_types) {
+            if (module_state.FindDef(param_type)->Opcode() == spv::OpTypeUntypedPointerKHR) {
+                has_untyped_pointer_function_params = true;
+                break;
             }
         }
     }
@@ -1436,7 +1509,7 @@ std::string Module::GetDecorations(uint32_t id) const {
         if (insn.Opcode() == spv::OpFunction) {
             break;  // decorations are found before first function block
         } else if (insn.Opcode() == spv::OpDecorate && insn.Word(1) == id) {
-            ss << " " << string_SpvDecoration(insn.Word(2));
+            ss << " " << spv::DecorationToString(static_cast<spv::Decoration>(insn.Word(2)));
         }
     }
     return ss.str();
@@ -1504,7 +1577,7 @@ void Module::DescribeTypeInner(std::ostringstream& ss, uint32_t type, uint32_t i
             DescribeTypeInner(ss, insn->Word(2), indent);
             break;
         case spv::OpTypePointer:
-            ss << "pointer to " << string_SpvStorageClass(insn->Word(2)) << " -> ";
+            ss << "pointer to " << spv::StorageClassToString(static_cast<spv::StorageClass>(insn->Word(2))) << " -> ";
             DescribeTypeInner(ss, insn->Word(3), indent);
             break;
         case spv::OpTypeStruct: {
@@ -1542,7 +1615,7 @@ void Module::DescribeTypeInner(std::ostringstream& ss, uint32_t type, uint32_t i
         case spv::OpTypeImage:
             ss << "image(dim=" << insn->Word(3) << ", sampled=" << insn->Word(7) << ")";
             break;
-        case spv::OpTypeAccelerationStructureNV:
+        case spv::OpTypeAccelerationStructureKHR:
             ss << "accelerationStruture";
             break;
         default:
@@ -1660,7 +1733,7 @@ LocalSize Module::FindLocalSize(const EntryPoint& entrypoint) const {
     return local_size;
 }
 
-uint32_t Module::CalculateWorkgroupSharedMemory() const {
+uint32_t Module::CalculateWorkgroupSharedMemory(const EntryPoint& entrypoint) const {
     uint32_t total_size = 0;
     // when using WorkgroupMemoryExplicitLayoutKHR
     // either all or none the structs are decorated with Block,
@@ -1668,80 +1741,117 @@ uint32_t Module::CalculateWorkgroupSharedMemory() const {
     // In this case we want to find the MAX not ADD the block sizes
     bool find_max_block = false;
 
+    constexpr uint32_t spirv_version_1_4 = 0x00010400;
+    const bool spirv_1_4_or_later = words_[1] >= spirv_version_1_4;
+
     for (const Instruction* insn : static_data_.variable_inst) {
-        // StorageClass Workgroup is shared memory
-        if (insn->StorageClass() == spv::StorageClassWorkgroup) {
-            if (GetDecorationSet(insn->Word(2)).Has(DecorationSet::aliased_bit)) {
-                find_max_block = true;
+        if (insn->StorageClass() != spv::StorageClassWorkgroup) {
+            continue;  // "shared memory" == the Workgroup storage class
+        }
+
+        // Starting in SPIR-V 1.4, only the Workgroup variables listed in the OpEntryPoint interface are counted
+        // https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/8678
+        if (spirv_1_4_or_later) {
+            const Instruction& entry_point = entrypoint.entrypoint_insn;
+            uint32_t word = entry_point.GetEntryPointInterfaceStart();
+            const uint32_t total_words = entrypoint.entrypoint_insn.Length();
+            bool in_interface = false;
+            for (; word < total_words; word++) {
+                if (entry_point.Word(word) == insn->ResultId()) {
+                    in_interface = true;
+                    break;
+                }
             }
-
-            const Instruction* type = GetVariablePointerType(*insn);
-
-            // structs might have an offset padding
-            const uint32_t variable_shared_size =
-                (type->Opcode() == spv::OpTypeStruct) ? GetTypeStructInfo(type)->GetSize(*this).size : GetTypeBytesSize(type);
-
-            if (find_max_block) {
-                total_size = std::max(total_size, variable_shared_size);
-            } else {
-                total_size += variable_shared_size;
+            if (!in_interface) {
+                continue;
             }
+        }
+
+        if (GetDecorationSet(insn->Word(2)).Has(DecorationSet::aliased_bit)) {
+            find_max_block = true;
+        }
+
+        const Instruction* type = GetVariablePointerType(*insn);
+
+        // structs might have an offset padding
+        const uint32_t variable_shared_size =
+            (type->Opcode() == spv::OpTypeStruct) ? GetTypeStructInfo(type)->GetSize(*this).size : GetTypeBytesSize(type);
+
+        if (find_max_block) {
+            total_size = std::max(total_size, variable_shared_size);
+        } else {
+            total_size += variable_shared_size;
         }
     }
     return total_size;
 }
 
 // See https://gitlab.khronos.org/vulkan/vulkan/-/issues/4858
-// When we hit a OpConstantSizeOfEXT, we get the <Type ID> and use this function to map it to the correct prop
-uint32_t Module::ResolveConstantSizeOf(const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props,
-                                       const spirv::Instruction& inst) const {
-    assert(inst.Opcode() == spv::OpConstantSizeOfEXT);
+// When we hit a OpConstantSizeOfEXT, we get the <Type ID> and use this function to map it to the correct value
+uint32_t Module::ResolveDescriptorConstant(const CachedDescriptorSize& descriptor_sizes, const spirv::Instruction& inst) const {
     const spirv::Instruction* type_inst = FindDef(inst.Word(3));
-    const spv::Op opcode = (spv::Op)type_inst->Opcode();
-
-    if (opcode == spv::OpTypeSampler) {
-        return (uint32_t)props.samplerDescriptorSize;
-    } else if (opcode == spv::OpTypeBufferEXT || opcode == spv::OpTypeAccelerationStructureKHR) {
-        return (uint32_t)props.bufferDescriptorSize;
-    } else if (opcode == spv::OpTypeImage) {
-        return (uint32_t)props.imageDescriptorSize;
+    VkDescriptorType descriptor_type;
+    switch (type_inst->Opcode()) {
+        case spv::OpTypeSampler:
+            descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLER;
+            break;
+        case spv::OpTypeImage:
+            descriptor_type = type_inst->GetImageType();
+            break;
+        case spv::OpTypeBufferEXT:
+            descriptor_type = type_inst->Word(2) == spv::StorageClassUniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                                                                             : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            break;
+        case spv::OpTypeAccelerationStructureKHR:
+            descriptor_type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+            break;
+        case spv::OpTypeTensorARM:
+            descriptor_type = VK_DESCRIPTOR_TYPE_TENSOR_ARM;
+            break;
+        default:
+            assert(false);  // spirv-val checks it is a descriptor type
+            return 0;
     }
-    assert(false);
-    return 0;
+
+    assert(inst.Opcode() == spv::OpConstantSizeOfEXT);
+    return static_cast<uint32_t>(descriptor_sizes.GetConstantSizeOf(descriptor_type));
+}
+
+static bool IsDescriptorConstant(uint32_t opcode) { return opcode == spv::OpConstantSizeOfEXT; }
+
+static uint32_t ResolveConstantFoldOperand(const Module& module, const Instruction& operand_inst,
+                                           const CachedDescriptorSize& descriptor_sizes) {
+    if (IsDescriptorConstant(operand_inst.Opcode())) {
+        return module.ResolveDescriptorConstant(descriptor_sizes, operand_inst);
+    } else if (operand_inst.Opcode() == spv::OpSpecConstantOp) {
+        return module.ResolveConstantFoldHeaps(descriptor_sizes, operand_inst);
+    }
+    return operand_inst.GetConstantValue();
 }
 
 // if we hit this, its because of OpConstantSizeOfEXT can't be folded (https://godbolt.org/z/3z6Pao4sf)
 // TODO - We will need some sort of internal constant folding here... fun!
 // ... for now lets make assumption only thing people will use here is IMul/IAdd/Isub and just do some folding
-uint32_t Module::ResolveConstantFoldHeaps(const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props,
+//
+// Slang with -spirv-unified-descriptor-heap-stride will do a OpSelect/OpUGreaterThan to get a max(buffer, image)
+uint32_t Module::ResolveConstantFoldHeaps(const CachedDescriptorSize& descriptor_sizes,
                                           const spirv::Instruction& spec_constant_op) const {
     assert(spec_constant_op.Opcode() == spv::OpSpecConstantOp);
     const uint32_t spec_op = spec_constant_op.Word(3);
-    if (spec_op != spv::OpIMul && spec_op != spv::OpIAdd && spec_op != spv::OpISub) {
+    if (!IsValueIn((spv::Op)spec_op, {spv::OpIMul, spv::OpIAdd, spv::OpISub, spv::OpUDiv, spv::OpUMod, spv::OpNot,
+                                      spv::OpBitwiseAnd, spv::OpBitwiseOr, spv::OpUGreaterThan, spv::OpUGreaterThanEqual,
+                                      spv::OpULessThan, spv::OpULessThanEqual, spv::OpSelect})) {
         assert(false);  // hit another case
         return 0;
     }
 
-    const spirv::Instruction& operand_0_inst = *FindDef(spec_constant_op.Word(4));
-    const spirv::Instruction& operand_1_inst = *FindDef(spec_constant_op.Word(5));
+    const spirv::Instruction* operand_0_inst = FindDef(spec_constant_op.Word(4));
+    const spirv::Instruction* operand_1_inst = spec_constant_op.Length() > 5 ? FindDef(spec_constant_op.Word(5)) : nullptr;
+    const spirv::Instruction* operand_2_inst = spec_constant_op.Length() > 6 ? FindDef(spec_constant_op.Word(6)) : nullptr;
 
-    uint32_t operand_0 = 0;
-    if (operand_0_inst.Opcode() == spv::OpConstantSizeOfEXT) {
-        operand_0 = ResolveConstantSizeOf(props, operand_0_inst);
-    } else if (operand_0_inst.Opcode() == spv::OpSpecConstantOp) {
-        operand_0 = ResolveConstantFoldHeaps(props, operand_0_inst);
-    } else {
-        operand_0 = operand_0_inst.GetConstantValue();
-    }
-
-    uint32_t operand_1 = 0;
-    if (operand_1_inst.Opcode() == spv::OpConstantSizeOfEXT) {
-        operand_1 = ResolveConstantSizeOf(props, operand_1_inst);
-    } else if (operand_1_inst.Opcode() == spv::OpSpecConstantOp) {
-        operand_1 = ResolveConstantFoldHeaps(props, operand_1_inst);
-    } else {
-        operand_1 = operand_1_inst.GetConstantValue();
-    }
+    const uint32_t operand_0 = ResolveConstantFoldOperand(*this, *operand_0_inst, descriptor_sizes);
+    const uint32_t operand_1 = operand_1_inst ? ResolveConstantFoldOperand(*this, *operand_1_inst, descriptor_sizes) : 0;
+    const uint32_t operand_2 = operand_2_inst ? ResolveConstantFoldOperand(*this, *operand_2_inst, descriptor_sizes) : 0;
 
     if (spec_op == spv::OpIMul) {
         return operand_0 * operand_1;
@@ -1749,20 +1859,39 @@ uint32_t Module::ResolveConstantFoldHeaps(const VkPhysicalDeviceDescriptorHeapPr
         return operand_0 + operand_1;
     } else if (spec_op == spv::OpISub) {
         return operand_0 - operand_1;
+    } else if (spec_op == spv::OpUDiv) {
+        return operand_1 != 0 ? operand_0 / operand_1 : 0;
+    } else if (spec_op == spv::OpUMod) {
+        return operand_1 != 0 ? operand_0 % operand_1 : 0;
+    } else if (spec_op == spv::OpNot) {
+        return ~operand_0;
+    } else if (spec_op == spv::OpBitwiseAnd) {
+        return operand_0 & operand_1;
+    } else if (spec_op == spv::OpBitwiseOr) {
+        return operand_0 | operand_1;
+    } else if (spec_op == spv::OpUGreaterThan) {
+        return operand_0 > operand_1;
+    } else if (spec_op == spv::OpUGreaterThanEqual) {
+        return operand_0 >= operand_1;
+    } else if (spec_op == spv::OpULessThan) {
+        return operand_0 < operand_1;
+    } else if (spec_op == spv::OpULessThanEqual) {
+        return operand_0 <= operand_1;
+    } else if (spec_op == spv::OpSelect) {
+        return operand_0 != 0 ? operand_1 : operand_2;
     }
     assert(false);
     return 0;
 }
 
-uint32_t Module::GetHeapUntypedSize(const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props,
-                                    const spirv::Instruction& inst) const {
+uint32_t Module::GetHeapUntypedSize(const CachedDescriptorSize& descriptor_sizes, const spirv::Instruction& inst) const {
     const spv::Op opcode = (spv::Op)inst.Opcode();
-    if (opcode == spv::OpConstantSizeOfEXT) {
-        return ResolveConstantSizeOf(props, inst);
+    if (IsDescriptorConstant(opcode)) {
+        return ResolveDescriptorConstant(descriptor_sizes, inst);
     } else if (opcode == spv::OpConstant) {
         return inst.GetConstantValue();
     } else if (opcode == spv::OpSpecConstantOp) {
-        return ResolveConstantFoldHeaps(props, inst);
+        return ResolveConstantFoldHeaps(descriptor_sizes, inst);
     }
     assert(false);  // assumptions
     return 0;
@@ -2027,8 +2156,8 @@ VkFormat Module::GetTensorFormat(const spirv::Instruction& type_inst) const {
 
 std::string InterfaceSlot::Describe() const {
     std::ostringstream msg;
-    msg << "Location = " << Location() << " | Component = " << Component() << " | Type = " << string_SpvOpcode(type) << " "
-        << bit_width << " bits";
+    msg << "Location = " << Location() << " | Component = " << Component()
+        << " | Type = " << spv::OpToString(static_cast<spv::Op>(type)) << " " << bit_width << " bits";
     return msg.str();
 }
 
@@ -2138,7 +2267,7 @@ std::string ResourceInterfaceVariable::DescribeDescriptor() const {
 std::string StageInterfaceVariable::Describe() const {
     assert(!is_built_in);
     std::ostringstream ss;
-    ss << "[" << string_SpvStorageClass(storage_class) << " variable";
+    ss << "[" << spv::StorageClassToString(storage_class) << " variable";
 
     if (type_struct_info) {
         // is a struct where each field has it's own location
@@ -2321,7 +2450,8 @@ std::vector<InterfaceSlot> StageInterfaceVariable::GetInterfaceSlots(StageInterf
                     if (padding_components != 0) {
                         component_offset = padding_components * (j / column_components);
                     }
-                    slots.emplace_back(base_location, j + component_offset, numerical_type_opcode, numerical_type_width);
+                    slots.emplace_back(base_location, j + component_offset, numerical_type_opcode, numerical_type_width,
+                                       variable.decorations.flags | (members.decorations ? members.decorations->flags : 0));
                 }
                 base_location++;  // If using, each members starts a new Location
             }
@@ -2365,7 +2495,7 @@ std::vector<InterfaceSlot> StageInterfaceVariable::GetInterfaceSlots(StageInterf
                             component_offset = padding_components * (j / column_components);
                         }
                         slots.emplace_back(location, starting_component + j + component_offset, numerical_type_opcode,
-                                           numerical_type_width);
+                                           numerical_type_width, variable.decorations.flags | member_decoration.flags);
                     }
                 }
             }
@@ -2403,7 +2533,7 @@ std::vector<InterfaceSlot> StageInterfaceVariable::GetInterfaceSlots(StageInterf
                     matrix_offset += (4 - vector_components);  // skip to next Location
                 }
                 slots.emplace_back(location, component + starting_component + matrix_offset, numerical_type_opcode,
-                                   numerical_type_width);
+                                   numerical_type_width, variable.decorations.flags);
             }
         }
     }
@@ -2480,11 +2610,11 @@ bool ResourceInterfaceVariable::IsHeap() const {
     // It is only legal to not have a set/binding for descriptors if they are the heap
     // We might one day want to know which heap it is, and could just check for |ResourceHeapEXT| or |SamplerHeapEXT| but that will
     // for sure require more testing
-    return decorations.set == kInvalidValue || decorations.binding == kInvalidValue;
+    return !(decorations.Has(DecorationBase::descriptor_set_bit) && decorations.Has(DecorationBase::binding_bit));
 }
 
 const Instruction& ResourceInterfaceVariable::FindBaseType(ResourceInterfaceVariable& variable, const Module& module_state) {
-    // Takes a OpVariable and looks at the the descriptor type it uses. This will find things such as if the variable is writable,
+    // Takes a OpVariable and looks at the descriptor type it uses. This will find things such as if the variable is writable,
     // image atomic operation, matching images to samplers, etc
     const Instruction* type = module_state.FindDef(variable.type_id);
     assert(type->Opcode() == spv::OpTypePointer || type->Opcode() == spv::OpTypeUntypedPointerKHR);
@@ -2538,7 +2668,7 @@ VkDescriptorType ResourceInterfaceVariable::GetPotentialDescriptorType() const {
         return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     } else if (is_combined_image_sampler) {
         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    } else if (is_acceleration_structure || is_acceleration_structure_nv) {
+    } else if (is_acceleration_structure) {
         return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     }
     return VK_DESCRIPTOR_TYPE_MAX_ENUM;
@@ -2583,14 +2713,7 @@ vvl::unordered_set<VkDescriptorType> ResourceInterfaceVariable::GetAllDescriptor
         types.insert(VK_DESCRIPTOR_TYPE_TENSOR_ARM);
     } else if (is_acceleration_structure) {
         types.insert(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR);
-        if (is_partitioned_acceleration_structure) {
-            types.insert(VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV);
-        }
-    } else if (is_acceleration_structure_nv) {
-        types.insert(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV);
-        if (is_partitioned_acceleration_structure) {
-            types.insert(VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV);
-        }
+        types.insert(VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV);
     }
 
     assert(!types.empty() || IsHeap());
@@ -2696,10 +2819,8 @@ ResourceInterfaceVariable::ResourceInterfaceVariable(const Module& module_state,
                     if (is_input_attachment) {
                         if (!IsArray()) {
                             input_attachment_index_read.emplace(0);
-                        } else if (image_access.image_access_chain_index != kInvalidValue &&
-                                   image_access.image_access_chain_index != kSpecConstant) {
-                            // Non-constant index requires GPU-AV
-                            // Spec Constants are handled after constant folding
+                        } else {
+                            // Might be kInvalidValue, but handled from the code accessing it
                             input_attachment_index_read.emplace(image_access.image_access_chain_index);
                         }
                     }
@@ -2753,24 +2874,12 @@ ResourceInterfaceVariable::ResourceInterfaceVariable(const Module& module_state,
     } else if (base_type_opcode == spv::OpTypeSampler) {
         is_sampler = true;
     } else if (base_type_opcode == spv::OpTypeAccelerationStructureKHR) {
-        // The SPIR-V OpType* are alias, but the Descriptor Types are different
-
-        // Only KHR or NV base acceleration structure is selected
-        if (module_state.HasCapability(spv::CapabilityRayTracingNV)) {
-            is_acceleration_structure_nv = true;
-        } else {
-            is_acceleration_structure = true;
-        }
-
-        // Additionally allow PTLAS if shader uses cluster acceleration structure features
-        if (module_state.HasCapability(spv::CapabilityRayTracingClusterAccelerationStructureNV)) {
-            is_partitioned_acceleration_structure = true;
-        }
+        is_acceleration_structure = true;
     }
 
     for (const Instruction* pointer : entrypoint.accessible.access_chains) {
         const spirv::Instruction* base = module_state.FindDef(pointer->Word(3));
-        if (base->Opcode() == spv::OpVariable && type_id == base->Word(1)) {
+        if (base->Opcode() == spv::OpVariable && base->ResultId() == id) {
             const spirv::Instruction* base_pointer = module_state.FindDef(base->Word(1));
             const spirv::Instruction* base_type = module_state.FindDef(base_pointer->Word(3));
             if (base_type->IsArray()) {

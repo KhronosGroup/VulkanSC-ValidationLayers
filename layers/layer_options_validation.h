@@ -52,26 +52,27 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT &la
         else if (strcmp(VK_LAYER_DEBUG_ACTION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
         else if (strcmp(VK_LAYER_DEBUG_DISABLE_SPIRV_VAL, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_DESCRIPTOR_HASHING, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
+        else if (strcmp(VK_LAYER_DESCRIPTOR_HASHING_TOTAL_DESCRIPTORS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_UINT32_EXT; }
         else if (strcmp(VK_LAYER_DISABLES, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
         else if (strcmp(VK_LAYER_DUPLICATE_MESSAGE_LIMIT, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_UINT32_EXT; }
         else if (strcmp(VK_LAYER_ENABLE_MESSAGE_LIMIT, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_ENABLES, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
-        else if (strcmp(VK_LAYER_FINE_GRAINED_LOCKING, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPU_DUMP_COPY_MEMORY_INDIRECT, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPU_DUMP_DESCRIPTORS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
-        else if (strcmp(VK_LAYER_GPU_DUMP_DEVICE_COPY, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPU_DUMP_DEVICE_GENERATED_COMMANDS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPU_DUMP_TO_STDOUT, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_ACCELERATION_STRUCTURES_BUILDS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_BUFFER_ADDRESS_OOB, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_BUFFER_COPIES, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_BUFFERS_VALIDATION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
+        else if (strcmp(VK_LAYER_GPUAV_CDL_DUMP_PATH, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_COPY_MEMORY_INDIRECT, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DEBUG_DISABLE_ALL, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DEBUG_DISABLE_DONTINLINE, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DEBUG_DUMP_INSTRUMENTED_SHADERS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DEBUG_MAX_INSTRUMENTATIONS_COUNT, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_UINT32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DEBUG_PRINT_INSTRUMENTATION_INFO, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
+        else if (strcmp(VK_LAYER_GPUAV_DEBUG_TEST_LOWER_LIMITS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DEBUG_VALIDATE_INSTRUMENTED_SHADERS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_DESCRIPTOR_CHECKS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_ENABLE, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
@@ -93,6 +94,7 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT &la
         else if (strcmp(VK_LAYER_GPUAV_VALIDATE_TRACE_RAY, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_GPUAV_VERTEX_ATTRIBUTE_FETCH_OOB, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_LEGACY_DETECTION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
+        else if (strcmp(VK_LAYER_LEGACY_DETECTION_MODE, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
         else if (strcmp(VK_LAYER_LOG_FILENAME, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
         else if (strcmp(VK_LAYER_MESSAGE_FORMAT_DISPLAY_APPLICATION_NAME, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_MESSAGE_FORMAT_JSON, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
@@ -105,8 +107,10 @@ static void ValidateLayerSettingsProvided(const VkLayerSettingsCreateInfoEXT &la
         else if (strcmp(VK_LAYER_PRINTF_VERBOSE, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_REPORT_FLAGS, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_STRING_EXT; }
         else if (strcmp(VK_LAYER_STATELESS_PARAM, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
+        else if (strcmp(VK_LAYER_SYNCVAL_FULL_VALIDATION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_SYNCVAL_LOAD_OP_AFTER_STORE_OP_VALIDATION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_SYNCVAL_MESSAGE_EXTRA_PROPERTIES, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
+        else if (strcmp(VK_LAYER_SYNCVAL_RECORD_TIME_VALIDATION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_SYNCVAL_SHADER_ACCESSES_HEURISTIC, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_SYNCVAL_SUBMIT_TIME_VALIDATION, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }
         else if (strcmp(VK_LAYER_THREAD_SAFETY, name) == 0) { required_type = VK_LAYER_SETTING_TYPE_BOOL32_EXT; }

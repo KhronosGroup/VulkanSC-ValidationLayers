@@ -57,8 +57,6 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/shader_object_helper.cpp
     ../framework/pipeline_helper.h
     ../framework/pipeline_helper.cpp
-    ../framework/ray_tracing_helper_nv.h
-    ../framework/ray_tracing_helper_nv.cpp
     ../framework/ray_tracing_objects.h
     ../framework/ray_tracing_objects.cpp
     ../framework/external_memory_sync.h
@@ -180,5 +178,3 @@ if (CMAKE_CROSSCOMPILING)
 else()
     gtest_discover_tests(vksc_layer_validation_tests DISCOVERY_TIMEOUT 100)
 endif()
-
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../layers ${CMAKE_CURRENT_BINARY_DIR}/../layers)

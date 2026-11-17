@@ -22,6 +22,8 @@
 
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/utility/vk_format_utils.h>
+#include <vulkan/vulkan_core.h>
+#include "containers/container_utils.h"
 #include "error_message/error_location.h"
 #include "core_validation.h"
 #include "cc_buffer_address.h"
@@ -46,9 +48,9 @@ bool CoreChecks::ValidateBufferUsageFlags(const LogObjectList& objlist, vvl::Buf
     }
 
     if (!correct_usage) {
-        skip |= LogError(vuid, objlist, buffer_loc, "(%s) was created with %s but requires %s.",
+        skip |= LogError(vuid, objlist, buffer_loc, "(%s) was created with %s but requires %s%s.",
                          FormatHandle(buffer_state.Handle()).c_str(), string_VkBufferUsageFlags2(buffer_state.usage).c_str(),
-                         string_VkBufferUsageFlags2(desired).c_str());
+                         strict ? "" : "at least one of ", string_VkBufferUsageFlags2(desired).c_str());
     }
     return skip;
 }
@@ -61,12 +63,17 @@ bool CoreChecks::ValidateBufferViewRange(const vvl::Buffer& buffer_state, const 
     if (range != VK_WHOLE_SIZE) {
         // The sum of range and offset must be less than or equal to the size of buffer
         if (range + create_info.offset > buffer_state.GetSize()) {
+            const VkDeviceSize remaining_space =
+                (create_info.offset <= buffer_state.GetSize()) ? (buffer_state.GetSize() - create_info.offset) : 0;
             skip |= LogError("VUID-VkBufferViewCreateInfo-offset-00931", buffer_state.Handle(), loc.dot(Field::range),
-                             "(%" PRIuLEAST64 ") does not equal VK_WHOLE_SIZE, the sum of offset (%" PRIuLEAST64
-                             ") and range must be less than or equal to the size of the buffer (%" PRIuLEAST64 ").",
-                             range, create_info.offset, buffer_state.GetSize());
+                             "(%" PRIuLEAST64 ") does not equal VK_WHOLE_SIZE, so the sum of offset (%" PRIuLEAST64
+                             ") and range must be less than or equal to the size of %s (%" PRIuLEAST64
+                             "), which allows a maximum range of (%" PRIuLEAST64 ") at this offset.",
+                             range, create_info.offset, FormatHandle(buffer_state.Handle()).c_str(), buffer_state.GetSize(),
+                             remaining_space);
         }
-    } else {
+    } else if (create_info.offset < buffer_state.GetSize()) {
+        // If offset is over, will be caught elsewhere (00925)
         const VkFormat format = create_info.format;
         // will be 1 because  block-compressed format are not supported for Texe l Buffer
         const VkDeviceSize texels_per_block = static_cast<VkDeviceSize>(vkuFormatTexelsPerBlock(format));
@@ -237,12 +244,14 @@ bool CoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBuffer
     skip |= ValidateDeviceQueueSupport(error_obj.location);
     auto buffer_state_ptr = Get<vvl::Buffer>(pCreateInfo->buffer);
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
-    // If this isn't a sparse buffer, it needs to have memory backing it at CreateBufferView time
-    if (!buffer_state_ptr) return skip;
+    if (!buffer_state_ptr) {
+        return skip;
+    }
 
     const auto& buffer_state = *buffer_state_ptr;
     const LogObjectList objlist(device, pCreateInfo->buffer);
 
+    // If this isn't a sparse buffer, it needs to have memory backing it at CreateBufferView time
     skip |= ValidateMemoryIsBoundToBuffer(device, buffer_state, create_info_loc.dot(Field::buffer),
                                           "VUID-VkBufferViewCreateInfo-buffer-00935");
     // In order to create a valid buffer view, the buffer must have been created with at least one of the following flags:
@@ -389,6 +398,12 @@ bool CoreChecks::PreCallValidateDestroyBuffer(VkDevice device, VkBuffer buffer, 
     return skip;
 }
 
+void CoreChecks::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator,
+                                            const RecordObject& record_obj) {
+    // Ownership transfer releases that were never acquired
+    qfo_release_buffer_barrier_map.erase(buffer);
+}
+
 bool CoreChecks::PreCallValidateDestroyBufferView(VkDevice device, VkBufferView bufferView, const VkAllocationCallbacks* pAllocator,
                                                   const ErrorObject& error_obj) const {
     bool skip = false;
@@ -414,8 +429,8 @@ bool CoreChecks::PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkB
     skip |= ValidateBufferUsageFlags(objlist, *buffer_state, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT, true,
                                      "VUID-vkCmdFillBuffer-dstBuffer-00029", buffer_loc);
 
-    skip |= ValidateProtectedBuffer(cb_state, *buffer_state, buffer_loc, "VUID-vkCmdFillBuffer-commandBuffer-01811");
-    skip |= ValidateUnprotectedBuffer(cb_state, *buffer_state, buffer_loc, "VUID-vkCmdFillBuffer-commandBuffer-01812");
+    skip |= ValidateProtectedBuffer(cb_state, *buffer_state, buffer_loc);
+    skip |= ValidateUnprotectedBuffer(cb_state, *buffer_state, buffer_loc);
 
     if (dstOffset >= buffer_state->GetSize()) {
         skip |= LogError("VUID-vkCmdFillBuffer-dstOffset-00024", objlist, error_obj.location.dot(Field::dstOffset),
@@ -433,7 +448,8 @@ bool CoreChecks::PreCallValidateCmdFillBuffer(VkCommandBuffer commandBuffer, VkB
         const VkQueueFlags required_flags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
         if (!HasRequiredQueueFlags(cb_state, *physical_device_state, required_flags)) {
             const LogObjectList objlist_pool(cb_state.Handle(), cb_state.command_pool.Handle());
-            skip |= LogError("VUID-vkCmdFillBuffer-apiVersion-07894", objlist_pool, error_obj.location, "%s",
+            skip |= LogError("VUID-vkCmdFillBuffer-apiVersion-07894", objlist_pool, error_obj.location,
+                             "%s\nHint: This can be allowed in some cases if VK_KHR_maintenance1 (or Vulkan 1.1) is enabled.",
                              DescribeRequiredQueueFlag(cb_state, *physical_device_state, required_flags).c_str());
         }
     }
@@ -526,36 +542,20 @@ bool CoreChecks::ValidateDeviceAddressCommands(const LogObjectList& objlist, VkD
 
         if (flags & VK_ADDRESS_COMMAND_FULLY_BOUND_BIT_KHR) {
             if (!buffer->sparse) {
-                // TODO - use VerifyBoundMemoryIsValid? Not obvious which funciton to use
+                // TODO - use VerifyBoundMemoryIsValid? Not obvious which function to use
                 const std::string vuid_13097 =
                     vvl::GetDeviceAddressCommandVUID(loc, vvl::DeviceAddressCommandError::CompletelyBound_13097);
                 skip |= ValidateMemoryIsBoundToBuffer(objlist, *buffer, loc, vuid_13097.c_str());
             } else {
-                // TODO - We should have a common util for sparse memory
-                using BufferRange = vvl::BindableMemoryTracker::BufferRange;
                 const VkDeviceSize offset = address - buffer->deviceAddress;
-                BufferRange ranges_bounds(offset, offset + size);
-                const auto ranges = buffer->GetBoundMemoryRange(ranges_bounds);
-                uint64_t start = offset;
-                bool fully_bound = true;
-                for (const auto& range : ranges) {
-                    for (const auto& memory_range : range.second) {
-                        if (start < memory_range.begin) {
-                            fully_bound = false;
-                            break;
-                        }
-                        start = memory_range.end;
-                    }
-                    if (!fully_bound) {
-                        break;
-                    }
-                }
-                if (!fully_bound || (start < (offset + size))) {
+                const vvl::BindableMemoryTracker::BufferRange buffer_range(offset, offset + size);
+                if (!buffer->IsRangeFullyBound(buffer_range)) {
                     skip |= LogError(vvl::GetDeviceAddressCommandVUID(loc, vvl::DeviceAddressCommandError::CompletelyBound_13097),
-                                     objlist, loc.dot(Field::flags),
-                                     "contains VK_ADDRESS_COMMAND_FULLY_BOUND_BIT_KHR, but the address range [0x%" PRIx64
-                                     ", 0x%" PRIx64 ") is not fully backed by memory for buffer %s.",
-                                     offset, offset + size, FormatHandle(buffer->Handle()).c_str());
+                                     objlist, loc.dot(Field::address),
+                                     "(0x%" PRIx64 ") with size (%" PRIu64
+                                     ") is used with VK_ADDRESS_COMMAND_FULLY_BOUND_BIT_KHR, but the sparse %s is not fully backed "
+                                     "by memory over the corresponding buffer range [%" PRIu64 ", %" PRIu64 ").",
+                                     address, size, FormatHandle(buffer->Handle()).c_str(), offset, offset + size);
                     break;
                 }
             }
@@ -604,13 +604,14 @@ bool CoreChecks::PreCallValidateCmdFillMemoryKHR(VkCommandBuffer commandBuffer, 
 
 // Validates the buffer is allowed to be protected
 bool CoreChecks::ValidateProtectedBuffer(const vvl::CommandBuffer& cb_state, const vvl::Buffer& buffer_state,
-                                         const Location& buffer_loc, const char* vuid, const char* more_message) const {
+                                         const Location& buffer_loc, const char* more_message) const {
     bool skip = false;
 
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == true) && (buffer_state.unprotected == false)) {
         const LogObjectList objlist(cb_state.Handle(), buffer_state.Handle());
-        skip |= LogError(vuid, objlist, buffer_loc, "(%s) is a protected buffer, but command buffer (%s) is unprotected.%s",
+        skip |= LogError(vvl::GetProtectedVUID(buffer_loc), objlist, buffer_loc,
+                         "(%s) is a protected buffer, but command buffer (%s) is unprotected.%s",
                          FormatHandle(buffer_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
     }
     return skip;
@@ -618,13 +619,14 @@ bool CoreChecks::ValidateProtectedBuffer(const vvl::CommandBuffer& cb_state, con
 
 // Validates the buffer is allowed to be unprotected
 bool CoreChecks::ValidateUnprotectedBuffer(const vvl::CommandBuffer& cb_state, const vvl::Buffer& buffer_state,
-                                           const Location& buffer_loc, const char* vuid, const char* more_message) const {
+                                           const Location& buffer_loc, const char* more_message) const {
     bool skip = false;
 
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == false) && (buffer_state.unprotected == true)) {
         const LogObjectList objlist(cb_state.Handle(), buffer_state.Handle());
-        skip |= LogError(vuid, objlist, buffer_loc, "(%s) is an unprotected buffer, but command buffer (%s) is protected.%s",
+        skip |= LogError(vvl::GetUnprotectedVUID(buffer_loc), objlist, buffer_loc,
+                         "(%s) is an unprotected buffer, but command buffer (%s) is protected.%s",
                          FormatHandle(buffer_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
     }
     return skip;

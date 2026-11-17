@@ -2045,7 +2045,7 @@ bool Device::PreCallValidateGetImageMemoryRequirements2(VkDevice device, const V
     if (pInfo) {
         [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
         skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryRequirementsInfo2-image-parameter",
-                               "UNASSIGNED-VkSemaphoreSignalInfo-image-parent", pInfo_loc.dot(Field::image));
+                               "UNASSIGNED-VkImageMemoryRequirementsInfo2-image-parent", pInfo_loc.dot(Field::image));
     }
 
     return skip;
@@ -2060,7 +2060,7 @@ bool Device::PreCallValidateGetBufferMemoryRequirements2(VkDevice device, const 
         [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
         skip |=
             ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryRequirementsInfo2-buffer-parameter",
-                           "UNASSIGNED-VkSemaphoreSignalInfo-buffer-parent", pInfo_loc.dot(Field::buffer));
+                           "UNASSIGNED-VkBufferMemoryRequirementsInfo2-buffer-parent", pInfo_loc.dot(Field::buffer));
     }
 
     return skip;
@@ -2076,7 +2076,7 @@ bool Device::PreCallValidateGetImageSparseMemoryRequirements2(VkDevice device, c
         [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
         skip |=
             ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageSparseMemoryRequirementsInfo2-image-parameter",
-                           "UNASSIGNED-VkSemaphoreSignalInfo-image-parent", pInfo_loc.dot(Field::image));
+                           "UNASSIGNED-VkImageSparseMemoryRequirementsInfo2-image-parent", pInfo_loc.dot(Field::image));
     }
 
     return skip;
@@ -2337,10 +2337,10 @@ bool Device::PreCallValidateCmdBeginRenderPass2(VkCommandBuffer commandBuffer, c
     if (pRenderPassBegin) {
         [[maybe_unused]] const Location pRenderPassBegin_loc = error_obj.location.dot(Field::pRenderPassBegin);
         skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false,
-                               "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent",
+                               "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-vkCmdBeginRenderPass2-framebuffer-02779",
                                pRenderPassBegin_loc.dot(Field::renderPass));
         skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false,
-                               "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent",
+                               "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-vkCmdBeginRenderPass2-framebuffer-02779",
                                pRenderPassBegin_loc.dot(Field::framebuffer));
         if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkRenderPassAttachmentBeginInfo>(pRenderPassBegin->pNext)) {
             [[maybe_unused]] const Location pNext_loc = pRenderPassBegin_loc.pNext(Struct::VkRenderPassAttachmentBeginInfo);
@@ -4747,6 +4747,53 @@ bool Device::PreCallValidateCreatePipelineBinariesKHR(VkDevice device, const VkP
         skip |= ValidateObject(pCreateInfo->pipeline, kVulkanObjectTypePipeline, true,
                                "VUID-VkPipelineBinaryCreateInfoKHR-pipeline-parameter",
                                "UNASSIGNED-VkPipelineBinaryCreateInfoKHR-pipeline-parent", pCreateInfo_loc.dot(Field::pipeline));
+        if (pCreateInfo->pPipelineCreateInfo) {
+            [[maybe_unused]] const Location pPipelineCreateInfo_loc = pCreateInfo_loc.dot(Field::pPipelineCreateInfo);
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkComputePipelineCreateInfo>(pCreateInfo->pPipelineCreateInfo->pNext)) {
+                [[maybe_unused]] const Location pNext_loc = pPipelineCreateInfo_loc.pNext(Struct::VkComputePipelineCreateInfo);
+                skip |= ValidateObject(pNext->layout, kVulkanObjectTypePipelineLayout, true,
+                                       "VUID-VkComputePipelineCreateInfo-layout-parameter",
+                                       "VUID-VkComputePipelineCreateInfo-commonparent", pNext_loc.dot(Field::layout));
+                if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                    skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                           "VUID-VkComputePipelineCreateInfo-flags-07984",
+                                           "VUID-VkComputePipelineCreateInfo-commonparent", error_obj.location);
+            }
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkExecutionGraphPipelineCreateInfoAMDX>(pCreateInfo->pPipelineCreateInfo->pNext)) {
+                [[maybe_unused]] const Location pNext_loc =
+                    pPipelineCreateInfo_loc.pNext(Struct::VkExecutionGraphPipelineCreateInfoAMDX);
+                skip |= ValidateObject(pNext->layout, kVulkanObjectTypePipelineLayout, true,
+                                       "VUID-VkExecutionGraphPipelineCreateInfoAMDX-layout-parameter",
+                                       "VUID-VkExecutionGraphPipelineCreateInfoAMDX-commonparent", pNext_loc.dot(Field::layout));
+                if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                    skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false, kVUIDUndefined,
+                                           "VUID-VkExecutionGraphPipelineCreateInfoAMDX-commonparent", error_obj.location);
+            }
+#endif  // VK_ENABLE_BETA_EXTENSIONS
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkGraphicsPipelineCreateInfo>(pCreateInfo->pPipelineCreateInfo->pNext)) {
+                [[maybe_unused]] const Location pNext_loc = pPipelineCreateInfo_loc.pNext(Struct::VkGraphicsPipelineCreateInfo);
+                if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                    skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                           "VUID-VkGraphicsPipelineCreateInfo-flags-07984",
+                                           "VUID-VkGraphicsPipelineCreateInfo-commonparent", error_obj.location);
+            }
+            if ([[maybe_unused]] auto pNext =
+                    vku::FindStructInPNextChain<VkRayTracingPipelineCreateInfoKHR>(pCreateInfo->pPipelineCreateInfo->pNext)) {
+                [[maybe_unused]] const Location pNext_loc =
+                    pPipelineCreateInfo_loc.pNext(Struct::VkRayTracingPipelineCreateInfoKHR);
+                skip |= ValidateObject(pNext->layout, kVulkanObjectTypePipelineLayout, true,
+                                       "VUID-VkRayTracingPipelineCreateInfoKHR-layout-parameter",
+                                       "VUID-VkRayTracingPipelineCreateInfoKHR-commonparent", pNext_loc.dot(Field::layout));
+                if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                    skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                           "VUID-VkRayTracingPipelineCreateInfoKHR-flags-07984",
+                                           "VUID-VkRayTracingPipelineCreateInfoKHR-commonparent", error_obj.location);
+            }
+        }
     }
 
     return skip;
@@ -4771,8 +4818,57 @@ void Device::PreCallRecordDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBi
     RecordDestroyObject(pipelineBinary, kVulkanObjectTypePipelineBinaryKHR, record_obj.location);
 }
 
-// vkGetPipelineKeyKHR:
-// Checked by chassis: device: "VUID-vkGetPipelineKeyKHR-device-parameter"
+bool Device::PreCallValidateGetPipelineKeyKHR(VkDevice device, const VkPipelineCreateInfoKHR* pPipelineCreateInfo,
+                                              VkPipelineBinaryKeyKHR* pPipelineKey, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkGetPipelineKeyKHR-device-parameter"
+    if (pPipelineCreateInfo) {
+        [[maybe_unused]] const Location pPipelineCreateInfo_loc = error_obj.location.dot(Field::pPipelineCreateInfo);
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkComputePipelineCreateInfo>(pPipelineCreateInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pPipelineCreateInfo_loc.pNext(Struct::VkComputePipelineCreateInfo);
+            skip |= ValidateObject(pNext->layout, kVulkanObjectTypePipelineLayout, true,
+                                   "VUID-VkComputePipelineCreateInfo-layout-parameter",
+                                   "VUID-VkComputePipelineCreateInfo-commonparent", pNext_loc.dot(Field::layout));
+            if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                       "VUID-VkComputePipelineCreateInfo-flags-07984",
+                                       "VUID-VkComputePipelineCreateInfo-commonparent", error_obj.location);
+        }
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkExecutionGraphPipelineCreateInfoAMDX>(pPipelineCreateInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc =
+                pPipelineCreateInfo_loc.pNext(Struct::VkExecutionGraphPipelineCreateInfoAMDX);
+            skip |= ValidateObject(pNext->layout, kVulkanObjectTypePipelineLayout, true,
+                                   "VUID-VkExecutionGraphPipelineCreateInfoAMDX-layout-parameter",
+                                   "VUID-VkExecutionGraphPipelineCreateInfoAMDX-commonparent", pNext_loc.dot(Field::layout));
+            if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false, kVUIDUndefined,
+                                       "VUID-VkExecutionGraphPipelineCreateInfoAMDX-commonparent", error_obj.location);
+        }
+#endif  // VK_ENABLE_BETA_EXTENSIONS
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkGraphicsPipelineCreateInfo>(pPipelineCreateInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pPipelineCreateInfo_loc.pNext(Struct::VkGraphicsPipelineCreateInfo);
+            if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                       "VUID-VkGraphicsPipelineCreateInfo-flags-07984",
+                                       "VUID-VkGraphicsPipelineCreateInfo-commonparent", error_obj.location);
+        }
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkRayTracingPipelineCreateInfoKHR>(pPipelineCreateInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pPipelineCreateInfo_loc.pNext(Struct::VkRayTracingPipelineCreateInfoKHR);
+            skip |= ValidateObject(pNext->layout, kVulkanObjectTypePipelineLayout, true,
+                                   "VUID-VkRayTracingPipelineCreateInfoKHR-layout-parameter",
+                                   "VUID-VkRayTracingPipelineCreateInfoKHR-commonparent", pNext_loc.dot(Field::layout));
+            if ((pNext->flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pNext->basePipelineIndex == -1))
+                skip |= ValidateObject(pNext->basePipelineHandle, kVulkanObjectTypePipeline, false,
+                                       "VUID-VkRayTracingPipelineCreateInfoKHR-flags-07984",
+                                       "VUID-VkRayTracingPipelineCreateInfoKHR-commonparent", error_obj.location);
+        }
+    }
+
+    return skip;
+}
 
 bool Device::PreCallValidateGetPipelineBinaryDataKHR(VkDevice device, const VkPipelineBinaryDataInfoKHR* pInfo,
                                                      VkPipelineBinaryKeyKHR* pPipelineBinaryKey, size_t* pPipelineBinaryDataSize,
@@ -6227,6 +6323,22 @@ bool Device::PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, VkPipel
     return skip;
 }
 
+void Device::PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
+                                                       const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
+                                                       const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                                       const RecordObject& record_obj) {
+    if (VK_ERROR_VALIDATION_FAILED_EXT == record_obj.result) {
+        return;
+    }
+    if (pPipelines) {
+        for (uint32_t index = 0; index < createInfoCount; index++) {
+            if (!pPipelines[index]) continue;
+            tracker.CreateObject(pPipelines[index], kVulkanObjectTypePipeline, pAllocator,
+                                 record_obj.location.dot(Field::pPipelines, index), device);
+        }
+    }
+}
+
 bool Device::PreCallValidateGetRayTracingShaderGroupHandlesKHR(VkDevice device, VkPipeline pipeline, uint32_t firstGroup,
                                                                uint32_t groupCount, size_t dataSize, void* pData,
                                                                const ErrorObject& error_obj) const {
@@ -7026,6 +7138,35 @@ bool Device::PreCallValidateCmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer,
 // vkCmdEndPerTileExecutionQCOM:
 // Checked by chassis: commandBuffer: "VUID-vkCmdEndPerTileExecutionQCOM-commandBuffer-parameter"
 
+// vkSetLatencySleepModeLegacyNV:
+// Checked by chassis: device: "VUID-vkSetLatencySleepModeLegacyNV-device-parameter"
+
+bool Device::PreCallValidateLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                                 const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: "VUID-vkLatencySleepLegacyNV-device-parameter"
+    skip |=
+        ValidateObject(signalSemaphore, kVulkanObjectTypeSemaphore, false, "VUID-vkLatencySleepLegacyNV-signalSemaphore-parameter",
+                       "VUID-vkLatencySleepLegacyNV-signalSemaphore-parent", error_obj.location.dot(Field::signalSemaphore));
+
+    return skip;
+}
+
+// vkSetLatencyMarkerLegacyNV:
+// Checked by chassis: device: "VUID-vkSetLatencyMarkerLegacyNV-device-parameter"
+
+// vkGetLatencyTimingsLegacyNV:
+// Checked by chassis: device: "VUID-vkGetLatencyTimingsLegacyNV-device-parameter"
+
+// vkQueueNotifyOutOfBandLegacyNV:
+// Checked by chassis: queue: "VUID-vkQueueNotifyOutOfBandLegacyNV-queue-parameter"
+
+// vkGetSleepStatusLegacyNV:
+// Checked by chassis: device: "VUID-vkGetSleepStatusLegacyNV-device-parameter"
+
+// vkShutdownLatencyDeviceLegacyNV:
+// Checked by chassis: device: "VUID-vkShutdownLatencyDeviceLegacyNV-device-parameter"
+
 #ifdef VK_USE_PLATFORM_METAL_EXT
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
@@ -7409,7 +7550,7 @@ bool Device::PreCallValidateGetPipelinePropertiesEXT(VkDevice device, const VkPi
         [[maybe_unused]] const Location pPipelineInfo_loc = error_obj.location.dot(Field::pPipelineInfo);
         skip |=
             ValidateObject(pPipelineInfo->pipeline, kVulkanObjectTypePipeline, false, "VUID-VkPipelineInfoKHR-pipeline-parameter",
-                           "UNASSIGNED-VkPipelineInfoKHR-pipeline-parent", pPipelineInfo_loc.dot(Field::pipeline));
+                           "VUID-vkGetPipelinePropertiesEXT-pipeline-06738", pPipelineInfo_loc.dot(Field::pipeline));
     }
 
     return skip;
@@ -9096,6 +9237,9 @@ bool Device::PreCallValidateClearShaderInstrumentationMetricsARM(VkDevice device
 // vkCmdSetComputeOccupancyPriorityNV:
 // Checked by chassis: commandBuffer: "VUID-vkCmdSetComputeOccupancyPriorityNV-commandBuffer-parameter"
 
+// vkGetPhysicalDeviceCooperativeMatrixProperties2EXT:
+// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceCooperativeMatrixProperties2EXT-physicalDevice-parameter"
+
 #ifdef VK_USE_PLATFORM_UBM_SEC
 
 // vkCreateUbmSurfaceSEC:
@@ -9114,6 +9258,18 @@ void Instance::PostCallRecordCreateUbmSurfaceSEC(VkInstance instance, const VkUb
 // Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceUbmPresentationSupportSEC-physicalDevice-parameter"
 
 #endif  // VK_USE_PLATFORM_UBM_SEC
+
+// vkGetPhysicalDeviceInternalHandleNV:
+// Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceInternalHandleNV-physicalDevice-parameter"
+
+// vkGetDeviceInternalHandleNV:
+// Checked by chassis: device: "VUID-vkGetDeviceInternalHandleNV-device-parameter"
+
+// vkGetQueueInternalHandleNV:
+// Checked by chassis: queue: "VUID-vkGetQueueInternalHandleNV-queue-parameter"
+
+// vkGetCommandBufferInternalHandleNV:
+// Checked by chassis: commandBuffer: "VUID-vkGetCommandBufferInternalHandleNV-commandBuffer-parameter"
 
 // vkCmdSetPrimitiveRestartIndexEXT:
 // Checked by chassis: commandBuffer: "VUID-vkCmdSetPrimitiveRestartIndexEXT-commandBuffer-parameter"

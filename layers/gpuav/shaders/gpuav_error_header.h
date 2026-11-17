@@ -146,7 +146,7 @@ const int kInst_DescriptorIndexing_IndexMask = 0x7FFFFFF;
 //   this is to allow us to get the information that state tracking already has for the error message
 // - |Alignment Shift| is used to store the exponent to shift to get the alignment
 //    ex. if alignment is 16, we store 4 (1 << 4)
-//    Note - Alignment MUST be a power of 2 according the the spec
+//    Note - Alignment MUST be a power of 2 according the spec
 //    Note - Alignment value SHOULD be at max 256, (this will support 32k anyway)
 const int kInst_DescriptorHeap_DescriptorTypeShift = 28;
 const int kInst_DescriptorHeap_DescriptorTypeMask = 0xF << kInst_DescriptorHeap_DescriptorTypeShift;
@@ -187,11 +187,12 @@ const int kValCmd_ErrorPayloadDword_4 = kHeaderSize + 4;
 
 // Sizes/Counts
 // -------------------
-const int kErrorRecordSize = kHeaderSize + 5;
+const int kErrorRecordDwordSize = kHeaderSize + 5;
 const int kErrorRecordCounts = 4096;  // Maximum number of errors a command buffer can hold. Arbitrary value
-const int kErrorBufferByteSize = 4 * kErrorRecordSize * kErrorRecordCounts + 2 * 4;  // 2 * 4 bytes to store flags and errors count
+const int kErrorBufferByteSize =
+    4 * kErrorRecordDwordSize * kErrorRecordCounts + 3 * 4;  // 3 * 4 bytes to store flags, buffer dword size and errors count
 // We know the size of the uint32_t array for SpecConstantInstErrorBufferLengthId
-const int kErrorBufferDataLength = kErrorRecordSize * kErrorRecordCounts;
+const int kErrorBufferDataLength = kErrorRecordDwordSize * kErrorRecordCounts;
 
 #ifdef __cplusplus
 }  // namespace glsl

@@ -15,6 +15,7 @@
 #include "layer_validation_tests.h"
 #include "pipeline_helper.h"
 #include "buffer_helper.h"
+#include "descriptor_heap_object.h"
 
 class NegativeGpuAVVertexAttributeFetch : public GpuAVTest {};
 
@@ -117,10 +118,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex32) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -172,10 +170,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex16) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -230,10 +225,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex8) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -285,10 +277,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex32) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
 
     pipe.CreateGraphicsPipeline();
@@ -338,8 +327,8 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex32ShaderObject) {
         }
     )glsl";
 
-    const vkt::Shader vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source));
-    const vkt::Shader fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl));
+    const vkt::ShaderEXT vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vs_source);
+    const vkt::ShaderEXT fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
 
     VkVertexInputBindingDescription2EXT input_binding = vku::InitStructHelper();
     input_binding.binding = 0;
@@ -354,8 +343,8 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex32ShaderObject) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    m_command_buffer.BindShaders(vs, fs);
-    SetDefaultDynamicStatesExclude({VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE});
+    m_command_buffer.BindShadersEXT(vs, fs);
+    SetDefaultDynamicStatesExcludeEXT({VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE});
 
     vkt::Buffer index_buffer = vkt::IndexBuffer<uint32_t>(*m_device, {0, 666, 42});
     vkt::Buffer vertex_buffer = vkt::VertexBuffer<float>(*m_device, {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f});
@@ -392,10 +381,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawInSecondaryCmdBufferBadVertexIndex
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -471,10 +457,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex16) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -593,10 +576,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex8) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -728,10 +708,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, IndirectDrawBadVertexIndex32DebugLabel
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -1283,10 +1260,7 @@ TEST_F(NegativeGpuAVVertexAttributeFetch, DrawBadVertexIndex32MultiDraw) {
     CreatePipelineHelper pipe(*this);
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
 
     pipe.CreateGraphicsPipeline();

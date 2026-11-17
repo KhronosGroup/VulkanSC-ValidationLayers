@@ -1,0 +1,169 @@
+// Copyright (c) 2022-2026 The Khronos Group Inc.
+// Copyright (c) 2022-2026 Valve Corporation
+// Copyright (c) 2022-2026 LunarG, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "common.h"
+#include "build_acceleration_structures.h"
+
+using namespace gpuav::shader;
+
+[vk::push_constant]
+ConstantBuffer<TLASValidationShaderPushData> pc;
+
+bool RangesInclude(Range r1, Range r2) {
+    return (r1.begin <= r2.begin) && (r2.end <= r1.end);
+}
+bool RangesOverlap(Range r1, Range r2) {
+    return RangesInclude(r1, r2) || RangesInclude(r2, r1);
+}
+
+[shader("compute")]
+[numthreads(tlas_validation_shader_wg_x, tlas_validation_shader_wg_y, 1)]
+void main(uint3 thread_id: SV_DispatchThreadID) {
+    uint as_instance_i = 0;
+    if (pc.validation_mode == kBuildASValidationMode_invalid_AS) {
+        // Slang has no system value semantic for the dispatch dimensions, gl_NumWorkGroups is available thanks to -allow-glsl
+        as_instance_i = thread_id.x * (gl_NumWorkGroups.y * tlas_validation_shader_wg_y) + thread_id.y;
+    } else if (pc.validation_mode == kBuildASValidationMode_memory_overlaps) {
+        as_instance_i = thread_id.x;
+    }
+    if (as_instance_i >= pc.blas_array_size) {
+        return;
+    }
+    const uint blas_built_in_cmd_i = thread_id.y;
+
+    // Address of BLAS to validate
+    uint64_t blas_addr = 0;
+    if (pc.is_array_of_pointers == 0) {
+        blas_addr = pc.blas_array_start_addr[as_instance_i].accelerationStructureReference;
+    } else {
+        blas_addr = pc.blas_ptr_array_start_addr[as_instance_i]->accelerationStructureReference;
+    }
+
+    // At least mentioned in VUID 12281:
+    // A BLAS address of 0 is valid
+    if (blas_addr == 0) {
+        return;
+    }
+
+    uint error_subcode = 0;
+
+    if ((blas_addr % 16u ) != 0) {
+        error_subcode = kErrorSubCode_PreBuildAccelerationStructures_BlasAddrAlignment;
+    } else if (pc.validation_mode == kBuildASValidationMode_invalid_AS) {
+        error_subcode = kErrorSubCode_PreBuildAccelerationStructures_InvalidAS;
+        const uint as_count = pc.ptr_to_ptr_to_accel_structs_arrays->addresses_ptr->count;
+        for (uint as_i = 0; as_i < as_count; ++as_i) {
+            uint64_t valid_as_addr = pc.ptr_to_ptr_to_accel_structs_arrays->addresses_ptr->array[as_i];
+
+            if (valid_as_addr == blas_addr) {
+                const uint as_metadata = pc.ptr_to_ptr_to_accel_structs_arrays->cpu_submit_time_state_ptr[as_i];
+
+                const uint as_type = GET_BUILD_AS_CPU_SUBMIT_STATE_AS_TYPE(as_metadata);
+                const uint as_buffer_status = GET_BUILD_AS_CPU_SUBMIT_STATE_BUFFER_STATUS(as_metadata);
+                const uint as_metadata_buffer_memory_status = GET_BUILD_AS_CPU_SUBMIT_STATE_BUFFER_MEMORY_STATUS(as_metadata);
+
+                const uint32_t as_gpu_state = *pc.ptr_to_ptr_to_accel_structs_arrays->gpu_state_ptr[as_i];
+                const bool is_as_built = bool((as_gpu_state >> kAsGpuStateBuiltShift) & kAsGpuStateBuiltMask);
+
+                // Valid AS found, quick exit
+                if (as_type == BUILD_AS_CPU_SUBMIT_STATE_AS_TYPE_BLAS &&
+                    as_buffer_status == BUILD_AS_CPU_SUBMIT_STATE_VALID_BUFFER &&
+                    as_metadata_buffer_memory_status == BUILD_AS_CPU_SUBMIT_STATE_VALID_BUFFER_MEMORY
+                    && is_as_built) {
+                    error_subcode = 0;
+                    break;
+                }
+
+                // Found blas_addr in the array of valid AS addresses,
+                // but the AS itself has an issue.
+                // Flag it but keep looking for a valid AS - finding one would indicate validity
+                // ---
+                // How can we end up in this situation?
+                // ---
+                // The buffer associated to an AS can be destroyed before it, and recycled to create another AS.
+                // Say for instance a TLAS is created with a buffer, then this buffer is destroyed.
+                // TLAS is now invalid.
+                // Say a BLAS is created, with a newly buffer that happens to end up giving this BLAS
+                // the same address as the previous TLAS
+                // => the "valid AS array" GPU-AV maintains will be {TLAS's address, BLAS's address}
+                // and so those 2 are equal.
+                // In this loop, TLAS will first be found, but the valid BLAS is right after
+                // hence the need to look past it.
+                if (as_type != BUILD_AS_CPU_SUBMIT_STATE_AS_TYPE_BLAS) {
+                    error_subcode = kErrorSubCode_PreBuildAccelerationStructures_InvalidASType;
+                    continue;
+                }
+
+                if (!is_as_built) {
+                    error_subcode = kErrorSubCode_PreBuildAccelerationStructures_BlasNotBuilt;
+                    continue;
+                }
+
+                if (as_buffer_status != BUILD_AS_CPU_SUBMIT_STATE_VALID_BUFFER) {
+                    error_subcode = kErrorSubCode_PreBuildAccelerationStructures_DestroyedASBuffer;
+                    continue;
+                }
+
+                if (as_metadata_buffer_memory_status != BUILD_AS_CPU_SUBMIT_STATE_VALID_BUFFER_MEMORY) {
+                    error_subcode = kErrorSubCode_PreBuildAccelerationStructures_DestroyedASMemory;
+                    continue;
+                }
+            }
+        }
+    } else if (pc.validation_mode == kBuildASValidationMode_memory_overlaps) {
+        if (blas_built_in_cmd_i >= pc.blas_built_in_cmd_array_size) {
+            return;
+        }
+        // Try to find buffer range associated to BLAS to validate
+        Range blas_buffer_range = {0, 0};
+        const uint as_count = pc.ptr_to_ptr_to_accel_structs_arrays->addresses_ptr->count;
+        for (uint as_i = 0; as_i < as_count; ++as_i) {
+            uint64_t valid_as_addr = pc.ptr_to_ptr_to_accel_structs_arrays->addresses_ptr->array[as_i];
+
+            if (valid_as_addr == blas_addr) {
+                blas_buffer_range = pc.ptr_to_ptr_to_accel_structs_arrays->buffer_ranges_ptr[as_i];
+                break;
+            }
+        }
+        // Does BLAS buffer range, referenced in a TLAS build,
+        // overlaps with another BLAS buffer range referenced in the same build command?
+        if (blas_buffer_range.begin != 0) {
+            Range blas_built_in_cmd_buffer_range = pc.blas_built_in_cmd_array_ptr[blas_built_in_cmd_i];
+            if (RangesOverlap(blas_buffer_range, blas_built_in_cmd_buffer_range)) {
+                error_subcode = kErrorSubCode_PreBuildAccelerationStructures_BlasMemoryOverlap;
+            }
+        }
+    }
+
+    if (error_subcode != 0) {
+        if (pc.is_array_of_pointers == 0) {
+            // Set mask to 0 (upper 8 bits), so instance cannot get hit
+            pc.blas_array_start_addr[as_instance_i].instanceCustomIndex_and_mask &= 0xffffff;
+            // Point to a valid dummy blas
+            pc.blas_array_start_addr[as_instance_i].accelerationStructureReference = pc.valid_dummy_blas_addr;
+        } else {
+            pc.blas_ptr_array_start_addr[as_instance_i]->instanceCustomIndex_and_mask &= 0xffffff;
+            pc.blas_ptr_array_start_addr[as_instance_i]->accelerationStructureReference = pc.valid_dummy_blas_addr;
+        }
+
+        const uint error_dword_0 = uint(blas_addr);
+        const uint error_dword_1 = uint(blas_addr >> 32u);
+        const uint error_dword_2 = pc.tlas_build_i;
+        const uint error_dword_3 = as_instance_i;
+        const uint error_dword_4 = blas_built_in_cmd_i;
+        GpuavLogError5(kErrorGroup_GpuPreBuildAccelerationStructures, error_subcode, error_dword_0, error_dword_1, error_dword_2, error_dword_3, error_dword_4);
+    }
+}

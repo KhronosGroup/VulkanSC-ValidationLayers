@@ -38,8 +38,8 @@ bool Device::manual_PreCallValidateAllocateMemory(VkDevice device, const VkMemor
     auto chained_prio_struct = vku::FindStructInPNextChain<VkMemoryPriorityAllocateInfoEXT>(pAllocateInfo->pNext);
     if (chained_prio_struct && (chained_prio_struct->priority < 0.0f || chained_prio_struct->priority > 1.0f)) {
         skip |= LogError("VUID-VkMemoryPriorityAllocateInfoEXT-priority-02602", device,
-                         allocate_info_loc.pNext(Struct::VkMemoryPriorityAllocateInfoEXT, Field::priority), "is %f",
-                         chained_prio_struct->priority);
+                         allocate_info_loc.pNext(Struct::VkMemoryPriorityAllocateInfoEXT, Field::priority),
+                         "is %f, but must be between 0.0 and 1.0 (inclusive).", chained_prio_struct->priority);
     }
 
     auto flags_info = vku::FindStructInPNextChain<VkMemoryAllocateFlagsInfo>(pAllocateInfo->pNext);
@@ -59,6 +59,32 @@ bool Device::manual_PreCallValidateAllocateMemory(VkDevice device, const VkMemor
                              "has VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT set, but bufferDeviceAddress feature is not enabled.");
         }
     }
+
+    if (const auto* alignment_info =
+            vku::FindStructInPNextChain<VkBufferDeviceAddressAlignmentAllocateInfoVALVE>(pAllocateInfo->pNext)) {
+        const Location alignment_loc =
+            allocate_info_loc.pNext(Struct::VkBufferDeviceAddressAlignmentAllocateInfoVALVE, Field::alignment);
+        skip |= ValidateBufferDeviceAddressAlignmentAllocateInfo(*alignment_info, alignment_loc);
+
+        if (alignment_info->alignment != 0) {
+            if ((flags & VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT) == 0) {
+                skip |= LogError("VUID-VkMemoryAllocateInfo-flags-12510", device, alignment_loc,
+                                 "is %" PRIu32
+                                 " (not zero), but VkMemoryAllocateFlagsInfo::flags (%s) does not include "
+                                 "VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT.",
+                                 alignment_info->alignment, string_VkMemoryAllocateFlags(flags).c_str());
+            }
+            if (const auto* opaque_addr_info =
+                    vku::FindStructInPNextChain<VkMemoryOpaqueCaptureAddressAllocateInfo>(pAllocateInfo->pNext);
+                opaque_addr_info && opaque_addr_info->opaqueCaptureAddress != 0) {
+                skip |= LogError("VUID-VkMemoryAllocateInfo-alignment-12511", device, alignment_loc,
+                                 "is %" PRIu32
+                                 " (not zero), but VkMemoryOpaqueCaptureAddressAllocateInfo::opaqueCaptureAddress (%" PRIu64
+                                 ") is not 0.",
+                                 alignment_info->alignment, opaque_addr_info->opaqueCaptureAddress);
+            }
+        }
+    }
     return skip;
 }
 
@@ -73,11 +99,12 @@ bool Device::ValidateDeviceImageMemoryRequirements(VkDevice device, const VkDevi
                          loc.dot(Field::pCreateInfo).dot(Field::pNext), "chain contains VkImageSwapchainCreateInfoKHR.\n%s",
                          PrintPNextChain(Struct::VkImageCreateInfo, create_info.pNext).c_str());
     }
-    if (vku::FindStructInPNextChain<VkImageDrmFormatModifierExplicitCreateInfoEXT>(create_info.pNext)) {
-        skip |= LogError("VUID-VkDeviceImageMemoryRequirements-pCreateInfo-06776", device,
-                         loc.dot(Field::pCreateInfo).dot(Field::pNext),
-                         "chain contains VkImageDrmFormatModifierExplicitCreateInfoEXT.\n%s",
-                         PrintPNextChain(Struct::VkImageCreateInfo, create_info.pNext).c_str());
+    if (create_info.tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT) {
+        skip |= LogError("VUID-VkDeviceImageMemoryRequirements-pCreateInfo-12489", device,
+                         loc.dot(Field::pCreateInfo).dot(Field::tiling),
+                         "is VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT\nThe issue is that there is currently no way for the "
+                         "application to determine which format modifier in the specified list the implementation will choose, and "
+                         "hence no way to determine which memory plane aspects are valid.");
     }
 
     const bool has_disjoint = (create_info.flags & VK_IMAGE_CREATE_DISJOINT_BIT) != 0;
@@ -98,7 +125,7 @@ bool Device::ValidateDeviceImageMemoryRequirements(VkDevice device, const VkDevi
                          "pNext chain contains VkExternalFormatANDROID with externalFormat %" PRIu64 ".", external_format);
     }
 
-    if (create_info.tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT || has_disjoint) {
+    if (!has_disjoint) {
         skip |= context.ValidateFlags(loc.dot(Field::planeAspect), vvl::FlagBitmask::VkImageAspectFlagBits,
                                       AllVkImageAspectFlagBits, memory_requirements.planeAspect, kOptionalSingleBit,
                                       "VUID-VkDeviceImageMemoryRequirements-planeAspect-12399", nullptr, false);
@@ -127,67 +154,67 @@ bool Device::manual_PreCallValidateCmdDecompressMemoryEXT(VkCommandBuffer comman
                                                           const Context& context) const {
     bool skip = false;
     const auto& error_obj = context.error_obj;
+    const Location memory_info_loc = error_obj.location.dot(Field::pDecompressMemoryInfoEXT);
+    const Location method_loc = memory_info_loc.dot(Field::decompressionMethod);
 
     if (!enabled_features.memoryDecompression) {
         skip |= LogError("VUID-vkCmdDecompressMemoryEXT-memoryDecompression-11761", commandBuffer, error_obj.location,
-                         "The memoryDecompression feature must be enabled.");
+                         "memoryDecompression feature was not enabled.");
     }
 
     const auto& props = phys_dev_ext_props.memory_decompression_props;
     if ((pDecompressMemoryInfoEXT->decompressionMethod & props.decompressionMethods) == 0) {
-        skip |= LogError("VUID-VkDecompressMemoryInfoEXT-decompressionMethod-11763", commandBuffer,
-                         error_obj.location.dot(Field::decompressionMethod),
+        skip |= LogError("VUID-VkDecompressMemoryInfoEXT-decompressionMethod-11763", commandBuffer, method_loc,
                          "(0x%" PRIx64 ") is not a supported decompression method bit (supported mask: 0x%" PRIx64 ").",
                          pDecompressMemoryInfoEXT->decompressionMethod, props.decompressionMethods);
     }
 
-    if (pDecompressMemoryInfoEXT->decompressionMethod & VK_MEMORY_DECOMPRESSION_METHOD_GDEFLATE_1_0_BIT_EXT) {
-        const Location memory_info_loc = error_obj.location.dot(Field::pDecompressMemoryInfoEXT);
-        for (uint32_t i = 0; i < pDecompressMemoryInfoEXT->regionCount; ++i) {
-            const Location region_loc = memory_info_loc.dot(Field::pRegions, i);
-            const VkDecompressMemoryRegionEXT mem_region = pDecompressMemoryInfoEXT->pRegions[i];
-            if (mem_region.decompressedSize > 65536) {
-                skip |= LogError("VUID-VkDecompressMemoryInfoEXT-decompressionMethod-11762", commandBuffer,
-                                 region_loc.dot(Field::decompressedSize),
-                                 "(%" PRIu64 ") must be less than or equal to 65536 bytes.", mem_region.decompressedSize);
-            }
-
-            if (mem_region.compressedSize == 0) {
-                skip |= LogError("VUID-VkDecompressMemoryRegionEXT-compressedSize-11795", commandBuffer,
-                                 region_loc.dot(Field::compressedSize), "must not be zero.");
-            }
-
-            if (mem_region.decompressedSize == 0) {
-                skip |= LogError("VUID-VkDecompressMemoryRegionEXT-decompressedSize-11796", commandBuffer,
-                                 region_loc.dot(Field::decompressedSize), "must not be zero.");
-            }
-
-            if (!IsPointerAligned(mem_region.srcAddress, 4)) {
-                skip |=
-                    LogError("VUID-VkDecompressMemoryRegionEXT-srcAddress-07685", commandBuffer, region_loc.dot(Field::srcAddress),
-                             "(0x%" PRIx64 ") is not 4-byte aligned.", mem_region.srcAddress);
-            }
-
-            if (!IsPointerAligned(mem_region.dstAddress, 4)) {
-                skip |=
-                    LogError("VUID-VkDecompressMemoryRegionEXT-dstAddress-07687", commandBuffer, region_loc.dot(Field::dstAddress),
-                             "(0x%" PRIx64 ") is not 4-byte aligned.", mem_region.dstAddress);
-            }
-
-            const vvl::range<VkDeviceAddress> src_range{mem_region.srcAddress, mem_region.srcAddress + mem_region.compressedSize};
-            const vvl::range<VkDeviceAddress> dst_range{mem_region.dstAddress, mem_region.dstAddress + mem_region.decompressedSize};
-            if (src_range.intersects(dst_range)) {
-                skip |= LogError("VUID-VkDecompressMemoryRegionEXT-srcAddress-07691", commandBuffer,
-                                 region_loc.dot(Field::srcAddress), "range %s overlaps with dstAddress range %s.",
-                                 string_range_hex(src_range).c_str(), string_range_hex(dst_range).c_str());
-            }
-        }
+    if (!IsPowerOfTwo(pDecompressMemoryInfoEXT->decompressionMethod)) {
+        skip |= LogError("VUID-VkDecompressMemoryInfoEXT-decompressionMethod-07690", commandBuffer, method_loc,
+                         "(0x%" PRIx64 ") must have a single bit set.", pDecompressMemoryInfoEXT->decompressionMethod);
     }
 
-    if (!IsPowerOfTwo(pDecompressMemoryInfoEXT->decompressionMethod)) {
-        skip |= LogError("VUID-VkDecompressMemoryInfoEXT-decompressionMethod-07690", commandBuffer,
-                         error_obj.location.dot(Field::pDecompressMemoryInfoEXT).dot(Field::decompressionMethod),
-                         "(0x%" PRIx64 ") must have a single bit set.", pDecompressMemoryInfoEXT->decompressionMethod);
+    const bool is_gdeflate =
+        (pDecompressMemoryInfoEXT->decompressionMethod & VK_MEMORY_DECOMPRESSION_METHOD_GDEFLATE_1_0_BIT_EXT) != 0;
+    for (uint32_t i = 0; i < pDecompressMemoryInfoEXT->regionCount; ++i) {
+        const Location region_loc = memory_info_loc.dot(Field::pRegions, i);
+        const VkDecompressMemoryRegionEXT& mem_region = pDecompressMemoryInfoEXT->pRegions[i];
+
+        if (is_gdeflate && mem_region.decompressedSize > 65536) {
+            skip |= LogError("VUID-VkDecompressMemoryInfoEXT-decompressionMethod-11762", commandBuffer,
+                             region_loc.dot(Field::decompressedSize),
+                             "(%" PRIu64
+                             ") must be less than or equal to 65536 bytes when decompressionMethod is "
+                             "VK_MEMORY_DECOMPRESSION_METHOD_GDEFLATE_1_0_BIT_EXT.",
+                             mem_region.decompressedSize);
+        }
+
+        if (mem_region.compressedSize == 0) {
+            skip |= LogError("VUID-VkDecompressMemoryRegionEXT-compressedSize-11795", commandBuffer,
+                             region_loc.dot(Field::compressedSize), "must not be zero.");
+        }
+        if (mem_region.decompressedSize == 0) {
+            skip |= LogError("VUID-VkDecompressMemoryRegionEXT-decompressedSize-11796", commandBuffer,
+                             region_loc.dot(Field::decompressedSize), "must not be zero.");
+        }
+        if (!IsPointerAligned(mem_region.srcAddress, 4)) {
+            skip |= LogError("VUID-VkDecompressMemoryRegionEXT-srcAddress-07685", commandBuffer, region_loc.dot(Field::srcAddress),
+                             "(0x%" PRIx64 ") is not 4-byte aligned.", mem_region.srcAddress);
+        }
+        if (!IsPointerAligned(mem_region.dstAddress, 4)) {
+            skip |= LogError("VUID-VkDecompressMemoryRegionEXT-dstAddress-07687", commandBuffer, region_loc.dot(Field::dstAddress),
+                             "(0x%" PRIx64 ") is not 4-byte aligned.", mem_region.dstAddress);
+        }
+
+        const vvl::range<VkDeviceAddress> src_range{mem_region.srcAddress, mem_region.srcAddress + mem_region.compressedSize};
+        const vvl::range<VkDeviceAddress> dst_range{mem_region.dstAddress, mem_region.dstAddress + mem_region.decompressedSize};
+        // A range whose address plus size wraps past the end of the address space would make intersects() silently return
+        // false, the bad address/size itself is caught elsewhere
+        if (src_range.valid() && dst_range.valid() && src_range.intersects(dst_range)) {
+            skip |= LogError("VUID-VkDecompressMemoryRegionEXT-srcAddress-07691", commandBuffer, region_loc.dot(Field::srcAddress),
+                             "range %s overlaps with dstAddress range %s.", string_range_hex(src_range).c_str(),
+                             string_range_hex(dst_range).c_str());
+        }
     }
 
     return skip;
@@ -201,7 +228,7 @@ bool Device::manual_PreCallValidateCmdDecompressMemoryIndirectCountEXT(
 
     if (!enabled_features.memoryDecompression) {
         skip |= LogError("VUID-vkCmdDecompressMemoryIndirectCountEXT-None-07692", commandBuffer, error_obj.location,
-                         "The memoryDecompression feature must be enabled.");
+                         "memoryDecompression feature was not enabled.");
     }
 
     const auto& props = phys_dev_ext_props.memory_decompression_props;
@@ -305,8 +332,8 @@ bool Device::manual_PreCallValidateSetDeviceMemoryPriorityEXT(VkDevice device, V
     bool skip = false;
     const auto& error_obj = context.error_obj;
     if (!IsBetweenInclusive(priority, 0.0F, 1.0F)) {
-        skip |= LogError("VUID-vkSetDeviceMemoryPriorityEXT-priority-06258", device, error_obj.location.dot(Field::priority),
-                         "is %f.", priority);
+        skip |= LogError("VUID-vkSetDeviceMemoryPriorityEXT-priority-06258", memory, error_obj.location.dot(Field::priority),
+                         "is %f, but must be between 0.0 and 1.0 (inclusive).", priority);
     }
     return skip;
 }
@@ -328,20 +355,29 @@ bool Device::ValidateTileMemorySizeInfo(const VkTileMemorySizeInfoQCOM& tile_mem
     bool skip = false;
     uint64_t largest_heap_size = 0;
     uint32_t heap_index = 0;
+    bool found_tile_heap = false;
     for (uint32_t i = 0; i < phys_dev_mem_props.memoryHeapCount; i++) {
         if (phys_dev_mem_props.memoryHeaps[i].flags & VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM) {
-            if (phys_dev_mem_props.memoryHeaps[i].size > largest_heap_size) {
+            if (!found_tile_heap || phys_dev_mem_props.memoryHeaps[i].size > largest_heap_size) {
                 largest_heap_size = phys_dev_mem_props.memoryHeaps[i].size;
                 heap_index = i;
+                found_tile_heap = true;
             }
         }
     }
     if (tile_memory_size_info.size > largest_heap_size) {
-        skip |= LogError("VUID-VkTileMemorySizeInfoQCOM-size-10729", device, loc.dot(Field::size),
-                         "(%" PRIu64 ") must be less than or equal to %" PRIu64 ", found at memoryHeaps[%" PRIu32
-                         "],"
-                         " the largest VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM heap.",
-                         tile_memory_size_info.size, largest_heap_size, heap_index);
+        if (found_tile_heap) {
+            skip |= LogError("VUID-VkTileMemorySizeInfoQCOM-size-10729", device, loc.dot(Field::size),
+                             "(%" PRIu64 ") must be less than or equal to %" PRIu64 ", found at memoryHeaps[%" PRIu32
+                             "], the largest VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM heap.",
+                             tile_memory_size_info.size, largest_heap_size, heap_index);
+        } else {
+            // Without reporting this, the error above would point at memoryHeaps[0] which is not a tile memory heap
+            skip |= LogError("VUID-VkTileMemorySizeInfoQCOM-size-10729", device, loc.dot(Field::size),
+                             "(%" PRIu64 ") is not zero, but none of the %" PRIu32
+                             " memory heaps have VK_MEMORY_HEAP_TILE_MEMORY_BIT_QCOM set.",
+                             tile_memory_size_info.size, phys_dev_mem_props.memoryHeapCount);
+        }
     }
 
     return skip;

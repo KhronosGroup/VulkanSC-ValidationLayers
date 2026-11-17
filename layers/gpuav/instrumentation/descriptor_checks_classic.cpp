@@ -60,7 +60,7 @@ DescriptorIdPool::~DescriptorIdPool() {
     }
 }
 
-DescriptorId DescriptorIdPool::NextId(const VulkanTypedHandle& handle) {
+DescriptorId DescriptorIdPool::NextId() {
     if (max_descriptors_ == 0) {
         return 0;
     }
@@ -69,7 +69,7 @@ DescriptorId DescriptorIdPool::NextId(const VulkanTypedHandle& handle) {
     // NOTE: valid ids are in the range [1, max_descriptors_] (inclusive)
     // 0 is the invalid id.
     std::lock_guard guard(lock_);
-    if (alloc_map_.size() >= max_descriptors_) {
+    if (allocated_ids_.size() >= max_descriptors_) {
         return 0;
     }
     do {
@@ -77,8 +77,8 @@ DescriptorId DescriptorIdPool::NextId(const VulkanTypedHandle& handle) {
         if (next_id_ > max_descriptors_) {
             next_id_ = 1;
         }
-    } while (alloc_map_.count(result) > 0);
-    alloc_map_[result] = handle;
+    } while (allocated_ids_.count(result) > 0);
+    allocated_ids_.insert(result);
     gpu_id_pool_state_[result / 32] |= 1u << (result & 31);
     return result;
 }
@@ -88,7 +88,7 @@ void DescriptorIdPool::DeleteId(DescriptorId id) {
         std::lock_guard guard(lock_);
         // Note: We don't mess with next_id_ here because ids should be assigned in LRU order.
         gpu_id_pool_state_[id / 32] &= ~(1u << (id & 31));
-        alloc_map_.erase(id);
+        allocated_ids_.erase(id);
     }
 }
 
@@ -120,7 +120,7 @@ void RegisterDescriptorChecksClassicValidation(Validator& gpuav, CommandBufferSu
     }
 
     cb.on_instrumentation_error_logger_register_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb,
-                                                                          const LastBound& last_bound) {
+                                                                          const LastBound&) {
         // We want to grab the last (current) element in descriptor_binding_commands, but as a std::vector, the reference might be
         // garbage later, so just hold the index for later. It is possible to have no descriptor sets bound, for example if using
         // push constants.
@@ -142,7 +142,6 @@ void RegisterDescriptorChecksClassicValidation(Validator& gpuav, CommandBufferSu
             if (GetErrorGroup(error_record) != kErrorGroup_InstDescriptorIndexingOOB) {
                 return error_found;
             }
-            error_found = true;
 
             std::ostringstream strm;
 
@@ -193,7 +192,7 @@ void RegisterDescriptorChecksClassicValidation(Validator& gpuav, CommandBufferSu
                                 "descriptor.";
                     }
 
-                    out_vuid_msg = vvl::CreateActionVuid(loc.function, vvl::ActionVUID::INVALID_DESCRIPTOR_08114);
+                    out_vuid_msg = vvl::CreateActionVuid(loc.function, vvl::ActionVUID::DESCRIPTOR_08114);
                     error_found = true;
                 } break;
 
@@ -397,7 +396,8 @@ void RegisterDescriptorChecksClassicValidation(Validator& gpuav, CommandBufferSu
 
     // For every descriptor binding command, and for each set bound by this command, update a GPU buffer holding its
     // corresponding descriptor states
-    cb.on_pre_cb_submission_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb, VkCommandBuffer) {
+    cb.on_pre_cb_submission_functions.emplace_back([](Validator& gpuav, CommandBufferSubState& cb, VkCommandBuffer,
+                                                      gpuav::QueueSubmission&, gpuav::CommandBufferSubmitInfo&) {
         DescriptorSetBindings& desc_set_bindings = cb.shared_resources_cache.Get<DescriptorSetBindings>();
         for (DescriptorSetBindings::BindingCommand& desc_binding_cmd : desc_set_bindings.descriptor_set_binding_commands) {
             auto desc_sets_ssbo_ptr =

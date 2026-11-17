@@ -12,6 +12,7 @@
  */
 
 #include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 #include <cstdlib>
 
 class PositiveOther : public VkLayerTest {};
@@ -710,21 +711,33 @@ TEST_F(PositiveOther, HeapWithoutUntypedPointers) {
     InitState();
 }
 
-TEST_F(PositiveOther, GetDeviceFaultReportsWithoutTimeout) {
+TEST_F(PositiveOther, GetDeviceFaultReports) {
     AddRequiredExtensions(VK_KHR_DEVICE_FAULT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::deviceFault);
     RETURN_IF_SKIP(Init());
+
     uint32_t fault_counts = 0;
     VkResult result = vk::GetDeviceFaultReportsKHR(device(), 0, &fault_counts, nullptr);
-    ASSERT_EQ(VK_SUCCESS, result);
-    ASSERT_EQ(fault_counts, 0);
+    ASSERT_EQ(VK_TIMEOUT, result);
+    ASSERT_EQ(fault_counts, 0u);
+
+    fault_counts = 0;
+    result = vk::GetDeviceFaultReportsKHR(device(), 1000u, &fault_counts, nullptr);
+    ASSERT_EQ(VK_TIMEOUT, result);
+    ASSERT_EQ(fault_counts, 0u);
 }
 
-TEST_F(PositiveOther, GetDeviceFaultReportsWithTimeout) {
-    AddRequiredExtensions(VK_KHR_DEVICE_FAULT_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::deviceFault);
+TEST_F(PositiveOther, AppendingPipelineCreateFlags2) {
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
-    uint32_t fault_counts = 0;
-    VkResult result = vk::GetDeviceFaultReportsKHR(device(), 1000u, &fault_counts, nullptr);
-    ASSERT_EQ(VK_TIMEOUT, result);
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    // If the values overlap, we don't want to risk noise
+    VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
+    flags2.flags = VK_PIPELINE_CREATE_2_ALLOW_DERIVATIVES_BIT | VK_PIPELINE_CREATE_2_DISABLE_OPTIMIZATION_BIT;
+
+    CreateComputePipelineHelper pipe(*this, &flags2);
+    pipe.cp_ci_.flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+    pipe.CreateComputePipeline();
 }

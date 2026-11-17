@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD041 -->
-<!-- Copyright 2015-2025 LunarG, Inc. -->
+<!-- Copyright 2015-2026 LunarG, Inc. -->
 [![Khronos Vulkan][1]][2]
 
 [1]: https://vulkan.lunarg.com/img/Vulkan_100px_Dec16.png "https://www.khronos.org/vulkan/"
@@ -117,7 +117,9 @@ In this case, a read-after-write check is done for R based on W0 and M, and a wr
 
 ### Tracking Across Command Buffers
 
-For multiple command buffers/secondary buffers, a partial recording of memory accesses and synchronization operations is required.  Current design targets the use of storing the “first” access information (first reads, first write), along with the either a recording of all synchronization operations *or* some "barrier state" that can be stored with each “first access”.  This approach should be familiar to those that have seen the “image layout” queue-submit, and execute-command validation, which validates against a similar “first” record.
+The current implementation records memory accesses and synchronization operations as commands. Full validation replays these commands in order against the queue batch access context, validating each command and then applying its accesses and synchronization effects. This context includes access state inherited from previous submissions. The access maps track current access state; no first-access history is recorded.
+
+Record-time validation operates on command-buffer access contexts. Secondary command buffers also store commands when only record-time validation is enabled, so `vkCmdExecuteCommands` can validate their accesses against the primary command buffer using the same command replay machinery.
 
 Overall the operations to perform include
 
@@ -161,7 +163,7 @@ Memory extent can be specified in a variety of ways:
   <tr>
    <td>Tiled (opaque) image subresource range
    </td>
-   <td>A VkImage handle to an opaque (optimal tiling) image with a VkSubresourceRange which cannot be mapped to a specific subset of the the <code>VkMemory </code>bound to the <code>VkImage</code>.  The subresources are encoded to the opaque range reserved for the resource, specific to the image creation parameters which can only be compared relative to “compatible” aliases.  Otherwise all subresources within the range are assumed to alias to *every* device memory address bound to the image.
+   <td>A VkImage handle to an opaque (optimal tiling) image with a VkSubresourceRange which cannot be mapped to a specific subset of the <code>VkMemory </code>bound to the <code>VkImage</code>.  The subresources are encoded to the opaque range reserved for the resource, specific to the image creation parameters which can only be compared relative to “compatible” aliases.  Otherwise all subresources within the range are assumed to alias to *every* device memory address bound to the image.
    </td>
   </tr>
   <tr>
@@ -491,9 +493,9 @@ The scope of memory access is instead _restricted_ to the set of accesses both l
 
 A marker representing a specific access for error reporting or sequence specific operations.
 
-#### ResourceAccessState
+#### AccessState
 
-The specific access/barrier state for a given extent of memory (or opaque range) addresses. The `ResourceAccessState` reflects the common state of a single contiguous range of "fake" addresses.
+The specific access/barrier state for a given extent of memory (or opaque range) addresses. The `AccessState` reflects the common state of a single contiguous range of "fake" addresses.
 
 Stores:
 
@@ -520,19 +522,17 @@ Implements:
 
 Queue Id and Sync stages are used for semaphore, queue, and fence wait operations, and for synchronization operation replay at queue submit time.
 
-#### ResourceAccessRangeMap
+#### AccessMap
 
-#### ResourceAccessRangeMap
-
-Interval tree of ResourceAccessState records within the unified "fake" address space, comprising VkDeviceMemory linear ranges and opaque ranges
+Interval tree of AccessState records within the unified "fake" address space, comprising VkDeviceMemory linear ranges and opaque ranges
 
 #### AccessContext
 
-ResourceAccessState and dependency information for a given “context” (for example within a given command buffer, but outside a renderpass, or within a given subpass of a renderpass instance)
+AccessState and dependency information for a given “context” (for example within a given command buffer, but outside a renderpass, or within a given subpass of a renderpass instance)
 
 Stores:
 
-*   "Fake"address space ResourceAccessRangeMap
+*   "Fake"address space AccessMap
 *   Subpass dependency and barrier information (for traversal within renderpass instances) if needed.
 
 Implements:
@@ -541,9 +541,9 @@ Implements:
 *   VkMemory FBA offset
 *   State update traversal over (potentially discontiguous) ranges for images and buffers
 *   Subpass dependency graph traversal for state lookup and resolution operations (including support  for RenderPass specific and Hazard detection operations)
-*   Range map operations to split (and potentially combine) ResourceAccessState records, to ensure state changes only impact the correct portion of the address space.
+*   Range map operations to split (and potentially combine) AccessState records, to ensure state changes only impact the correct portion of the address space.
 
-#### CommandBufferAccessContext
+#### CommandBufferContext
 
 container for all access contexts for a specific command buffer, and state reflecting the current context.
 
@@ -578,23 +578,23 @@ RenderPass specific hazard check and state update operations
 
 Contains the access and event context information for a given queue submission batch.  This includes a full copy of all accesses from earlier queue batches.  "Earlier" includes the previous batches in submission order on the same queue and batches corresponding to Semaphore wait operations.  To minimize memory footprint, only two groups of contexts are retained. The first contains the access and  event context for a given queue as of its most recent submission operation. The second group are the QueueBatchContext corresponding to the state of a queue with a signaled semaphore or fence operation which has not yet been awaited.  Batches that have neither unresolved semaphore or fence operations associated, nor are the most recently submitted, may have QueueBatchContext with lifespans of only the submit entry point call.
 
-Accesses within a QueueBatchContext are tagged with "global" (at device scope) ResourceUsageTag id's, which are atomically allocated when the batch context is created. These tags are unique and monotonically increasing across all queues for a given VkDevice. While CommandBufferAccessContext contains the access usage records for all commands and synchronization operations, the QueueBatchContext tagging information references a global usage record store.  *Note: Clean up of the global usage record store will require traversing the access contexts of the queue batch contexts to find and eliminate unreferenced usage records.  This will need to be assessed as to priority relative to other apparent memory leaks in the maintenance of unresolved/unknown signal and event states.*
+Accesses within a QueueBatchContext are tagged with "global" (at device scope) ResourceUsageTag id's, which are atomically allocated when the batch context is created. These tags are unique and monotonically increasing across all queues for a given VkDevice. While CommandBufferContext contains the access usage records for all commands and synchronization operations, the QueueBatchContext tagging information references a global usage record store.  *Note: Clean up of the global usage record store will require traversing the access contexts of the queue batch contexts to find and eliminate unreferenced usage records.  This will need to be assessed as to priority relative to other apparent memory leaks in the maintenance of unresolved/unknown signal and event states.*
 
 
 ### Range Based Operations
 
 In the discussion below, validation or update of the state of resource is discussed as if it is a uniform, singular operation.  However, over the input range of a memory access or synchronization operation the resource access state can vary.  For images, the input range may even be discontinuous, covering a series of locally contiguous ranges (mapping to `VkDeviceMemory` or opaque range addresses).
 
-All resource access state operations described below happen over ranges over which the input and current access state values are constant.  As such, top-level operations (such as hazard detection for the use a of memory range in a copy operation), are implemented using range traversal functions to hide the complexity of the underlying variability in current state. Return values from certain query operations (like those needed for “resolve” operations below) are not single valued but are ResourceAccessRangeMap objects reflecting the set of range/value pairs in the query range.  State update operations also must deal with the potential of a non-constant current state over the range, range boundary misalignment, or gaps in current state, requiring record splitting or infilling of initial data.
+All resource access state operations described below happen over ranges over which the input and current access state values are constant.  As such, top-level operations (such as hazard detection for the use a of memory range in a copy operation), are implemented using range traversal functions to hide the complexity of the underlying variability in current state. Return values from certain query operations (like those needed for “resolve” operations below) are not single valued but are AccessMap objects reflecting the set of range/value pairs in the query range.  State update operations also must deal with the potential of a non-constant current state over the range, range boundary misalignment, or gaps in current state, requiring record splitting or infilling of initial data.
 
 The interposition of the traversal functions between the Access Context level operations and the Resource Access State Operations adds an unavoidable complexity to the implementation of each operation. To the extent possible, common traversal frameworks should be used to prevent the proliferation of range (and or graph) walkers.  (To the extent these are truly general, they should be add to the algorithms implemented with the underlying range_map.) Maintainers should become familiar and comfortable with the traversal tools for the range maps and their use in Synchronization Validation.
 
 Fragmentation of the access range maps is a distinct possibility, with the map implementation supporting record coalescence, should this prove a performance or memory usage issue. Optimizations such as using alternative update traversal algorithms are possible, for example, in situations where it is known that the update will fully overwrite the existing records.
 
 
-### ResourceAccessState Operations
+### AccessState Operations
 
-The ResourceAccessState is the leaf level structure at which the synchronization validation and state tracking is performed.  The operations on the access state implement the logic described in the Vulkan specification regarding the effects of access and synchronization operations from a resource (memory address range) point of view.  The caller _must _assure that both the input and the current state are constant and correctly bounded over the range of the operation.
+The AccessState is the leaf level structure at which the synchronization validation and state tracking is performed.  The operations on the access state implement the logic described in the Vulkan specification regarding the effects of access and synchronization operations from a resource (memory address range) point of view.  The caller _must _assure that both the input and the current state are constant and correctly bounded over the range of the operation.
 
 
 #### State Update
@@ -635,7 +635,7 @@ The ResourceAccessState is the leaf level structure at which the synchronization
       *   Remove write access from access state if:
           *   Write access matching queue/tag of wait operation
           *   -OR- if there are any read stages matching the wait criteria (MRA)
-  *   If all resulting ResourceAccessState contains no accesses, delete from AccessContext.
+  *   If all resulting AccessState contains no accesses, delete from AccessContext.
 
   > Note: Queue/Fence Wait operations require inspecting and updating all QueueBatchContext Access contexts, and is likely a heavyweight operation, though far less common that other state update operations.
 
@@ -730,7 +730,7 @@ Command buffer state commands also affect the execution of the action commands, 
 
 ### Image Layout Transitions
 
-As noted above Image Layout Transition are typically implemented in the context of a barrier operation, as such these have special support at the Resource Access level.  In the implementation of synchronization validation for these barriers, validation checks are only required for barriers with a layout transition.  State update for barriers with layout transitions first update the state to reflect the write-access, then update the destination barriers using the layout transition as the source access scope. Otherwise no state up operation is performed, and the source and destination scopes are passed to the ResourceAccess state to update the barrier state.
+As noted above Image Layout Transition are typically implemented in the context of a barrier operation, as such these have special support at the Resource Access level.  In the implementation of synchronization validation for these barriers, validation checks are only required for barriers with a layout transition.  State update for barriers with layout transitions first update the state to reflect the write-access, then update the destination barriers using the layout transition as the source access scope. Otherwise no state up operation is performed, and the source and destination scopes are passed to the AccessState to update the barrier state.
 
 
 ### Renderpass Operations
@@ -816,7 +816,7 @@ Load operations have guarantees memory access order guarantees:
 
 > The load operation for each sample in an attachment happens-before any recorded command which accesses the sample
 
-To support these guarantees, load operations update resource access state to reflect the effective stage/access of the load operation, and then apply an effective barrier with the source execution and access scopes reflecting the load operation stage/access and the destination execution and access scopes based on the the valid stages and accesses listed. _(Note: some consideration was given to simply zeroing out the access state  s.t. no hazard relative to the access could occur, however, given the presence of asynchronous access hazards, conserving the record of the operation, while providing a correct effective barrier was preferred, here and elsewhere in the design.)_
+To support these guarantees, load operations update resource access state to reflect the effective stage/access of the load operation, and then apply an effective barrier with the source execution and access scopes reflecting the load operation stage/access and the destination execution and access scopes based on the valid stages and accesses listed. _(Note: some consideration was given to simply zeroing out the access state  s.t. no hazard relative to the access could occur, however, given the presence of asynchronous access hazards, conserving the record of the operation, while providing a correct effective barrier was preferred, here and elsewhere in the design.)_
 
 **_PHASE1 TODO: review both in document and code (in light of the DetectHazard time Ordering Guarantee support) whether this effective barrier is still required, as there are good reasons (such as synchronization operation chaining) not to pollute the barrier state._**
 
@@ -895,7 +895,7 @@ Apply global execution barriers from the src/dstStageMask.
 
 **TODO/KNOWN LIMITATION:** host set event not supported through at least phase 2.
 
-vkCmdSetEvent defines the source execution scope for the matching vkCmdWaitEvent but does not cause any update to the resource access state.  While a simplistic model would allow simple recording of the resource usage tag to define the set of resource accesses affected at wait time, the access state’s storage of dependency chain information is not time-stamped.  Thus to record the accesses within the scope of the the set event, a range map (containing potentially simply a boolean) is constructed to record the address ranges containing “in scope” accesses.  This map should likely have a “merge operation” run, combining adjacent ranges with the same value to minimize the memory footprint of the map.  Additionally, vkCmdSetEvent must record the usage tag (or equivalent sequence/timestamp).
+vkCmdSetEvent defines the source execution scope for the matching vkCmdWaitEvent but does not cause any update to the resource access state.  While a simplistic model would allow simple recording of the resource usage tag to define the set of resource accesses affected at wait time, the access state’s storage of dependency chain information is not time-stamped.  Thus to record the accesses within the scope of the set event, a range map (containing potentially simply a boolean) is constructed to record the address ranges containing “in scope” accesses.  This map should likely have a “merge operation” run, combining adjacent ranges with the same value to minimize the memory footprint of the map.  Additionally, vkCmdSetEvent must record the usage tag (or equivalent sequence/timestamp).
 
 CmdWaitEvent uses both the source execution scope map and the usage tag to determine the _effective _source scopes.  Resource access state barrier information are _only _updated if they lie within a range of the source scope map, have not (by means of testing usage tags) been updated since the CmdSetEvent call, and (as appropriate) lie within the access scopes defined by the wait event command.
 
@@ -1119,16 +1119,16 @@ Recorded action command describe compute, graphics, or transfer actions to be ex
    </td>
    <td><code>vkCmdExecuteCommands</code>
    </td>
-   <td>Not supported in initial release.
+   <td>Secondary command buffers are validated using command replay.
    </td>
   </tr>
 </table>
 
 
 
-**TODO/KNOWN LIMITATION:** ExecuteCommands and QueueSubmit not supported in phase 1
+When record-time validation is enabled, `vkCmdExecuteCommands` validates the secondary command buffers by replaying their commands against a temporary copy of the primary command buffer's current access context. Recording the execute command then applies the secondary commands to the primary access context and imports them into its command stream when command storage is needed.
 
-Recording and validating `vkCmdExecuteCommands `which is more similar in scope to the various `vkQueue… `commands.  The “first” access state of the executed command buffers must be added to the access context of the calling parent buffer. Record time validation of `vkCmdExecuteCommands `may require a replay of the secondary command buffer synchronization operations up to the point of the first access within the secondary command buffer. TODO: Finish in phase 2 design, with as much code reuse w.r.t. queue submit as possible.
+With full validation enabled, queue submission replays the resulting command stream against the queue batch access context. If record-time validation is disabled, recording `vkCmdExecuteCommands` imports the secondary commands without validating or applying their accesses until submission.
 
 
 #### Command Buffer State Bindings
@@ -1369,7 +1369,7 @@ Depth/Stencil Attachment usage is controlled by `VkPipelineRasterizationStateCre
 </table>
 
 
-Stencil attachments are controlled by `stencilTestEnable`, with additional state to determine the type of access.  The type of access is controlled by the the `VkStencilOpState`. Stencil aspect access is read-only If  `writeMask `is zero, or the one of the following combination of stencil parameters is set for all  non-culled (see `VkPipelineRasterizationStateCreateInfo::cullMode)` faces front or back.
+Stencil attachments are controlled by `stencilTestEnable`, with additional state to determine the type of access.  The type of access is controlled by the `VkStencilOpState`. Stencil aspect access is read-only If  `writeMask `is zero, or the one of the following combination of stencil parameters is set for all  non-culled (see `VkPipelineRasterizationStateCreateInfo::cullMode)` faces front or back.
 
 
 <table>

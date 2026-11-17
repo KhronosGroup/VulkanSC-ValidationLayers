@@ -583,14 +583,12 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-04095");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-04095");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_MESH_SHADER_BIT_NV, VK_PIPELINE_STAGE_MESH_SHADER_BIT_NV, 0, 0,
-                           nullptr, 0, nullptr, 0, nullptr);
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_MESH_SHADER_BIT_NV, VK_PIPELINE_STAGE_MESH_SHADER_BIT_NV);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-04096");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstStageMask-04096");
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TASK_SHADER_BIT_NV, VK_PIPELINE_STAGE_TASK_SHADER_BIT_NV, 0, 0,
-                           nullptr, 0, nullptr, 0, nullptr);
+    m_command_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_TASK_SHADER_BIT_NV, VK_PIPELINE_STAGE_TASK_SHADER_BIT_NV);
     m_errorMonitor->VerifyFound();
 
     m_command_buffer.End();
@@ -1213,8 +1211,8 @@ TEST_F(NegativeMesh, DrawIndexMeshShaderObject) {
     )glsl";
 
     m_errorMonitor->SetDesiredError("VUID-vkCreateShadersEXT-pCreateInfos-09632");
-    const vkt::Shader meshShader(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT,
-                                 GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, mesh_src, SPV_ENV_VULKAN_1_2));
+    const vkt::ShaderEXT meshShader(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT,
+                                    GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, mesh_src, SPV_ENV_VULKAN_1_2));
     m_errorMonitor->VerifyFound();
 }
 

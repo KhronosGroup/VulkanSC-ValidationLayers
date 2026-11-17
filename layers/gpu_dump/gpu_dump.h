@@ -17,9 +17,17 @@
 #include <vulkan/vulkan.h>
 #include "chassis/layer_object_id.h"
 #include "state_tracker/state_tracker.h"
+#include <iosfwd>  // Forward declarations of <ostream>
 
 // Wanted 'gpu_dump' but conflicts with EnableFlags::gpu_dump
 namespace gpudump {
+
+// Prints a value as "0x..." without leaving the stream in std::hex
+struct Hex {
+    explicit Hex(uint64_t value) : value(value) {}
+    uint64_t value;
+};
+std::ostream& operator<<(std::ostream& os, const Hex& hex);
 
 class Instance : public vvl::InstanceProxy {
   public:
@@ -37,23 +45,11 @@ class GpuDump : public vvl::DeviceProxy {
 
     void Created(vvl::CommandBuffer& cb_state) override;
 
-    std::vector<uint8_t> CopyDataFromMemory(VkDeviceAddress memory_addresss, VkDeviceSize copy_size);
+    std::vector<uint8_t> CopyDataFromMemory(VkDeviceAddress memory_address, VkDeviceSize copy_size);
 
     // Returns true if no object was found
     bool ListBuffers(std::ostringstream& ss, VkDeviceAddress address, uint32_t indents, bool new_line_start = false);
     bool ListAccelerationStructures(std::ostringstream& ss, VkDeviceAddress address, uint32_t indents, bool new_line_start = false);
-
-    void FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
-
-    // TODO - will likely need to share so GPU-AV can use as well
-    // Currnetly only want to gather once for lifetime of device
-    // (When |descriptor_hashing| is turned on)
-    VkDeviceSize heap_max_descriptor_size = 0;
-    std::vector<VkDeviceSize> heap_all_descriptor_sizes;
-    VkDeviceSize buffer_max_descriptor_size = 0;
-    std::vector<VkDeviceSize> buffer_all_descriptor_sizes;
-    uint32_t null_descriptor_dword = 0;
-    bool null_descriptor_allowed = false;
 };
 
 }  // namespace gpudump

@@ -52,8 +52,7 @@ TEST_F(NegativeObjectLifetime, CmdBarrierBufferDestroyed) {
     buf_barrier.offset = 0;
     buf_barrier.size = VK_WHOLE_SIZE;
 
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 1,
-                           &buf_barrier, 0, NULL);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, buf_barrier);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -81,8 +80,7 @@ TEST_F(NegativeObjectLifetime, CmdBarrierImageDestroyed) {
     img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -1297,4 +1295,103 @@ TEST_F(NegativeObjectLifetime, DestroyBufferAddressRange) {
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
     monitor_.SetAllowedFailureMsg("VUID-vkDestroyDevice-device-05137");
+}
+
+TEST_F(NegativeObjectLifetime, LeakBufferAndBufferView) {
+    RETURN_IF_SKIP(InitFramework());
+    if (!IsPlatformMockICD()) {
+        // This test leaks a buffer/buffer view (on purpose) and should not be run on a real driver
+        GTEST_SKIP() << "This test only runs on the mock ICD";
+    }
+
+    const auto q_props = vkt::PhysicalDevice(Gpu()).queue_properties_;
+    ASSERT_TRUE(q_props.size() > 0);
+    ASSERT_TRUE(q_props[0].queueCount > 0);
+
+    const float q_priority[] = {1.0f};
+    VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
+    queue_ci.queueFamilyIndex = 0;
+    queue_ci.queueCount = 1;
+    queue_ci.pQueuePriorities = q_priority;
+
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
+    device_ci.queueCreateInfoCount = 1;
+    device_ci.pQueueCreateInfos = &queue_ci;
+
+    VkDevice leaky_device = VK_NULL_HANDLE;
+    ;
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &leaky_device);
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+    buffer_ci.size = 4096;
+    VkBuffer buffer = VK_NULL_HANDLE;
+    vk::CreateBuffer(leaky_device, &buffer_ci, nullptr, &buffer);
+
+    VkMemoryRequirements mem_reqs{};
+    vk::GetBufferMemoryRequirements(leaky_device, buffer, &mem_reqs);
+    VkPhysicalDeviceMemoryProperties mem_props{};
+    vk::GetPhysicalDeviceMemoryProperties(Gpu(), &mem_props);
+    uint32_t mem_type_index = 0;
+    for (; mem_type_index < mem_props.memoryTypeCount; ++mem_type_index) {
+        if (mem_reqs.memoryTypeBits & (1u << mem_type_index)) break;
+    }
+    ASSERT_TRUE(mem_type_index < mem_props.memoryTypeCount);
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.allocationSize = mem_reqs.size;
+    alloc_info.memoryTypeIndex = mem_type_index;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    vk::AllocateMemory(leaky_device, &alloc_info, nullptr, &memory);
+    vk::BindBufferMemory(leaky_device, buffer, memory, 0);
+
+    VkBufferViewCreateInfo bvci = vku::InitStructHelper();
+    bvci.buffer = buffer;
+    bvci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    bvci.range = VK_WHOLE_SIZE;
+    VkBufferView view = VK_NULL_HANDLE;
+    vk::CreateBufferView(leaky_device, &bvci, nullptr, &view);
+
+    // VUID-vkDestroyDevice-device-05137
+    // VkDeviceMemory, VkBuffer, and VkBufferView
+    m_errorMonitor->SetDesiredError("has 3 leaked objects that have not been destroyed");
+    vk::DestroyDevice(leaky_device, nullptr);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeObjectLifetime, CmdBufferInvalidationChainMessage) {
+    RETURN_IF_SKIP(Init());
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer foo { int x; } bar;
+        void main() { bar.x = 1; }
+    )glsl";
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+
+    {
+        vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        descriptor_set.UpdateDescriptorSets();
+
+        m_command_buffer.Begin();
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+        vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                                  nullptr);
+        vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+        m_command_buffer.End();
+    }
+
+    // VUID-vkQueueSubmit-pCommandBuffers-00070
+    m_errorMonitor->SetDesiredError("which was used by VkDescriptorSet");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
 }

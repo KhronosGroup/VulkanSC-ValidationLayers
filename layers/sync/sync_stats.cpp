@@ -98,9 +98,10 @@ void AccessContextStats::UpdateMax(const AccessContextStats& cur_stats) {
     UPDATE_MAX(access_states);
     UPDATE_MAX(read_states);
     UPDATE_MAX(write_states);
-    UPDATE_MAX(first_accesses);
+    UPDATE_MAX(map_entries);
+    UPDATE_MAX(strided_entries);
+    UPDATE_MAX(strided_allocation_size);
     UPDATE_MAX(access_states_with_multiple_reads);
-    UPDATE_MAX(access_states_with_multiple_firsts);
     UPDATE_MAX(access_states_with_dynamic_allocations);
     UPDATE_MAX(access_states_dynamic_allocation_size);
 #undef UPDATE_MAX
@@ -108,10 +109,16 @@ void AccessContextStats::UpdateMax(const AccessContextStats& cur_stats) {
 
 void UpdateAccessMapStats(const AccessMap& access_map, AccessContextStats& stats) {
     stats.access_contexts += 1;
-    stats.access_states += (uint32_t)access_map.Size();
+    stats.map_entries += static_cast<uint32_t>(access_map.Size());
     for (const auto& entry : access_map) {
-        const AccessState& access_state = entry.second;
-        access_state.UpdateStats(stats);
+        if (entry.second.strided_access) {
+            ++stats.strided_entries;
+            stats.strided_allocation_size += sizeof(AccessEntry::StridedAccess);
+        }
+        entry.second.VisitStates([&stats](const AccessState& access_state) {
+            ++stats.access_states;
+            access_state.UpdateStats(stats);
+        });
     }
 }
 
@@ -122,8 +129,8 @@ void AccessStats::Update(SyncValidator& validator) {
     subpass_access_stats = {};
 
     validator.device_state->ForEachShared<vvl::CommandBuffer>([this](std::shared_ptr<vvl::CommandBuffer> cb) {
-        const CommandBufferAccessContext* cb_access_context = GetAccessContext(*cb);
-        cb_access_context->UpdateStats(*this);
+        const CommandBufferContext& cb_context = GetCommandBufferContext(*cb);
+        cb_context.UpdateStats(*this);
     });
     for (const auto& batch : validator.GetAllQueueBatchContexts()) {
         const AccessContext& access_context = batch->GetAccessContext();
@@ -170,10 +177,10 @@ void Stats::OnBarrierCommand(uint32_t memory_barrier_count, uint32_t buffer_barr
 
 void Stats::UpdateMemoryStats() {
 #if defined(USE_MIMALLOC_STATS)
-    mi_stats_merge();
     {
         std::unique_lock<std::mutex> lock(mi_stats_mutex);
-        mi_stats_get(sizeof(mi_stats), &mi_stats);
+        mi_stats_init(&mi_stats);
+        mi_stats_get(&mi_stats);
     }
 #endif
 }
@@ -206,20 +213,32 @@ std::string Stats::CreateReport() {
         ss << std::setw(2) << "| ";
         ss << std::setw(10) << stats.read_states;
         ss << std::setw(10) << stats.write_states;
-        ss << std::setw(9) << stats.first_accesses;
 
         ss << std::setw(2) << "| ";
         ss << std::setw(12) << stats.access_states_with_multiple_reads;
-        ss << std::setw(13) << stats.access_states_with_multiple_firsts;
         ss << std::setw(13) << stats.access_states_with_dynamic_allocations;
         ss << std::setw(15) << stats.access_states_dynamic_allocation_size;
+        ss << "\n";
+    };
+    auto print_access_map_stats = [&ss](const char* context_type, const AccessContextStats& stats, bool include_overhead = true) {
+        ss << std::setw(8) << std::string(context_type) + ":" << " entries " << std::setw(8)
+           << std::to_string(stats.map_entries) + "," << " strided entries " << std::setw(6)
+           << std::to_string(stats.strided_entries) + "," << " strided allocations (B) ";
+        if (include_overhead) {
+            const uint64_t payload_bytes = sizeof(AccessEntry) * uint64_t(stats.map_entries) + stats.strided_allocation_size;
+            const uint64_t representation_overhead = payload_bytes - sizeof(AccessState) * uint64_t(stats.access_states);
+            ss << std::setw(10) << std::to_string(stats.strided_allocation_size) + "," << " representation overhead (B) "
+               << representation_overhead;
+        } else {
+            ss << stats.strided_allocation_size;
+        }
         ss << "\n";
     };
 
     ss << "-----------------------\n";
     ss << "Common stats                    count       max_count\n";
     ss << "-----------------------\n";
-    print_common_stats("CommandBufferAccessContext", command_buffer_contexts);
+    print_common_stats("CommandBufferContext", command_buffer_contexts);
     print_common_stats("QueueBatchContext", queue_batch_contexts);
     print_common_stats("Timeline signal", timeline_signals);
     print_common_stats("Unresolved batch", unresolved_batches);
@@ -230,7 +249,7 @@ std::string Stats::CreateReport() {
     print_common_stats64("HandleRecord bytes", handle_record_memory, handle_record_max_memory);
 
     const char* access_stats_header =
-        "context      accesses   size (MB)  | reads     writes    firsts   | many_reads  many_firsts  have_allocs  allocated (B)\n";
+        "context      accesses   size (MB)  | reads     writes    | many_reads   have_allocs  allocated (B)\n";
 
     ss << "\n";
     ss << "-----------------------\n";
@@ -250,6 +269,19 @@ std::string Stats::CreateReport() {
     print_access_state_stats("Queue", access_stats.max_queue_access_stats);
     print_access_state_stats("Subpass", access_stats.max_subpass_access_stats);
 
+    ss << "\n-----------------------\n";
+    ss << "Access map representation (excluding map nodes)\n";
+    ss << "-----------------------\n";
+    print_access_map_stats("CB", access_stats.cb_access_stats);
+    print_access_map_stats("Queue", access_stats.queue_access_stats);
+    print_access_map_stats("Subpass", access_stats.subpass_access_stats);
+    ss << "\n-----------------------\n";
+    ss << "MAX Access map representation (excluding map nodes)\n";
+    ss << "-----------------------\n";
+    print_access_map_stats("CB", access_stats.max_cb_access_stats, false);
+    print_access_map_stats("Queue", access_stats.max_queue_access_stats, false);
+    print_access_map_stats("Subpass", access_stats.max_subpass_access_stats, false);
+
     ss << "\n";
     ss << "Memory barriers          : " << barrier_stats.memory_barriers.u32 << "\n";
     ss << "Buffer barriers          : " << barrier_stats.buffer_barriers.u32 << "\n";
@@ -262,17 +294,10 @@ std::string Stats::CreateReport() {
     ss << "Multi barrier commands only image    : " << barrier_stats.multi_barrier_commands_only_image.u32 << "\n";
 
     ss << "\n";
-    ss << "Layout ordering barrier registry size: " << GetLayoutOrderingBarrierLookup().ObjectCount();
-    ss << "\n";
     ss << "Max last reads array size";
     ss << ": CB: " << access_stats.cb_access_stats.max_last_reads_count;
     ss << ", Queue: " << access_stats.queue_access_stats.max_last_reads_count;
     ss << ", Subpass: " << access_stats.subpass_access_stats.max_last_reads_count;
-    ss << "\n";
-    ss << "Max first accesses array size";
-    ss << ": CB: " << access_stats.cb_access_stats.max_first_accesses_size;
-    ss << ", Queue: " << access_stats.queue_access_stats.max_first_accesses_size;
-    ss << ", Subpass: " << access_stats.subpass_access_stats.max_first_accesses_size;
     ss << "\n";
 
 #if defined(USE_MIMALLOC_STATS)

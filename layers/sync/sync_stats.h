@@ -28,7 +28,7 @@
 #include <atomic>
 #include <mutex>
 
-// NOTE: mimalloc should be built with MI_STAT=1 to enable stats module
+// NOTE: mimalloc should be built with MI_STAT=2 to enable stats module
 #if defined(USE_MIMALLOC)
 #include <mimalloc.h>
 #if MI_MALLOC_VERSION >= 300
@@ -83,15 +83,14 @@ struct AccessContextStats {
     uint32_t access_states = 0;
     uint32_t read_states = 0;
     uint32_t write_states = 0;
-    uint32_t first_accesses = 0;
+    uint32_t map_entries = 0;
+    uint32_t strided_entries = 0;
+    uint64_t strided_allocation_size = 0;
 
     uint32_t access_states_with_multiple_reads = 0;
-    uint32_t access_states_with_multiple_firsts = 0;
     uint32_t access_states_with_dynamic_allocations = 0;
     uint64_t access_states_dynamic_allocation_size = 0;
 
-    // The largest first accesses array
-    uint32_t max_first_accesses_size = 0;
     // The largest last reads array
     uint32_t max_last_reads_count = 0;
 

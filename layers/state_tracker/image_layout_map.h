@@ -24,63 +24,78 @@
 #include <memory>
 
 #include "containers/custom_containers.h"
+#include "containers/limits.h"
 #include "containers/small_range_map.h"
-#include "state_tracker/subresource_adapter.h"
+#include "state_tracker/subresource_encoding.h"
+#include "generated/error_location_helper.h"
 
 constexpr VkImageLayout kInvalidLayout = VK_IMAGE_LAYOUT_MAX_ENUM;
 
 // Stores the image layout of each subresource of a single image.
 // It is used to track the actual current layout (as opposed to record time tracking)
-using ImageLayoutMap = sparse_container::SmallRangeMap<VkImageLayout, 16>;
+using ImageLayoutMap = sparse_container::SmallRangeMap<VkImageLayout, 16, vvl::SubresourceEncoder::IndexType>;
 
 // Image layout state during command buffer recording
 struct ImageLayoutState {
-    VkImageLayout current_layout;
+    VkImageLayout current_layout = kInvalidLayout;
+
+    // The command that set |current_layout|
+    vvl::Func current_layout_command = vvl::Func::Empty;
 
     // Tracks the first known layout of the subresource in the command buffer.
     // This value is tracked based on the expected layout parameters from various API functions.
     // For example, for vkCmdCopyImageToBuffer the expected layout is the srcImageLayout parameter,
     // and for image barrier it is the oldLayout.
-    VkImageLayout first_layout;
+    VkImageLayout first_layout = kInvalidLayout;
+
+    // The command that set |first_layout|
+    vvl::Func first_layout_command = vvl::Func::Empty;
+
+    // Index into the recording command buffer's label-command stream when |first_layout| was recorded
+    uint32_t first_layout_label_command_i = vvl::kNoIndex32;
 
     // Aspect mask is used to normalize layouts before comparison.
     // TODO: consider storing two additional normalized layouts instead of this field
-    VkImageAspectFlags aspect_mask;
+    VkImageAspectFlags aspect_mask = 0;
 
     // Submit time validation compares first_layout against image's current global layout.
     // If not null, this vuid is used to report an error.
     // If null, the current implementation will use VUID-vkCmdDraw-None-09600 until we fix all the places
-    const char* submit_time_layout_mismatch_vuid;
+    const char* submit_time_layout_mismatch_vuid = nullptr;
 };
 
 // Tracks image layout state of each subresource of a single image during record time.
 // Each command buffer has ImageLayoutRegistery that tracks all images.
-class CommandBufferImageLayoutMap : public sparse_container::SmallRangeMap<ImageLayoutState, 16> {
+class CommandBufferImageLayoutMap
+    : public sparse_container::SmallRangeMap<ImageLayoutState, 16, vvl::SubresourceEncoder::IndexType> {
   public:
-    CommandBufferImageLayoutMap(sparse_container::IndexType subresource_count, uint32_t image_id)
-        : sparse_container::SmallRangeMap<ImageLayoutState, 16>(subresource_count), image_id(image_id) {}
+    CommandBufferImageLayoutMap(vvl::SubresourceEncoder::IndexType subresource_count, uint32_t image_id)
+        : sparse_container::SmallRangeMap<ImageLayoutState, 16, vvl::SubresourceEncoder::IndexType>(subresource_count),
+          image_id(image_id) {}
     const uint32_t image_id;
 };
 using ImageLayoutRegistry = vvl::unordered_map<VkImage, std::shared_ptr<CommandBufferImageLayoutMap>>;
 
 // Update image layout state during command buffer recording phase.
 // The VkImageLayout parameters must be unnormalized values (as defined by the API) so they can be used in the error messages.
-bool UpdateCurrentLayout(CommandBufferImageLayoutMap& image_layout_map, subresource_adapter::RangeGenerator&& range_gen,
-                         VkImageLayout layout, VkImageLayout expected_layout, VkImageAspectFlags aspect_mask);
+bool UpdateCurrentLayout(CommandBufferImageLayoutMap& image_layout_map, vvl::SubresourceRangeGenerator&& range_gen,
+                         VkImageLayout layout, VkImageLayout expected_layout, VkImageAspectFlags aspect_mask,
+                         uint32_t label_command_i, vvl::Func command);
 
 // Track image layout at the beginning of the command buffer.
 // Typically called by the APIs that specify the expected layout but do not perform a layout transition.
 // The VkImageLayout parameter must be unnormalized value (as defined by the API) so it can be used in the error messages.
-void TrackFirstLayout(CommandBufferImageLayoutMap& image_layout_map, subresource_adapter::RangeGenerator&& range_gen,
-                      VkImageLayout expected_layout, VkImageAspectFlags aspect_mask, const char* submit_time_layout_mismatch_vuid);
+void TrackFirstLayout(CommandBufferImageLayoutMap& image_layout_map, vvl::SubresourceRangeGenerator&& range_gen,
+                      VkImageLayout expected_layout, VkImageAspectFlags aspect_mask, const char* submit_time_layout_mismatch_vuid,
+                      uint32_t label_command_i, vvl::Func command);
 
-// Iterate over layout map subresource ranges that intersect with the ranges defined by RangeGenerator.
+// Iterate over layout map subresource ranges that intersect with the ranges defined by SubresourceRangeGenerator.
 // Runs the callback on each matching layout map range.
 // Returns skip status (check todo in the implementation)
 bool ForEachMatchingLayoutMapRange(
-    const CommandBufferImageLayoutMap& image_layout_map, subresource_adapter::RangeGenerator&& gen,
-    std::function<bool(const subresource_adapter::IndexRange& range, const ImageLayoutState& entry)>&& func);
+    const CommandBufferImageLayoutMap& image_layout_map, vvl::SubresourceRangeGenerator&& gen,
+    std::function<bool(const vvl::SubresourceEncoder::IndexRange& range, const ImageLayoutState& entry)>&& func);
 
 bool ForEachMatchingLayoutMapRange(
-    const ImageLayoutMap& image_layout_map, subresource_adapter::RangeGenerator&& gen,
-    std::function<bool(const subresource_adapter::IndexRange& range, VkImageLayout image_layout)>&& func);
+    const ImageLayoutMap& image_layout_map, vvl::SubresourceRangeGenerator&& gen,
+    std::function<bool(const vvl::SubresourceEncoder::IndexRange& range, VkImageLayout image_layout)>&& func);

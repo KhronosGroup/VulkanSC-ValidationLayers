@@ -15,501 +15,81 @@
 # limitations under the License.
 
 import os
+from dataclasses import dataclass
 from base_generator import BaseGenerator
+from vulkan_object import DynamicState
 
-# TODO - Get in vk.xml
-# This is a representation of all the dynamic state information
-dynamic_state_map = {
-    "VK_DYNAMIC_STATE_VIEWPORT" : {
-        "command" : ["vkCmdSetViewport"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_SCISSOR" : {
-        "command" : ["vkCmdSetScissor"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_LINE_WIDTH" : {
-        "command" : ["vkCmdSetLineWidth"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_BIAS" : {
-        "command" : ["vkCmdSetDepthBias", "vkCmdSetDepthBias2EXT"],
-        "dependency" : ["rasterizerDiscardEnable", "depthBiasEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_BLEND_CONSTANTS" : {
-        "command" : ["vkCmdSetBlendConstants"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_BOUNDS" : {
-        "command" : ["vkCmdSetDepthBounds"],
-        "dependency" : ["rasterizerDiscardEnable", "depthBoundsTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK" : {
-        "command" : ["vkCmdSetStencilCompareMask"],
-        "dependency" : ["rasterizerDiscardEnable", "stencilTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_STENCIL_WRITE_MASK" : {
-        "command" : ["vkCmdSetStencilWriteMask"],
-        "dependency" : ["rasterizerDiscardEnable", "stencilTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_STENCIL_REFERENCE" : {
-        "command" : ["vkCmdSetStencilReference"],
-        "dependency" : ["rasterizerDiscardEnable", "stencilTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_CULL_MODE" : {
-        "command" : ["vkCmdSetCullMode"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_FRONT_FACE" : {
-        "command" : ["vkCmdSetFrontFace"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY" : {
-        "command" : ["vkCmdSetPrimitiveTopology"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["VertexInput"],
-        "pipeline" : "VkPipelineInputAssemblyStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT" : {
-        "command" : ["vkCmdSetViewportWithCount"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT" : {
-        "command" : ["vkCmdSetScissorWithCount"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE" : {
-        "command" : ["vkCmdBindVertexBuffers2"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["VertexInput"],
-        "pipeline" : "VkPipelineVertexInputStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE" : {
-        "command" : ["vkCmdSetDepthTestEnable"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE" : {
-        "command" : ["vkCmdSetDepthWriteEnable"],
-        "dependency" : ["rasterizerDiscardEnable", "depthTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_COMPARE_OP" : {
-        "command" : ["vkCmdSetDepthCompareOp"],
-        "dependency" : ["rasterizerDiscardEnable", "depthTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE" : {
-        "command" : ["vkCmdSetDepthBoundsTestEnable"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE" : {
-        "command" : ["vkCmdSetStencilTestEnable"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_STENCIL_OP" : {
-        "command" : ["vkCmdSetStencilOp"],
-        "dependency" : ["rasterizerDiscardEnable", "stencilTestEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineDepthStencilStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE" : {
-        "command" : ["vkCmdSetRasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE" : {
-        "command" : ["vkCmdSetDepthBiasEnable"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE" : {
-        "command" : ["vkCmdSetPrimitiveRestartEnable"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["VertexInput"],
-        "pipeline" : "VkPipelineInputAssemblyStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV" : {
-        "command" : ["vkCmdSetViewportWScalingNV"],
-        "dependency" : ["viewportWScalingEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportWScalingStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT" : {
-        "command" : ["vkCmdSetDiscardRectangleEXT"],
-        "dependency" : ["rasterizerDiscardEnable", "discardRectangleEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineDiscardRectangleStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT" : {
-        "command" : ["vkCmdSetDiscardRectangleEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineDiscardRectangleStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_DISCARD_RECTANGLE_MODE_EXT" : {
-        "command" : ["vkCmdSetDiscardRectangleModeEXT"],
-        "dependency" : ["rasterizerDiscardEnable", "discardRectangleEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineDiscardRectangleStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT" : {
-        "command" : ["vkCmdSetSampleLocationsEXT"],
-        "dependency" : ["rasterizerDiscardEnable", "sampleLocationsEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineSampleLocationsStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV" : {
-        "command" : ["vkCmdSetViewportShadingRatePaletteNV"],
-        "dependency" : ["rasterizerDiscardEnable", "shadingRateImageEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportShadingRateImageStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_VIEWPORT_COARSE_SAMPLE_ORDER_NV" : {
-        "command" : ["vkCmdSetCoarseSampleOrderNV"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportCoarseSampleOrderStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_ENABLE_NV" : {
-        "command" : ["vkCmdSetExclusiveScissorEnableNV"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportExclusiveScissorStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV" : {
-        "command" : ["vkCmdSetExclusiveScissorNV"],
-        "dependency" : ["pExclusiveScissorEnables"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportExclusiveScissorStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR" : {
-        "command" : ["vkCmdSetFragmentShadingRateKHR"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization", "FragmentShader"],
-        "pipeline" : "VkPipelineFragmentShadingRateStateCreateInfoKHR",
-    },
-    "VK_DYNAMIC_STATE_LINE_STIPPLE" : {
-        "command" : ["vkCmdSetLineStipple"],
-        "dependency" : ["rasterizerDiscardEnable", "stippledLineEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationLineStateCreateInfoKHR",
-    },
-    "VK_DYNAMIC_STATE_VERTEX_INPUT_EXT" : {
-        "command" : ["vkCmdSetVertexInputEXT"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["VertexInput"],
-        "pipeline" : "VkPipelineVertexInputStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT" : {
-        "command" : ["vkCmdSetPatchControlPointsEXT"],
-        "stage" : "VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineTessellationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_LOGIC_OP_EXT" : {
-        "command" : ["vkCmdSetLogicOpEXT"],
-        "dependency" : ["rasterizerDiscardEnable", "logicOpEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT" : {
-        "command" : ["vkCmdSetColorWriteEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorWriteCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_TESSELLATION_DOMAIN_ORIGIN_EXT" : {
-        "command" : ["vkCmdSetTessellationDomainOriginEXT"],
-        "stage" : "VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineTessellationDomainOriginStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT" : {
-        "command" : ["vkCmdSetDepthClampEnableEXT"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_POLYGON_MODE_EXT" : {
-        "command" : ["vkCmdSetPolygonModeEXT"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT" : {
-        "command" : ["vkCmdSetRasterizationSamplesEXT"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineMultisampleStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_SAMPLE_MASK_EXT" : {
-        "command" : ["vkCmdSetSampleMaskEXT"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineMultisampleStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT" : {
-        "command" : ["vkCmdSetAlphaToCoverageEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineMultisampleStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT" : {
-        "command" : ["vkCmdSetAlphaToOneEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineMultisampleStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT" : {
-        "command" : ["vkCmdSetLogicOpEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendStateCreateInfo",
-    },
-    "VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT" : {
-        "command" : ["vkCmdSetColorBlendEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendAttachmentState",
-    },
-    "VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT" : {
-        "command" : ["vkCmdSetColorBlendEquationEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendAttachmentState",
-    },
-    "VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT" : {
-        "command" : ["vkCmdSetColorWriteMaskEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendAttachmentState",
-    },
-    "VK_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT" : {
-        "command" : ["vkCmdSetRasterizationStreamEXT"],
-        "stage" : "VK_SHADER_STAGE_GEOMETRY_BIT",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationStateStreamCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT" : {
-        "command" : ["vkCmdSetConservativeRasterizationModeEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationConservativeStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_EXTRA_PRIMITIVE_OVERESTIMATION_SIZE_EXT" : {
-        "command" : ["vkCmdSetExtraPrimitiveOverestimationSizeEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationConservativeStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_CLIP_ENABLE_EXT" : {
-        "command" : ["vkCmdSetDepthClipEnableEXT"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationDepthClipStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_ENABLE_EXT" : {
-        "command" : ["vkCmdSetSampleLocationsEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineSampleLocationsStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT" : {
-        "command" : ["vkCmdSetColorBlendAdvancedEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentOutput"],
-        "pipeline" : "VkPipelineColorBlendAdvancedStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT" : {
-        "command" : ["vkCmdSetProvokingVertexModeEXT"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationProvokingVertexStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT" : {
-        "command" : ["vkCmdSetLineRasterizationModeEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationLineStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT" : {
-        "command" : ["vkCmdSetLineStippleEnableEXT"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_VERTEX_BIT",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineRasterizationLineStateCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE_EXT" : {
-        "command" : ["vkCmdSetDepthClipNegativeOneToOneEXT"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportDepthClipControlCreateInfoEXT",
-    },
-    "VK_DYNAMIC_STATE_VIEWPORT_W_SCALING_ENABLE_NV" : {
-        "command" : ["vkCmdSetViewportWScalingEnableNV"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportWScalingStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_VIEWPORT_SWIZZLE_NV" : {
-        "command" : ["vkCmdSetViewportSwizzleNV"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportSwizzleStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_COVERAGE_TO_COLOR_ENABLE_NV" : {
-        "command" : ["vkCmdSetCoverageToColorEnableNV"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineCoverageToColorStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_COVERAGE_TO_COLOR_LOCATION_NV" : {
-        "command" : ["vkCmdSetCoverageToColorLocationNV"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineCoverageToColorStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_COVERAGE_MODULATION_MODE_NV" : {
-        "command" : ["vkCmdSetCoverageModulationModeNV"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineCoverageModulationStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_ENABLE_NV" : {
-        "command" : ["vkCmdSetCoverageModulationTableEnableNV"],
-        "dependency" : ["rasterizerDiscardEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineCoverageModulationStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_NV" : {
-        "command" : ["vkCmdSetCoverageModulationTableNV"],
-        "dependency" : ["rasterizerDiscardEnable", "coverageModulationTableEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineCoverageModulationStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_SHADING_RATE_IMAGE_ENABLE_NV" : {
-        "command" : ["vkCmdSetShadingRateImageEnableNV"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportShadingRateImageStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_REPRESENTATIVE_FRAGMENT_TEST_ENABLE_NV" : {
-        "command" : ["vkCmdSetRepresentativeFragmentTestEnableNV"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader"],
-        "pipeline" : "VkPipelineRepresentativeFragmentTestStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_COVERAGE_REDUCTION_MODE_NV" : {
-        "command" : ["vkCmdSetCoverageReductionModeNV"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["FragmentShader", "FragmentOutput"],
-        "pipeline" : "VkPipelineCoverageReductionStateCreateInfoNV",
-    },
-    "VK_DYNAMIC_STATE_ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT" : {
-        "command" : ["vkCmdSetAttachmentFeedbackLoopEnableEXT"],
-        "stage" : "VK_SHADER_STAGE_FRAGMENT_BIT",
-        "gpl" : ["PreRasterization", "FragmentShader", "FragmentOutput"],
-    },
-    "VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR" : {
-        "command" : ["vkCmdSetRayTracingPipelineStackSizeKHR"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-    },
-    "VK_DYNAMIC_STATE_DEPTH_CLAMP_RANGE_EXT" : {
-        "command" : ["vkCmdSetDepthClampRangeEXT"],
-        "dependency" : ["depthClampEnable"],
-        "stage" : "VK_SHADER_STAGE_ALL",
-        "gpl" : ["PreRasterization"],
-        "pipeline" : "VkPipelineViewportDepthClampControlCreateInfoEXT"
-    },
+# Small wrapper around the VulkanObject DynamicState class
+@dataclass
+class PipelineDynamicState:
+    name: str # ex) VK_DYNAMIC_STATE_DEPTH_BIAS
+    commands: list[str] # ex) [vkCmdSetDepthBias, vkCmdSetDepthBias2EXT]
+    state: DynamicState # The logical state from the XML this VkDynamicState is part of
+
+# How to describe the dynamic state (keyed by the XML logical name) that other dynamic state depends on.
+# The tuple is (message if set dynamically, message if set statically in the pipeline)
+stateRequiredDescription = {
+    'stencilTestEnable': (
+        'vkCmdSetStencilTestEnable last set stencilTestEnable to VK_TRUE.',
+        'VkPipelineDepthStencilStateCreateInfo::stencilTestEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'depthTestEnable': (
+        'vkCmdSetDepthTestEnable last set depthTestEnable to VK_TRUE.',
+        'VkPipelineDepthStencilStateCreateInfo::depthTestEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'depthBoundsTestEnable': (
+        'vkCmdSetDepthBoundsTestEnable last set depthBoundsTestEnable to VK_TRUE.',
+        'VkPipelineDepthStencilStateCreateInfo::depthBoundsTestEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'depthBiasEnable': (
+        'vkCmdSetDepthBiasEnable last set depthBiasEnable to VK_TRUE.',
+        'VkPipelineRasterizationStateCreateInfo::depthBiasEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'depthClampEnable': (
+        'vkCmdSetDepthClampEnableEXT last set depthClampEnable to VK_TRUE.',
+        'VkPipelineRasterizationStateCreateInfo::depthClampEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'logicOpEnable': (
+        'vkCmdSetLogicOpEnableEXT last set logicOpEnable to VK_TRUE.',
+        'VkPipelineColorBlendStateCreateInfo::logicOpEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'lineStippleEnable': (
+        'vkCmdSetLineStippleEnableEXT last set stippledLineEnable to VK_TRUE.',
+        'VkPipelineRasterizationLineStateCreateInfo::stippledLineEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'sampleLocationsEnable': (
+        'vkCmdSetSampleLocationsEnableEXT last set sampleLocationsEnable to VK_TRUE.',
+        'VkPipelineMultisampleStateCreateInfo::pNext->VkPipelineSampleLocationsStateCreateInfoEXT::sampleLocationsEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'coverageModulationTableEnable': (
+        'vkCmdSetCoverageModulationTableEnableNV last set coverageModulationTableEnable to VK_TRUE.',
+        'VkPipelineMultisampleStateCreateInfo::pNext->VkPipelineCoverageModulationStateCreateInfoNV::coverageModulationTableEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'coverageToColorEnable': (
+        'vkCmdSetCoverageToColorEnableNV last set coverageToColorEnable to VK_TRUE.',
+        'VkPipelineMultisampleStateCreateInfo::pNext->VkPipelineCoverageToColorStateCreateInfoNV::coverageToColorEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'shadingRateImageEnable': (
+        'vkCmdSetShadingRateImageEnableNV last set shadingRateImageEnable to VK_TRUE.',
+        'VkPipelineViewportStateCreateInfo::pNext->VkPipelineViewportShadingRateImageStateCreateInfoNV::shadingRateImageEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'viewportWScalingEnable': (
+        'vkCmdSetViewportWScalingEnableNV last set viewportWScalingEnable to VK_TRUE.',
+        'VkPipelineViewportStateCreateInfo::pNext->VkPipelineViewportWScalingStateCreateInfoNV::viewportWScalingEnable was VK_TRUE in the last bound graphics pipeline.'),
+    'discardRectangleEnable': (
+        'vkCmdSetDiscardRectangleEnableEXT last set discardRectangleEnable to VK_TRUE.',
+        'VkGraphicsPipelineCreateInfo::pNext->VkPipelineDiscardRectangleStateCreateInfoEXT::discardRectangleCount was greater than zero in the last bound graphics pipeline.'),
+    'exclusiveScissorEnable': (
+        'vkCmdSetExclusiveScissorEnableNV last set an element of pExclusiveScissorEnables to VK_TRUE.',
+        'VkPipelineViewportStateCreateInfo::pNext->VkPipelineViewportExclusiveScissorStateCreateInfoNV::exclusiveScissorCount was greater than zero in the last bound graphics pipeline.'),
 }
 
 #
-# DynamicStateOutputGenerator - Generate SPIR-V validation
-# for SPIR-V extensions and capabilities
+# DynamicStateOutputGenerator - Generate helpers for VkDynamicState
 class DynamicStateOutputGenerator(BaseGenerator):
     def __init__(self):
         BaseGenerator.__init__(self)
 
     def generate(self):
+        # Flatten the logical states from the XML into VkDynamicState
+        # keep in VkDynamicState enum order so the generated code is stable
+        states = dict()
+        for dynamicState in self.vk.dynamicStates.values():
+            for command in dynamicState.commands:
+                if command.pipelineEnum not in states:
+                    states[command.pipelineEnum] = PipelineDynamicState(command.pipelineEnum, [], dynamicState)
+                states[command.pipelineEnum].commands.append(command.name)
+        self.pipelineDynamicStates = [states[field.name] for field in self.vk.enums['VkDynamicState'].fields if field.name in states]
+
         self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
             // See {os.path.basename(__file__)} for modifications
 
@@ -588,8 +168,8 @@ class DynamicStateOutputGenerator(BaseGenerator):
             "VK_SHADER_STAGE_GEOMETRY_BIT" : "kGeometryDynamicState",
         }
         stage_map = dict()
-        for key, value in dynamic_state_map.items():
-            stage_map.setdefault(value["stage"], []).append(key)
+        for dynamicState in self.pipelineDynamicStates:
+            stage_map.setdefault(dynamicState.state.shaderStage, []).append(dynamicState.name)
 
         # sort so each OS generates same order here
         for stage, states in sorted(stage_map.items()):
@@ -600,6 +180,63 @@ class DynamicStateOutputGenerator(BaseGenerator):
             for index, state in enumerate(states):
                 seperator = ' |' if (index + 1) != len(states) else ';\n'
                 out.append(f'CBDynamicFlags(1) << CB_{state[3:]}{seperator}\n')
+
+        out.append('''
+            // Some extra const also used, not sure where to put these otherwise
+            //
+            // VkPipelineColorBlendStateCreateInfo::attachmentCount
+            const CBDynamicFlags kColorBlendStateAttachmentCountDynamic =
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT;
+
+            // VkGraphicsPipelineCreateInfo::pDepthStencilState
+            const CBDynamicFlags kDepthStencilStateDynamic =
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_COMPARE_OP |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_STENCIL_OP |
+                CBDynamicFlags(1) << CB_DYNAMIC_STATE_DEPTH_BOUNDS;
+
+            // VkGraphicsPipelineCreateInfo::pRasterizationState
+            const CBDynamicFlags kRasterizationStateDynamic =
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_POLYGON_MODE_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_CULL_MODE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_FRONT_FACE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_BIAS_ENABLE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_BIAS |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_LINE_WIDTH;
+
+            // VkGraphicsPipelineCreateInfo::pColorBlendState
+            const CBDynamicFlags kColorBlendStateDynamic =
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_LOGIC_OP_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_BLEND_CONSTANTS;
+
+            // VK_EXT_extended_dynamic_state
+            const CBDynamicFlags kExtendedDynamicState1 =
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_CULL_MODE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_FRONT_FACE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_VIEWPORT_WITH_COUNT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_SCISSOR_WITH_COUNT |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_COMPARE_OP |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE |
+                CBDynamicFlags(1) <<  CB_DYNAMIC_STATE_STENCIL_OP;
+            ''')
+
 
         self.write("".join(out))
 
@@ -676,23 +313,17 @@ class DynamicStateOutputGenerator(BaseGenerator):
         out.append('''
             std::string DescribeDynamicStateCommand(CBDynamicState dynamic_state) {
                 std::ostringstream ss;
-                vvl::Func func = vvl::Func::Empty;
                 switch (dynamic_state) {
         ''')
-        for key, value in dynamic_state_map.items():
-            out.append(f'case CB_{key[3:]}:\n')
-            out.append(f'    func = vvl::Func::{value["command"][0]};\n')
+        for dynamicState in self.pipelineDynamicStates:
+            # Some state can be set by multiple commands (ex. vkCmdSetDepthBias and vkCmdSetDepthBias2EXT)
+            funcs = ' << " or " << '.join(f'String(vvl::Func::{command})' for command in dynamicState.commands)
+            out.append(f'case CB_{dynamicState.name[3:]}:\n')
+            out.append(f'    ss << {funcs};\n')
             out.append('    break;')
         out.append('''
                     default:
-                        ss << "(Unknown Dynamic State) ";
-                }
-
-                ss << String(func);
-
-                // Currently only exception that has 2 commands that can set it
-                if (dynamic_state == CB_DYNAMIC_STATE_DEPTH_BIAS) {
-                    ss << " or " << String(vvl::Func::vkCmdSetDepthBias2EXT);
+                        ss << "(Unknown Dynamic State) " << String(vvl::Func::Empty);
                 }
 
                 return ss.str();
@@ -700,114 +331,39 @@ class DynamicStateOutputGenerator(BaseGenerator):
         ''')
 
         out.append('''
-            // For anything with multple uses
+            // For anything with multiple uses
             static std::string_view rasterizer_discard_enable_dynamic{"vkCmdSetRasterizerDiscardEnable last set rasterizerDiscardEnable to VK_FALSE.\\n"};
             static std::string_view rasterizer_discard_enable_static{"VkPipelineRasterizationStateCreateInfo::rasterizerDiscardEnable was VK_FALSE in the last bound graphics pipeline.\\n"};
-            static std::string_view stencil_test_enable_dynamic{"vkCmdSetStencilTestEnable last set stencilTestEnable to VK_TRUE.\\n"};
-            static std::string_view stencil_test_enable_static{"VkPipelineDepthStencilStateCreateInfo::stencilTestEnable was VK_TRUE in the last bound graphics pipeline.\\n"};
 
             std::string DescribeDynamicStateDependency(CBDynamicState dynamic_state, const vvl::Pipeline* pipeline) {
                 std::ostringstream ss;
                 switch (dynamic_state) {
         ''')
-        for key, value in dynamic_state_map.items():
-            if 'dependency' not in value:
+        for dynamicState in self.pipelineDynamicStates:
+            state = dynamicState.state
+            if not state.requiresRasterization and state.stateRequired is None:
                 continue
-            out.append(f'case CB_{key[3:]}:')
+            out.append(f'case CB_{dynamicState.name[3:]}:')
 
-            dependency = value['dependency']
-            # TODO - Use XML to generate this
-            if 'rasterizerDiscardEnable' in dependency:
+            if state.requiresRasterization:
                 out.append('''
                 if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE)) {
                     ss << rasterizer_discard_enable_dynamic;
                 } else {
                     ss << rasterizer_discard_enable_static;
                 }''')
-            if 'stencilTestEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE)) {
-                    ss << stencil_test_enable_dynamic;
-                } else {
-                    ss << stencil_test_enable_static;
-                }''')
-            if 'depthTestEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE)) {
-                    ss << "vkCmdSetDepthTestEnable last set depthTestEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineDepthStencilStateCreateInfo::depthTestEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'depthBoundsTestEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE)) {
-                    ss << "vkCmdSetDepthBoundsTestEnable last set depthBoundsTestEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineDepthStencilStateCreateInfo::depthBoundsTestEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'depthBiasEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_DEPTH_BIAS_ENABLE)) {
-                    ss << "vkCmdSetDepthBiasEnable last set depthTestEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineRasterizationStateCreateInfo::depthTestEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'depthClampEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT)) {
-                    ss << "vkCmdSetDepthClampEnableEXT last set depthClampEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineRasterizationStateCreateInfo::depthClampEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'logicOpEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT)) {
-                    ss << "vkCmdSetLogicOpEnableEXT last set logicOpEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineColorBlendStateCreateInfo::logicOpEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'stippledLineEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT)) {
-                    ss << "vkCmdSetLineStippleEnableEXT last set stippledLineEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineRasterizationLineStateCreateInfo::stippledLineEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'sampleLocationsEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT)) {
-                    ss << "vkCmdSetSampleLocationsEnableEXT last set logicOpEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineMultisampleStateCreateInfo::pNext->VkPipelineSampleLocationsStateCreateInfoEXT::sampleLocationsEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'coverageModulationTableEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_ENABLE_NV)) {
-                    ss << "vkCmdSetCoverageModulationTableEnableNV last set coverageModulationTableEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineMultisampleStateCreateInfo::pNext->VkPipelineCoverageModulationStateCreateInfoNV::coverageModulationTableEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'shadingRateImageEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV)) {
-                    ss << "vkCmdSetShadingRateImageEnableNV last set shadingRateImageEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineViewportStateCreateInfo::pNext->VkPipelineViewportShadingRateImageStateCreateInfoNV::shadingRateImageEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'viewportWScalingEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_ENABLE_NV)) {
-                    ss << "vkCmdSetViewportWScalingEnableNV last set viewportWScalingEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkPipelineViewportStateCreateInfo::pNext->VkPipelineViewportWScalingStateCreateInfoNV::viewportWScalingEnable was VK_TRUE in the last bound graphics pipeline.\\n";
-                }''')
-            if 'discardRectangleEnable' in dependency:
-                out.append('''
-                if (!pipeline || pipeline->IsDynamic(CB_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT)) {
-                    ss << "vkCmdSetDiscardRectangleEnableEXT last set discardRectangleEnable to VK_TRUE.\\n";
-                } else {
-                    ss << "VkGraphicsPipelineCreateInfo::pNext->VkPipelineDiscardRectangleStateCreateInfoEXT::discardRectangleCount was greater than zero in the last bound graphics pipeline.\\n";
-                }''')
+            if state.stateRequired is not None:
+                # stateRequired is the logical name of another <dynamicstate>
+                assert state.stateRequired in stateRequiredDescription, f'{state.name} depends on {state.stateRequired}, add a message for it to stateRequiredDescription'
+                requiredEnums = {command.pipelineEnum for command in self.vk.dynamicStates[state.stateRequired].commands}
+                assert len(requiredEnums) == 1, f'{state.name} depends on {state.stateRequired} which has multiple VkDynamicState {requiredEnums}'
+                dynamicMessage, staticMessage = stateRequiredDescription[state.stateRequired]
+                out.append(f'''
+                if (!pipeline || pipeline->IsDynamic(CB_{requiredEnums.pop()[3:]})) {{
+                    ss << "{dynamicMessage}\\n";
+                }} else {{
+                    ss << "{staticMessage}\\n";
+                }}''')
 
             out.append('    break;')
         out.append('''

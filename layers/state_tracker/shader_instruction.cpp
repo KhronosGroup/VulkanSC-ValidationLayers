@@ -82,7 +82,7 @@ void Instruction::SetResultTypeIndex() {
 
 void Instruction::UpdateDebugInfo() {
 #ifndef NDEBUG
-    d_opcode_ = std::string(string_SpvOpcode(Opcode()));
+    d_opcode_ = std::string(spv::OpToString(static_cast<spv::Op>(Opcode())));
     d_length_ = Length();
     d_result_id_ = ResultId();
     d_type_id_ = TypeId();
@@ -107,7 +107,7 @@ std::string Instruction::Describe() const {
         ss << "%" << (has_type ? Word(2) : Word(1)) << " = ";
     }
 
-    ss << string_SpvOpcode(opcode);
+    ss << spv::OpToString(static_cast<spv::Op>(opcode));
 
     if (has_type) {
         operand_offset++;
@@ -116,10 +116,13 @@ std::string Instruction::Describe() const {
 
     // Exception for some opcode
     if (opcode == spv::OpEntryPoint) {
-        ss << " " << string_SpvExecutionModel(Word(1)) << " %" << Word(2) << " [Unknown]";
+        ss << " " << spv::ExecutionModelToString(static_cast<spv::ExecutionModel>(Word(1))) << " %" << Word(2) << " [Unknown]";
+    } else if (opcode == spv::OpNop) {
+        ss << "OpNop found, which means something else has gone wrong";
     } else {
         const OperandInfo& info = GetOperandInfo(opcode);
         const uint32_t operands = static_cast<uint32_t>(info.types.size());
+        assert(length >= operand_offset);
         const uint32_t remaining_words = length - operand_offset;
         for (uint32_t i = 0; i < remaining_words; i++) {
             OperandKind kind = (i < operands) ? info.types[i] : info.types.back();
@@ -136,7 +139,7 @@ std::string Instruction::Describe() const {
 
 // While simple, function name provides a more human readable description why Word(3) is used.
 //
-// The current various uses for constant values (OpAccessChain, OpTypeArray, LocalSize, etc) all have spec langauge making sure they
+// The current various uses for constant values (OpAccessChain, OpTypeArray, LocalSize, etc) all have spec language making sure they
 // are scalar ints. It is also not valid for any of these use cases to have a negative value. While it is valid SPIR-V to use 64-bit
 // int, found writting test there is no way to create something valid that also calls this function. So until a use-case is found,
 // we can safely assume returning a uint32_t is ok.
@@ -609,7 +612,8 @@ ImageInstruction::ImageInstruction(const uint32_t* words) {
         }
 
         case spv::OpImageSampleExplicitLod:
-        case spv::OpImageSparseSampleExplicitLod: {
+        case spv::OpImageSparseSampleExplicitLod:
+        case spv::OpImageSampleFootprintNV: {
             is_sampler_sampled = true;
             break;
         }
@@ -644,6 +648,7 @@ ImageInstruction::ImageInstruction(const uint32_t* words) {
         case spv::OpAtomicFMinEXT:
         case spv::OpAtomicFMaxEXT:
         case spv::OpAtomicFAddEXT:
+        case spv::OpImageGatherQCOM:
             break;
 
         case spv::OpImageSampleWeightedQCOM:
@@ -673,6 +678,16 @@ ImageInstruction::ImageInstruction(const uint32_t* words) {
 
         case spv::OpImageSparseTexelsResident:
             assert(false);  // This is not a proper OpImage* instruction, has no OpImage operand
+            break;
+
+        // From the spec
+        // "return properties of the image descriptor that would be accessed. The image itself is not accessed."
+        case spv::OpImage:
+        case spv::OpImageQuerySizeLod:
+        case spv::OpImageQuerySize:
+        case spv::OpImageQueryLevels:
+        case spv::OpImageQuerySamples:
+            is_non_access_query = true;
             break;
 
         default:

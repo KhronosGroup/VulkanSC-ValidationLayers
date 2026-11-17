@@ -21,8 +21,11 @@
 
 #include "state_tracker/state_object.h"
 #include "state_tracker/submission_reference.h"
+#include "state_tracker/surface_type.h"
 #include "containers/span.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
+#include <atomic>
+#include <mutex>
 #include <optional>
 #include <deque>
 
@@ -66,8 +69,11 @@ enum class AcquireSyncStatus { NotSpecified, Signaled, WasWaitedOn };
 struct SwapchainImage {
     vvl::Image* image_state = nullptr;
 
-    // Acquire state
+    // True from acquire until presentation (or release).
+    // In shared present mode, stays true after presentation until explicitly released
     bool acquired = false;
+    // First acquire guarantees memory backing for deferred swapchain images
+    bool ever_acquired = false;
     std::shared_ptr<vvl::Semaphore> acquire_semaphore;
     std::shared_ptr<vvl::Fence> acquire_fence;
     AcquireSyncStatus acquire_semaphore_status = AcquireSyncStatus::NotSpecified;
@@ -97,9 +103,10 @@ class Swapchain : public RefcountedStateObject, public SubStateManager<Swapchain
     std::vector<VkPresentModeKHR> present_modes;
     std::vector<SwapchainImage> images;
     bool retired = false;
-    bool exclusive_full_screen_access;
+    std::atomic<bool> exclusive_full_screen_access;
     const bool shared_presentable;
-    uint64_t max_present_id = 0;
+    // Read by vkWaitForPresent2KHR while presentation updates it
+    std::atomic<uint64_t> max_present_id{0};
     const vku::safe_VkImageCreateInfo image_create_info;
 
     std::shared_ptr<vvl::Surface> surface;
@@ -122,7 +129,10 @@ class Swapchain : public RefcountedStateObject, public SubStateManager<Swapchain
     struct PresentIdInfo {
         uint64_t present_id;
         SubmissionReference present_submission_ref;
+        // Submissions that signal present wait semaphores
+        small_vector<SubmissionReference, 1> signal_submission_refs;
     };
+    std::mutex present_id_mutex;  // protects ring buffer
     std::vector<PresentIdInfo> present_id_ring_buffer;
     uint32_t present_id_request_count = 0;
     uint32_t GetPresentIdInfoCount() const;
@@ -136,7 +146,7 @@ class Swapchain : public RefcountedStateObject, public SubStateManager<Swapchain
     std::shared_ptr<Swapchain> new_swapchain;
 
     // New swapchain state:
-    // Present wait semaphores from the the old swapchain presentations.
+    // Present wait semaphores from the old swapchain presentations.
     std::vector<std::shared_ptr<vvl::Semaphore>> old_swapchain_present_wait_semaphores;
     std::weak_ptr<Swapchain> old_swapchain;
 
@@ -200,7 +210,8 @@ class SwapchainSubState {
 //    vvl::Surface -> nothing
 class Surface : public StateObject {
   public:
-    Surface(VkSurfaceKHR handle) : StateObject(handle, kVulkanObjectTypeSurfaceKHR) {}
+    Surface(VkSurfaceKHR handle, SurfaceType type, uint64_t native_window)
+        : StateObject(handle, kVulkanObjectTypeSurfaceKHR), type_(type), native_window_(native_window) {}
 
     ~Surface() {
         if (!Destroyed()) {
@@ -236,6 +247,11 @@ class Surface : public StateObject {
     VkSurfacePresentScalingCapabilitiesKHR GetPresentModeScalingCapabilities(VkPhysicalDevice phys_dev,
                                                                              VkPresentModeKHR present_mode) const;
     std::vector<VkPresentModeKHR> GetCompatibleModes(VkPhysicalDevice phys_dev, VkPresentModeKHR present_mode) const;
+
+    SurfaceType GetSurfaceType() const { return type_; }
+    // The native window (HWND, X11 Window, wl_surface, etc.) the VkSurface was created from
+    // zero is used if not tracked for the platform
+    uint64_t GetNativeWindow() const { return native_window_; }
 
     vvl::Swapchain *swapchain{nullptr};
 
@@ -277,6 +293,8 @@ class Surface : public StateObject {
     mutable vvl::unordered_map<VkPhysicalDevice, std::vector<vku::safe_VkSurfaceFormat2KHR>> formats_;
 
     vvl::unordered_map<VkPhysicalDevice, PhysDevCache> cache_;
+    const SurfaceType type_;
+    const uint64_t native_window_;
 };
 
 }  // namespace vvl

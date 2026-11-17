@@ -18,6 +18,7 @@
  */
 #include "cc_vuid_maps.h"
 #include "containers/container_utils.h"
+#include "drawdispatch/drawdispatch_vuids.h"
 #include "error_message/error_location.h"
 #include "error_message/logging.h"
 #include "generated/error_location_helper.h"
@@ -762,6 +763,85 @@ const char* GetDispatchIndirectProtectVUID(const Location& loc) {
     return kVUIDUndefined;
 }
 
+std::string GetProtectedVUID(const Location& loc) {
+    static const std::array<Entry, 35> errors{{
+        {Key(Func::vkCmdClearColorImage), "VUID-vkCmdClearColorImage-commandBuffer-01805"},
+        {Key(Func::vkCmdClearDepthStencilImage), "VUID-vkCmdClearDepthStencilImage-commandBuffer-01807"},
+        {Key(Func::vkCmdClearAttachments), "VUID-vkCmdClearAttachments-commandBuffer-02504"},
+        {Key(Func::vkCmdFillBuffer), "VUID-vkCmdFillBuffer-commandBuffer-01811"},
+        {Key(Func::vkCmdUpdateBuffer), "VUID-vkCmdUpdateBuffer-commandBuffer-01813"},
+        {Key(Func::vkCmdCopyBuffer, Field::srcBuffer), "VUID-vkCmdCopyBuffer-commandBuffer-01822"},
+        {Key(Func::vkCmdCopyBuffer, Field::dstBuffer), "VUID-vkCmdCopyBuffer-commandBuffer-01823"},
+        {Key(Func::vkCmdCopyBuffer2, Field::srcBuffer), "VUID-vkCmdCopyBuffer2-commandBuffer-01822"},
+        {Key(Func::vkCmdCopyBuffer2, Field::dstBuffer), "VUID-vkCmdCopyBuffer2-commandBuffer-01823"},
+        {Key(Func::vkCmdCopyImage, Field::srcImage), "VUID-vkCmdCopyImage-commandBuffer-01825"},
+        {Key(Func::vkCmdCopyImage, Field::dstImage), "VUID-vkCmdCopyImage-commandBuffer-01826"},
+        {Key(Func::vkCmdCopyImage2, Field::srcImage), "VUID-vkCmdCopyImage2-commandBuffer-01825"},
+        {Key(Func::vkCmdCopyImage2, Field::dstImage), "VUID-vkCmdCopyImage2-commandBuffer-01826"},
+        {Key(Func::vkCmdCopyBufferToImage, Field::srcBuffer), "VUID-vkCmdCopyBufferToImage-commandBuffer-01828"},
+        {Key(Func::vkCmdCopyBufferToImage, Field::dstImage), "VUID-vkCmdCopyBufferToImage-commandBuffer-01829"},
+        {Key(Func::vkCmdCopyBufferToImage2, Field::srcBuffer), "VUID-vkCmdCopyBufferToImage2-commandBuffer-01828"},
+        {Key(Func::vkCmdCopyBufferToImage2, Field::dstImage), "VUID-vkCmdCopyBufferToImage2-commandBuffer-01829"},
+        {Key(Func::vkCmdCopyImageToBuffer, Field::srcImage), "VUID-vkCmdCopyImageToBuffer-commandBuffer-01831"},
+        {Key(Func::vkCmdCopyImageToBuffer, Field::dstBuffer), "VUID-vkCmdCopyImageToBuffer-commandBuffer-01832"},
+        {Key(Func::vkCmdCopyImageToBuffer2, Field::srcImage), "VUID-vkCmdCopyImageToBuffer2-commandBuffer-01831"},
+        {Key(Func::vkCmdCopyImageToBuffer2, Field::dstBuffer), "VUID-vkCmdCopyImageToBuffer2-commandBuffer-01832"},
+        {Key(Func::vkCmdBlitImage, Field::srcImage), "VUID-vkCmdBlitImage-commandBuffer-01834"},
+        {Key(Func::vkCmdBlitImage, Field::dstImage), "VUID-vkCmdBlitImage-commandBuffer-01835"},
+        {Key(Func::vkCmdBlitImage2, Field::srcImage), "VUID-vkCmdBlitImage2-commandBuffer-01834"},
+        {Key(Func::vkCmdBlitImage2, Field::dstImage), "VUID-vkCmdBlitImage2-commandBuffer-01835"},
+        {Key(Func::vkCmdResolveImage, Field::srcImage), "VUID-vkCmdResolveImage-commandBuffer-01837"},
+        {Key(Func::vkCmdResolveImage, Field::dstImage), "VUID-vkCmdResolveImage-commandBuffer-01838"},
+        {Key(Func::vkCmdResolveImage2, Field::srcImage), "VUID-vkCmdResolveImage2-commandBuffer-01837"},
+        {Key(Func::vkCmdResolveImage2, Field::dstImage), "VUID-vkCmdResolveImage2-commandBuffer-01838"},
+        {Key(Func::vkCmdBeginVideoCodingKHR), "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07235"},
+        {Key(Func::vkCmdDecodeVideoKHR, Field::srcBuffer), "VUID-vkCmdDecodeVideoKHR-commandBuffer-07136"},
+        {Key(Func::vkCmdDecodeVideoKHR, Field::imageViewBinding), "VUID-vkCmdDecodeVideoKHR-commandBuffer-07147"},
+        {Key(Func::vkCmdEncodeVideoKHR, Field::dstBuffer), "VUID-vkCmdEncodeVideoKHR-commandBuffer-08202"},
+        {Key(Func::vkCmdEncodeVideoKHR, Field::imageViewBinding), "VUID-vkCmdEncodeVideoKHR-commandBuffer-08211"},
+        {Key(Func::vkCmdEncodeVideoKHR, Field::quantizationMap), "VUID-vkCmdEncodeVideoKHR-pNext-10313"},
+    }};
+
+    const auto& result = FindVUID(loc, errors);
+    if (!result.empty()) {
+        return result;
+    }
+    // Everything else is an action command (draw, dispatch, trace rays, etc)
+    return CreateActionVuid(loc.function, ActionVUID::CB_UNPROTECTED_02707);
+}
+
+std::string GetUnprotectedVUID(const Location& loc) {
+    static const std::array<Entry, 20> errors{{
+        {Key(Func::vkCmdClearColorImage), "VUID-vkCmdClearColorImage-commandBuffer-01806"},
+        {Key(Func::vkCmdClearDepthStencilImage), "VUID-vkCmdClearDepthStencilImage-commandBuffer-01808"},
+        {Key(Func::vkCmdClearAttachments), "VUID-vkCmdClearAttachments-commandBuffer-02505"},
+        {Key(Func::vkCmdFillBuffer), "VUID-vkCmdFillBuffer-commandBuffer-01812"},
+        {Key(Func::vkCmdUpdateBuffer), "VUID-vkCmdUpdateBuffer-commandBuffer-01814"},
+        {Key(Func::vkCmdCopyBuffer, Field::dstBuffer), "VUID-vkCmdCopyBuffer-commandBuffer-01824"},
+        {Key(Func::vkCmdCopyBuffer2, Field::dstBuffer), "VUID-vkCmdCopyBuffer2-commandBuffer-01824"},
+        {Key(Func::vkCmdCopyImage, Field::dstImage), "VUID-vkCmdCopyImage-commandBuffer-01827"},
+        {Key(Func::vkCmdCopyImage2, Field::dstImage), "VUID-vkCmdCopyImage2-commandBuffer-01827"},
+        {Key(Func::vkCmdCopyBufferToImage, Field::dstImage), "VUID-vkCmdCopyBufferToImage-commandBuffer-01830"},
+        {Key(Func::vkCmdCopyBufferToImage2, Field::dstImage), "VUID-vkCmdCopyBufferToImage2-commandBuffer-01830"},
+        {Key(Func::vkCmdCopyImageToBuffer, Field::dstBuffer), "VUID-vkCmdCopyImageToBuffer-commandBuffer-01833"},
+        {Key(Func::vkCmdCopyImageToBuffer2, Field::dstBuffer), "VUID-vkCmdCopyImageToBuffer2-commandBuffer-01833"},
+        {Key(Func::vkCmdBlitImage, Field::dstImage), "VUID-vkCmdBlitImage-commandBuffer-01836"},
+        {Key(Func::vkCmdBlitImage2, Field::dstImage), "VUID-vkCmdBlitImage2-commandBuffer-01836"},
+        {Key(Func::vkCmdResolveImage, Field::dstImage), "VUID-vkCmdResolveImage-commandBuffer-01839"},
+        {Key(Func::vkCmdResolveImage2, Field::dstImage), "VUID-vkCmdResolveImage2-commandBuffer-01839"},
+        {Key(Func::vkCmdBeginVideoCodingKHR), "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07236"},
+        {Key(Func::vkCmdDecodeVideoKHR, Field::imageViewBinding), "VUID-vkCmdDecodeVideoKHR-commandBuffer-07148"},
+        {Key(Func::vkCmdEncodeVideoKHR, Field::dstBuffer), "VUID-vkCmdEncodeVideoKHR-commandBuffer-08203"},
+    }};
+
+    const auto& result = FindVUID(loc, errors);
+    if (!result.empty()) {
+        return result;
+    }
+    // Everything else is an action command (draw, dispatch, trace rays, etc)
+    return CreateActionVuid(loc.function, ActionVUID::CB_PROTECTED_02712);
+}
+
 const char* GetBuildASVUID(const Location& loc, BuildASError error) {
     // clang-format off
     switch (error) {
@@ -932,7 +1012,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines  ? "VUID-VkGraphicsPipelineCreateInfo-layout-07988" :
                 loc.function == Func::vkCreateComputePipelines   ? "VUID-VkComputePipelineCreateInfo-layout-07988" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR  ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07988" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV   ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07988" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10383" :
                 kVUIDUndefined;
         case SpirvInterfaceVariableError::Mutable_07990:
@@ -940,7 +1019,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-07990" :
                 loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-07990" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07990" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07990" :
                 loc.function == Func::vkCreateDataGraphPipelinesARM  ? "VUID-VkDataGraphPipelineCreateInfoARM-layout-09769" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10384" :
                 kVUIDUndefined;
@@ -949,7 +1027,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-07991" :
                 loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-07991" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07991" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07991" :
                 loc.function == Func::vkCreateDataGraphPipelinesARM  ? "VUID-VkDataGraphPipelineCreateInfoARM-layout-09934" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10385" :
                 kVUIDUndefined;
@@ -958,7 +1035,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-None-10391" :
                 loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-None-10391" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-None-10391" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-None-10391" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10386" :
                 kVUIDUndefined;
         case SpirvInterfaceVariableError::DescriptorHeapMapping_11312:
@@ -966,7 +1042,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-flags-11312" :
                 loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-flags-11312" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-flags-11312" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-flags-11312" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-flags-11292" :
                 kVUIDUndefined;
         case SpirvInterfaceVariableError::PushConstantStage_07987:
@@ -974,7 +1049,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-07987" :
                 loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-07987" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-07987" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-07987" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10064" :
                 kVUIDUndefined;
         case SpirvInterfaceVariableError::PushConstantRange_10069:
@@ -982,7 +1056,6 @@ const char* GetSpirvInterfaceVariableVUID(const Location& loc, SpirvInterfaceVar
                 loc.function == Func::vkCreateGraphicsPipelines ? "VUID-VkGraphicsPipelineCreateInfo-layout-10069" :
                 loc.function == Func::vkCreateComputePipelines  ? "VUID-VkComputePipelineCreateInfo-layout-10069" :
                 loc.function == Func::vkCreateRayTracingPipelinesKHR ? "VUID-VkRayTracingPipelineCreateInfoKHR-layout-10069" :
-                loc.function == Func::vkCreateRayTracingPipelinesNV  ? "VUID-VkRayTracingPipelineCreateInfoNV-layout-10069" :
                 loc.function == Func::vkCreateShadersEXT ? "VUID-VkShaderCreateInfoEXT-codeType-10065" :
                 kVUIDUndefined;
     }

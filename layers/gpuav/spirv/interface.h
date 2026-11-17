@@ -20,7 +20,7 @@
 #include <vector>
 #include "state_tracker/descriptor_mode.h"
 
-// The goal is to keep instrumentation a seperate library to draw a strong line where the GPU-AV SPIR-V logic is.
+// The goal is to keep instrumentation a separate library to draw a strong line where the GPU-AV SPIR-V logic is.
 // This header is designed as the interface that can be shared between the instrumentation passes and the rest of GPU-AV
 
 struct Location;
@@ -122,6 +122,9 @@ struct DeviceSettings {
     // Lets us embed the size instead of calling OpArrayLength
     uint32_t error_buffer_data_length;
     uint32_t debug_printf_buffer_size;
+
+    bool descriptor_hashing;
+    uint32_t descriptor_hashing_total_descriptors;
 
     CachedDescriptorSize* cached_descriptor_size;
 

@@ -15,6 +15,7 @@
 #include "pipeline_helper.h"
 #include "buffer_helper.h"
 #include "shader_templates.h"
+#include "descriptor_heap_object.h"
 
 class NegativeGpuAVIndirectBuffer : public GpuAVTest {};
 
@@ -23,7 +24,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DrawCountDeviceLimit) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);  // instead of enabling feature
     AddOptionalExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper();
     VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper(&mesh_shader_features);
@@ -36,17 +37,6 @@ TEST_F(NegativeGpuAVIndirectBuffer, DrawCountDeviceLimit) {
             mesh_shader_features.primitiveFragmentShadingRateMeshShader = VK_FALSE;
         }
     }
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxDrawIndirectCount = 1;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
 
     RETURN_IF_SKIP(InitState(nullptr, (features13.dynamicRendering || mesh_shader_enabled) ? (void*)&features13 : nullptr));
     InitRenderTarget();
@@ -138,20 +128,9 @@ TEST_F(NegativeGpuAVIndirectBuffer, DeviceAddressCommandsDrawCountDeviceLimit) {
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::deviceAddressCommands);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
-    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper();
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxDrawIndirectCount = 1;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
 
     RETURN_IF_SKIP(InitState(nullptr, (features13.dynamicRendering) ? (void*)&features13 : nullptr));
     InitRenderTarget();
@@ -190,18 +169,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DeviceAddressCommandsDrawCountDeviceLimit) {
 TEST_F(NegativeGpuAVIndirectBuffer, DrawCountDeviceLimitSubmit2) {
     TEST_DESCRIPTION("GPU validation: Validate maxDrawIndirectCount limit using vkQueueSubmit2");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxDrawIndirectCount = 1;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     AddRequiredFeature(vkt::Feature::drawIndirectCount);
     AddRequiredFeature(vkt::Feature::synchronization2);
@@ -294,10 +262,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DrawCount) {
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     // Offset of 4 should error
-    m_errorMonitor->SetDesiredWarningRegex(
-        "WARNING-GPU-AV-drawCount",
-        "Indirect draw count of 1 would exceed size \\(16\\) of buffer .* stride = 16 offset = 4 "
-        ".* = 20");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-maxDrawCount-03111");
     vk::CmdDrawIndirectCountKHR(m_command_buffer, draw_buffer, 4, count_buffer, 0, 1, sizeof(VkDrawIndirectCommand));
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -338,10 +303,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DrawCount) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdBindIndexBuffer(m_command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
     // Offset of 4 should error
-    m_errorMonitor->SetDesiredWarningRegex(
-        "WARNING-GPU-AV-drawCount",
-        "Indirect draw count of 1 would exceed size \\(20\\) of buffer .* stride = 20 offset = 4 "
-        ".* = 24");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirectCount-maxDrawCount-03143");
     vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer, indexed_draw_buffer, 4, count_buffer, 0, 1,
                                        sizeof(VkDrawIndexedIndirectCommand));
     m_command_buffer.EndRenderPass();
@@ -766,13 +728,13 @@ TEST_F(NegativeGpuAVIndirectBuffer, FirstInstance3) {
     )glsl";
 
     VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-    const vkt::Shader vert_shader(*m_device, stages[0], GLSLToSPV(stages[0], vert_src));
-    const vkt::Shader frag_shader(*m_device, stages[1], GLSLToSPV(stages[1], kFragmentMinimalGlsl));
+    const vkt::ShaderEXT vert_shader(*m_device, stages[0], GLSLToSPV(stages[0], vert_src));
+    const vkt::ShaderEXT frag_shader(*m_device, stages[1], GLSLToSPV(stages[1], kFragmentMinimalGlsl));
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
 
     VkVertexInputBindingDescription2EXT binding = vku::InitStructHelper();
     binding.stride = 4;
@@ -942,13 +904,13 @@ TEST_F(NegativeGpuAVIndirectBuffer, FirstInstanceIndexed3) {
     )glsl";
 
     VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-    const vkt::Shader vert_shader(*m_device, stages[0], GLSLToSPV(stages[0], vert_src));
-    const vkt::Shader frag_shader(*m_device, stages[1], GLSLToSPV(stages[1], kFragmentMinimalGlsl));
+    const vkt::ShaderEXT vert_shader(*m_device, stages[0], GLSLToSPV(stages[0], vert_src));
+    const vkt::ShaderEXT frag_shader(*m_device, stages[1], GLSLToSPV(stages[1], kFragmentMinimalGlsl));
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
 
     VkVertexInputBindingDescription2EXT binding = vku::InitStructHelper();
     binding.stride = 4;
@@ -987,20 +949,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, FirstInstanceIndexed3) {
 
 TEST_F(NegativeGpuAVIndirectBuffer, DispatchWorkgroupSize) {
     TEST_DESCRIPTION("GPU validation: Validate VkDispatchIndirectCommand");
-    RETURN_IF_SKIP(InitGpuAvFramework());
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxComputeWorkGroupCount[0] = 2;
-    props.limits.maxComputeWorkGroupCount[1] = 2;
-    props.limits.maxComputeWorkGroupCount[2] = 2;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     RETURN_IF_SKIP(InitState());
 
@@ -1079,20 +1028,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DispatchWorkgroupSizeShaderObjects) {
     TEST_DESCRIPTION("GPU validation: Validate VkDispatchIndirectCommand");
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderObject);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxComputeWorkGroupCount[0] = 2;
-    props.limits.maxComputeWorkGroupCount[1] = 2;
-    props.limits.maxComputeWorkGroupCount[2] = 2;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     AddRequiredFeature(vkt::Feature::shaderObject);
     RETURN_IF_SKIP(InitState());
@@ -1126,7 +1062,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, DispatchWorkgroupSizeShaderObjects) {
     ptr->z = 3;  // over
 
     VkShaderStageFlagBits stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    vkt::Shader shader(*m_device, stage, GLSLToSPV(stage, kMinimalShaderGlsl));
+    vkt::ShaderEXT shader(*m_device, stage, GLSLToSPV(stage, kMinimalShaderGlsl));
 
     m_command_buffer.Begin();
     vk::CmdBindShadersEXT(m_command_buffer, 1u, &stage, &shader.handle());
@@ -1173,20 +1109,7 @@ TEST_F(NegativeGpuAVIndirectBuffer, BufferUsageFlags2) {
     TEST_DESCRIPTION("test VkBufferUsageFlags2CreateInfo");
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance5);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxComputeWorkGroupCount[0] = 2;
-    props.limits.maxComputeWorkGroupCount[1] = 2;
-    props.limits.maxComputeWorkGroupCount[2] = 2;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     RETURN_IF_SKIP(InitState());
 
@@ -1250,6 +1173,181 @@ TEST_F(NegativeGpuAVIndirectBuffer, FirstInstanceCustomStride) {
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredErrorRegex("VUID-VkDrawIndirectCommand-firstInstance-00501", "at index 3 is 1");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVIndirectBuffer, MeshDeviceAddressCommands) {
+    TEST_DESCRIPTION(
+        "GPU validation: Validate mesh group counts of vkCmdDrawMeshTasksIndirect2EXT and vkCmdDrawMeshTasksIndirectCount2EXT");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    AddRequiredFeature(vkt::Feature::drawIndirectCount);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_props);
+    if (mesh_shader_props.maxMeshWorkGroupCount[0] == vvl::kU32Max) {
+        GTEST_SKIP() << "maxMeshWorkGroupCount[0] too high for this test";
+    }
+
+    vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                            vkt::device_address);
+    auto* draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT*>(draw_buffer.Memory().Map());
+    draw_ptr->groupCountX = mesh_shader_props.maxMeshWorkGroupCount[0] + 1;
+    draw_ptr->groupCountY = 1u;
+    draw_ptr->groupCountZ = 1u;
+
+    vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
+    *static_cast<uint32_t*>(count_buffer.Memory().Map()) = 1u;
+
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    CreatePipelineHelper mesh_pipe(*this);
+    mesh_pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    mesh_pipe.CreateGraphicsPipeline();
+
+    const bool total_exceeded = mesh_shader_props.maxMeshWorkGroupCount[0] + 1 > mesh_shader_props.maxMeshWorkGroupTotalCount;
+
+    {
+        VkDrawIndirect2InfoKHR info = vku::InitStructHelper();
+        info.addressRange = draw_buffer.StridedAddressRange(sizeof(VkDrawMeshTasksIndirectCommandEXT));
+        info.addressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+        info.drawCount = 1u;
+
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe);
+        vk::CmdDrawMeshTasksIndirect2EXT(m_command_buffer, &info);
+        m_command_buffer.EndRenderPass();
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07326");
+        if (total_exceeded) {
+            m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07329");
+        }
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        VkDrawIndirectCount2InfoKHR info = vku::InitStructHelper();
+        info.addressRange = draw_buffer.StridedAddressRange(sizeof(VkDrawMeshTasksIndirectCommandEXT));
+        info.addressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+        info.countAddressRange = count_buffer.AddressRange();
+        info.countAddressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+        info.maxDrawCount = 1u;
+
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+        vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe);
+        vk::CmdDrawMeshTasksIndirectCount2EXT(m_command_buffer, &info);
+        m_command_buffer.EndRenderPass();
+        m_command_buffer.End();
+
+        m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07326");
+        if (total_exceeded) {
+            m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07329");
+        }
+        m_default_queue->SubmitAndWait(m_command_buffer);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeGpuAVIndirectBuffer, MeshDeviceAddressCommandsDrawCountDeviceLimit) {
+    TEST_DESCRIPTION("GPU validation: Validate maxDrawIndirectCount limit with vkCmdDrawMeshTasksIndirectCount2EXT");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    AddRequiredFeature(vkt::Feature::drawIndirectCount);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::Buffer draw_buffer(*m_device, 2 * sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                            vkt::device_address);
+    memset(draw_buffer.Memory().Map(), 0, 2 * sizeof(VkDrawMeshTasksIndirectCommandEXT));
+
+    vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
+    *static_cast<uint32_t*>(count_buffer.Memory().Map()) = 2u;  // Fits in buffer but exceeds (fake) limit
+
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    CreatePipelineHelper mesh_pipe(*this);
+    mesh_pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    mesh_pipe.CreateGraphicsPipeline();
+
+    VkDrawIndirectCount2InfoKHR info = vku::InitStructHelper();
+    info.addressRange = draw_buffer.StridedAddressRange(sizeof(VkDrawMeshTasksIndirectCommandEXT));
+    info.addressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+    info.countAddressRange = count_buffer.AddressRange();
+    info.countAddressFlags = VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR;
+    info.maxDrawCount = 2u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe);
+    vk::CmdDrawMeshTasksIndirectCount2EXT(m_command_buffer, &info);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkDrawIndirectCount2InfoKHR-countAddressRange-13116");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVIndirectBuffer, MeshDescriptorHeap) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    vkt::DescriptorHeapEXT::AddDescriptorHeapRequirements(*this);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_props);
+    if (mesh_shader_props.maxMeshWorkGroupCount[0] == vvl::kU32Max) {
+        GTEST_SKIP() << "maxMeshWorkGroupCount[0] too high for this test";
+    }
+
+    vkt::DescriptorHeapEXT desc_heap(*this);
+    desc_heap.CreateResourceHeap(desc_heap.heap_props.bufferDescriptorSize);
+
+    vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawMeshTasksIndirectCommandEXT), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                            kHostVisibleMemProps);
+    auto* draw_ptr = static_cast<VkDrawMeshTasksIndirectCommandEXT*>(draw_buffer.Memory().Map());
+    draw_ptr->groupCountX = mesh_shader_props.maxMeshWorkGroupCount[0] + 1;
+    draw_ptr->groupCountY = 1;
+    draw_ptr->groupCountZ = 1;
+
+    VkShaderObj mesh_shader(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    vkt::HeapGraphicsPipelineEXT mesh_pipe(*this, mesh_shader.GetStageCreateInfo(), fs.GetStageCreateInfo());
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    desc_heap.BindResourceHeap(m_command_buffer);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe);
+    vk::CmdDrawMeshTasksIndirectEXT(m_command_buffer, draw_buffer, 0, 1, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07326");
+    if (mesh_shader_props.maxMeshWorkGroupCount[0] + 1 >= mesh_shader_props.maxMeshWorkGroupTotalCount) {
+        m_errorMonitor->SetDesiredError("VUID-VkDrawMeshTasksIndirectCommandEXT-TaskEXT-07329");
+    }
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

@@ -13,13 +13,10 @@
 
 #include "layer_validation_tests.h"
 #include "pipeline_helper.h"
+#include "render_pass_helper.h"
 
 bool QueryTest::HasZeroTimestampValidBits() {
-    uint32_t queue_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_count, nullptr);
-    std::vector<VkQueueFamilyProperties> queue_props(queue_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_count, queue_props.data());
-    return (queue_props[m_device->graphics_queue_node_index_].timestampValidBits == 0);
+    return m_device->Physical().queue_properties_[m_device->graphics_queue_node_index_].timestampValidBits == 0;
 }
 
 class PositiveQuery : public QueryTest {};
@@ -406,6 +403,90 @@ TEST_F(PositiveQuery, CommandBufferInheritanceFlags) {
     m_command_buffer.End();
 }
 
+TEST_F(PositiveQuery, SequentialRenderPassInstances) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9196");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2u);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 2u);
+
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    m_command_buffer.EndRenderPass();
+
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
+    m_command_buffer.EndRenderPass();
+
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveQuery, SequentialRenderingInstances) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9196");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2u);
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.layerCount = 1u;
+    begin_rendering_info.renderArea = {{0, 0}, {64, 64}};
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 2u);
+
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    m_command_buffer.EndRendering();
+
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
+    m_command_buffer.EndRendering();
+
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveQuery, SuspendResumeRenderingInstance) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9196");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2u);
+
+    VkRenderingInfo begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.layerCount = 1u;
+    begin_rendering_info.renderArea = {{0, 0}, {64, 64}};
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 2u);
+
+    begin_rendering_info.flags = VK_RENDERING_SUSPENDING_BIT;
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    m_command_buffer.EndRendering();
+
+    begin_rendering_info.flags = VK_RENDERING_RESUMING_BIT;
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
+    m_command_buffer.EndRendering();
+
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
 TEST_F(PositiveQuery, PerformanceQueries) {
 #if defined(VVL_ENABLE_TSAN)
     // NOTE: This test in particular has failed sporadically on CI when TSAN is enabled.
@@ -468,8 +549,7 @@ TEST_F(PositiveQuery, PerformanceQueries) {
 
     vk::CmdBeginQuery(cmd_buffer, query_pool, 0u, 0u);
 
-    vk::CmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr,
-                           0u, nullptr, 0u, nullptr);
+    cmd_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 
     vk::CmdEndQuery(cmd_buffer, query_pool, 0u);
 
@@ -505,6 +585,64 @@ TEST_F(PositiveQuery, HostQueryResetSuccess) {
     query_pool_create_info.queryCount = 1;
     vkt::QueryPool query_pool(*m_device, query_pool_create_info);
     vk::ResetQueryPoolEXT(device(), query_pool, 0, 1);
+}
+
+TEST_F(PositiveQuery, HostResetWhilePoolInFlight) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13390");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::hostQueryReset);
+    RETURN_IF_SKIP(Init());
+    if (HasZeroTimestampValidBits()) {
+        GTEST_SKIP() << "Device graphic queue has timestampValidBits of 0, skipping.";
+    }
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 2);
+    vk::ResetQueryPool(device(), query_pool, 0, 2);
+
+    m_command_buffer.Begin();
+    vk::CmdWriteTimestamp(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 1);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
+
+    // The in-flight command buffer only writes query 1
+    vk::ResetQueryPool(device(), query_pool, 0, 1);
+
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveQuery, HostResetAfterAvailabilityRead) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13390");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::hostQueryReset);
+    RETURN_IF_SKIP(Init());
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by MockICD, query results are never written";
+    }
+    if (HasZeroTimestampValidBits()) {
+        GTEST_SKIP() << "Device graphic queue has timestampValidBits of 0, skipping.";
+    }
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 2);
+    vk::ResetQueryPool(device(), query_pool, 0, 2);
+
+    m_command_buffer.Begin();
+    vk::CmdWriteTimestamp(m_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 0);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
+
+    // Query 1 is never written
+    const VkQueryResultFlags flags = VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
+    uint64_t data[4] = {};
+    for (uint32_t i = 0; i < 1000000 && data[1] == 0; ++i) {
+        vk::GetQueryPoolResults(device(), query_pool, 0, 2, sizeof(data), data, 2 * sizeof(uint64_t), flags);
+    }
+    if (data[1] == 0) {
+        GTEST_SKIP() << "Query never became available";
+    }
+
+    vk::ResetQueryPool(device(), query_pool, 0, 1);
+
+    m_default_queue->Wait();
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7874
@@ -592,8 +730,7 @@ TEST_F(PositiveQuery, PerformanceCountersWithoutEnumeration) {
 
     vk::CmdBeginQuery(cmd_buffer, query_pool, 0u, 0u);
 
-    vk::CmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr,
-                           0u, nullptr, 0u, nullptr);
+    cmd_buffer.ExecutionBarrier(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 
     vk::CmdEndQuery(cmd_buffer, query_pool, 0u);
 
@@ -634,8 +771,7 @@ TEST_F(PositiveQuery, QueryPoolResetBit) {
     vk::CmdEndQuery(m_command_buffer, query_pool, 0);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveQuery, QueryPoolResultsStride) {
@@ -707,4 +843,174 @@ TEST_F(PositiveQuery, SubpassQueries) {
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
+}
+
+TEST_F(PositiveQuery, MultiviewBeginQueryIndexed) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
+
+    uint32_t view_mask = 0x3u;
+    VkRenderPassMultiviewCreateInfo rpmv_ci = vku::InitStructHelper();
+    rpmv_ci.subpassCount = 1;
+    rpmv_ci.pViewMasks = &view_mask;
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.CreateRenderPass(&rpmv_ci);
+
+    VkFramebufferCreateInfo framebuffer_ci = vku::InitStructHelper();
+    framebuffer_ci.renderPass = render_pass;
+    framebuffer_ci.width = 32u;
+    framebuffer_ci.height = 32u;
+    framebuffer_ci.layers = 1u;
+    vkt::Framebuffer framebuffer(*m_device, framebuffer_ci);
+
+    // 2 views -> the query uses queries 0 and 1
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0, 2);
+    m_command_buffer.BeginRenderPass(render_pass, framebuffer, 32, 32);
+    vk::CmdBeginQueryIndexedEXT(m_command_buffer, query_pool, 0, 0, 0);
+    vk::CmdEndQueryIndexedEXT(m_command_buffer, query_pool, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveQuery, MultiviewWriteTimestampCopyAllQueries) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
+    if (HasZeroTimestampValidBits()) {
+        GTEST_SKIP() << "Device graphic queue has timestampValidBits of 0";
+    }
+
+    uint32_t view_mask = 0x3u;
+    VkRenderPassMultiviewCreateInfo rpmv_ci = vku::InitStructHelper();
+    rpmv_ci.subpassCount = 1;
+    rpmv_ci.pViewMasks = &view_mask;
+    RenderPassSingleSubpass render_pass(*this);
+    render_pass.CreateRenderPass(&rpmv_ci);
+
+    VkFramebufferCreateInfo framebuffer_ci = vku::InitStructHelper();
+    framebuffer_ci.renderPass = render_pass;
+    framebuffer_ci.width = 32u;
+    framebuffer_ci.height = 32u;
+    framebuffer_ci.layers = 1u;
+    vkt::Framebuffer framebuffer(*m_device, framebuffer_ci);
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 2);
+    vkt::Buffer buffer(*m_device, 2 * sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0, 2);
+    m_command_buffer.BeginRenderPass(render_pass, framebuffer, 32, 32);
+    // 2 views -> writes queries 0 and 1
+    vk::CmdWriteTimestamp(m_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, 0);
+    m_command_buffer.EndRenderPass();
+    vk::CmdCopyQueryPoolResults(m_command_buffer, query_pool, 0, 2, buffer, 0, sizeof(uint64_t),
+                                VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveQuery, CopyLastQueryResult) {
+    RETURN_IF_SKIP(Init());
+
+    constexpr VkDeviceSize buffer_size = 4096u;
+    constexpr VkDeviceSize stride = buffer_size - 4u;
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2u);
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 2u);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
+    vk::CmdCopyQueryPoolResults(m_command_buffer, query_pool, 0u, 2u, buffer, 0u, stride, VK_QUERY_RESULT_WAIT_BIT);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveQuery, ResetInPreviousSubmission) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8233");
+    RETURN_IF_SKIP(Init());
+    if (HasZeroTimestampValidBits()) {
+        GTEST_SKIP() << "Device graphic queue has timestampValidBits of 0";
+    }
+
+    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_TIMESTAMP, 2);
+    vkt::Buffer buffer(*m_device, 4 * sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkCommandBuffer command_buffer[3];
+    VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
+    command_buffer_allocate_info.commandPool = m_command_pool;
+    command_buffer_allocate_info.commandBufferCount = 3;
+    command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    vk::AllocateCommandBuffers(device(), &command_buffer_allocate_info, command_buffer);
+
+    {
+        VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+
+        vk::BeginCommandBuffer(command_buffer[0], &begin_info);
+        vk::CmdResetQueryPool(command_buffer[0], query_pool, 0, 2);
+        vk::EndCommandBuffer(command_buffer[0]);
+
+        vk::BeginCommandBuffer(command_buffer[1], &begin_info);
+        vk::CmdWriteTimestamp(command_buffer[1], VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, 0);
+        vk::EndCommandBuffer(command_buffer[1]);
+
+        vk::BeginCommandBuffer(command_buffer[2], &begin_info);
+        vk::CmdWriteTimestamp(command_buffer[2], VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, 1);
+        vk::CmdCopyQueryPoolResults(command_buffer[2], query_pool, 0, 2, buffer, 0, sizeof(uint64_t),
+                                    VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+        vk::CmdResetQueryPool(command_buffer[2], query_pool, 0, 2);
+        vk::EndCommandBuffer(command_buffer[2]);
+    }
+
+    for (uint32_t loop = 0; loop < 2; ++loop) {
+        VkSubmitInfo submit_info = vku::InitStructHelper();
+        submit_info.commandBufferCount = loop == 0 ? 3 : 2;
+        submit_info.pCommandBuffers = loop == 0 ? &command_buffer[0] : &command_buffer[1];
+        vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
+        m_default_queue->Wait();
+    }
+
+    vk::FreeCommandBuffers(device(), m_command_pool, 3, command_buffer);
+}
+
+TEST_F(PositiveQuery, ElapsedTimerQuery) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_QCOM_ELAPSED_TIMER_QUERY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::elapsedTimerQuery);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::deviceAddressCommands);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::QueryPool query_pool{*m_device, VK_QUERY_TYPE_TIME_ELAPSED_QCOM, 1u};
+    vkt::Buffer buffer{*m_device, sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT};
+    vkt::Buffer address_buffer{*m_device, sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address};
+    const VkStridedDeviceAddressRangeKHR range = address_buffer.StridedAddressRange(sizeof(uint64_t));
+
+    m_command_buffer.Begin();
+    vk::CmdResetQueryPool(m_command_buffer, query_pool, 0u, 1u);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    m_command_buffer.EndRenderPass();
+    vk::CmdCopyQueryPoolResults(m_command_buffer, query_pool, 0u, 1u, buffer, 0u, sizeof(uint64_t),
+                                VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 1u, &range, 0u,
+                                           VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    uint64_t data = 0ull;
+    vk::GetQueryPoolResults(device(), query_pool, 0u, 1u, sizeof(data), &data, sizeof(data), VK_QUERY_RESULT_64_BIT);
 }

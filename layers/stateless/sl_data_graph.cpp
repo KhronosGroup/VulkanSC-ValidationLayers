@@ -21,6 +21,53 @@
 
 namespace stateless {
 
+bool Device::ValidateDataGraphProcessingEngineCreateInfo(const VkDataGraphProcessingEngineCreateInfoARM& dg_engine_ci,
+                                                         const Location& dg_engine_ci_loc) const {
+    bool skip = false;
+
+    for (uint32_t i = 0; i < dg_engine_ci.processingEngineCount; ++i) {
+        const auto& engine = dg_engine_ci.pProcessingEngines[i];
+
+        if (engine.type != VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_NEURAL_QCOM &&
+            engine.type != VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_COMPUTE_QCOM) {
+            continue;
+        }
+
+        if (!enabled_features.dataGraphModel) {
+            skip |= LogError("VUID-VkDataGraphProcessingEngineCreateInfoARM-pProcessingEngines-11844", device,
+                             dg_engine_ci_loc.dot(Field::pProcessingEngines, i).dot(Field::type),
+                             "is %s, but dataGraphModel is not enabled.",
+                             string_VkPhysicalDeviceDataGraphProcessingEngineTypeARM(engine.type));
+            break;  // only report once
+        } else if (engine.isForeign && dg_engine_ci.processingEngineCount != 1) {
+            skip |=
+                LogError("VUID-VkDataGraphProcessingEngineCreateInfoARM-pProcessingEngines-11843", device,
+                         dg_engine_ci_loc.dot(Field::pProcessingEngines, i),
+                         "is %s, isForeign is true, but processingEngineCount is %" PRIu32 " (not 1).",
+                         string_VkPhysicalDeviceDataGraphProcessingEngineTypeARM(engine.type), dg_engine_ci.processingEngineCount);
+            break;  // only report once
+        }
+    }
+
+    return skip;
+}
+
+bool Device::manual_PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
+                                                     const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
+                                                     const Context& context) const {
+    bool skip = false;
+
+    if (enabled_features.dataGraph) {
+        if (const auto* dg_engine_ci = vku::FindStructInPNextChain<VkDataGraphProcessingEngineCreateInfoARM>(pCreateInfo->pNext)) {
+            skip |= ValidateDataGraphProcessingEngineCreateInfo(
+                *dg_engine_ci,
+                context.error_obj.location.dot(Field::pCreateInfo).pNext(Struct::VkDataGraphProcessingEngineCreateInfoARM));
+        }
+    }
+
+    return skip;
+}
+
 bool Device::ValidateCreateDataGraphPipelinesFlags(const VkPipelineCreateFlags2 flags, const Location& flags_loc) const {
     bool skip = false;
 
@@ -57,11 +104,12 @@ bool Device::manual_PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, 
 
     if (!enabled_features.dataGraph) {
         skip |= LogError("VUID-vkCreateDataGraphPipelinesARM-dataGraph-09760", device, error_obj.location,
-                         "dataGraph feature is not enabled");
+                         "dataGraph feature was not enabled.");
     }
     if (deferredOperation != VK_NULL_HANDLE) {
         skip |= LogError("VUID-vkCreateDataGraphPipelinesARM-deferredOperation-09761", deferredOperation,
-                         error_obj.location.dot(Field::deferredOperation), "must be VK_NULL_HANDLE");
+                         error_obj.location.dot(Field::deferredOperation), "is %s, but must be VK_NULL_HANDLE.",
+                         FormatHandle(deferredOperation).c_str());
     }
 
     for (uint32_t i = 0; i < createInfoCount; i++) {
@@ -83,7 +131,15 @@ bool Device::manual_PreCallValidateCreateDataGraphPipelinesARM(VkDevice device, 
                 skip |= LogError("VUID-vkCreateDataGraphPipelinesARM-pNext-09928", device,
                                  create_info_loc.pNext(Struct::VkDataGraphPipelineIdentifierCreateInfoARM),
                                  "exists but pipelineCache is VK_NULL_HANDLE.\n%s",
-                                 PrintPNextChain(Struct::VkDataGraphPipelineConstantARM, create_info.pNext).c_str());
+                                 PrintPNextChain(Struct::VkDataGraphPipelineCreateInfoARM, create_info.pNext).c_str());
+            }
+        }
+
+        if (enabled_features.dataGraph) {
+            if (const auto* dg_engine_ci =
+                    vku::FindStructInPNextChain<VkDataGraphProcessingEngineCreateInfoARM>(create_info.pNext)) {
+                skip |= ValidateDataGraphProcessingEngineCreateInfo(
+                    *dg_engine_ci, create_info_loc.pNext(Struct::VkDataGraphProcessingEngineCreateInfoARM));
             }
         }
 

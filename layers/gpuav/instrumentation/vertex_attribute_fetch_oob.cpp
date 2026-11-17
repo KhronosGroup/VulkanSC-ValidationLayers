@@ -24,6 +24,7 @@
 #include "state_tracker/shader_module.h"
 #include "utils/action_command_utils.h"
 #include "utils/image_utils.h"
+#include "utils/vk_api_utils.h"
 
 namespace gpuav {
 struct VertexAttributeFetchLimit {
@@ -124,6 +125,10 @@ static std::pair<std::optional<VertexAttributeFetchLimit>, std::optional<VertexA
                     vertex_attribute_fetch_limit_vertex_input_rate->attribute.offset = attrib.desc.offset;
                 }
             } else if (vertex_binding_desc.desc.inputRate == VK_VERTEX_INPUT_RATE_INSTANCE) {
+                if (vertex_binding_desc.desc.divisor == 0 && vertex_attributes_count > 0) {
+                    continue;
+                }
+
                 if (!vertex_attribute_fetch_limit_instance_input_rate.has_value()) {
                     vertex_attribute_fetch_limit_instance_input_rate = VertexAttributeFetchLimit{};
                 }
@@ -148,6 +153,8 @@ static std::pair<std::optional<VertexAttributeFetchLimit>, std::optional<VertexA
 
 void RegisterVertexAttributeFetchOobValidation(Validator& gpuav, CommandBufferSubState& cb) {
     if (!gpuav.gpuav_settings.shader_instrumentation.vertex_attribute_fetch_oob) {
+        return;
+    } else if (gpuav.modified_features.robustBufferAccess) {
         return;
     }
 
@@ -298,7 +305,8 @@ void RegisterVertexAttributeFetchOobValidation(Validator& gpuav, CommandBufferSu
             }
             out_error_msg +=
                 "Note: Vertex buffer binding size is the effective, valid one, based on how the VkBuffer was created and "
-                "the vkCmdBindVertexBuffers parameters. So it can be clamped up to 0 if binding was invalid.";
+                "the vkCmdBindVertexBuffers parameters. So it can be clamped up to 0 if binding was invalid.\nHint: This can be "
+                "allowed if the robustBufferAccess feature is enabled.";
 
             return true;
         };

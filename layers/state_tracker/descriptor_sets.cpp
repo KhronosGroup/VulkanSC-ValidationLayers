@@ -381,8 +381,12 @@ vvl::DescriptorSetLayoutDef::DescriptorSetLayoutDef(vvl::DeviceState& device_sta
     // info, but this information is lost and we have changed to a sorted list based on bindings.
     if (const auto* mutable_descriptor_type_create_info =
             vku::FindStructInPNextChain<VkMutableDescriptorTypeCreateInfoEXT>(p_create_info->pNext)) {
-        mutable_bindings_.resize(mutable_descriptor_type_create_info->mutableDescriptorTypeListCount);
-        for (uint32_t i = 0; i < mutable_descriptor_type_create_info->mutableDescriptorTypeListCount; ++i) {
+        // pMutableDescriptorTypeLists[i] belongs to pBindings[i]
+        // but you can pass more lists than there are bindings
+        mutable_bindings_.resize(binding_count_);
+        const uint32_t mutable_list_count =
+            std::min(mutable_descriptor_type_create_info->mutableDescriptorTypeListCount, p_create_info->bindingCount);
+        for (uint32_t i = 0; i < mutable_list_count; ++i) {
             const auto& list = mutable_descriptor_type_create_info->pMutableDescriptorTypeLists[i];
             const uint32_t mutable_index = binding_to_index_map_[p_create_info->pBindings[i].binding];
             mutable_bindings_[mutable_index].original_index = i;
@@ -553,7 +557,7 @@ bool vvl::ImmutableSamplersAreEqual(const DescriptorSetLayoutDef& dsl_def1, cons
     const std::vector<vku::safe_VkSamplerCreateInfo>& create_infos1 =
         dsl_def1.GetImmutableSamplerCreateInfosFromIndex(binding_index);
     const std::vector<vku::safe_VkSamplerCreateInfo>& create_infos2 =
-        dsl_def1.GetImmutableSamplerCreateInfosFromIndex(binding_index);
+        dsl_def2.GetImmutableSamplerCreateInfosFromIndex(binding_index);
     if (create_infos1.size() != create_infos2.size()) {
         return false;
     }
@@ -659,7 +663,9 @@ vvl::DescriptorSet::DescriptorSet(const VkDescriptorSet handle, vvl::DescriptorP
             case DescriptorClass::PlainSampler: {
                 auto binding = MakeBinding<SamplerBinding>(free_binding++, *create_info, descriptor_count, flags);
                 if (auto immutable_sampler_handles = layout_->GetImmutableSamplerPtrFromIndex(i)) {
-                    for (uint32_t di = 0; di < descriptor_count; ++di) {
+                    // pImmutableSamplers only has the layout's descriptorCount entries so variable_count may be larger
+                    const uint32_t immutable_sampler_count = std::min(descriptor_count, create_info->descriptorCount);
+                    for (uint32_t di = 0; di < immutable_sampler_count; ++di) {
                         auto sampler = state_data->GetConstCastShared<vvl::Sampler>(immutable_sampler_handles[di]);
                         if (sampler) {
                             some_update_ = true;  // Immutable samplers are updated at creation
@@ -674,7 +680,9 @@ vvl::DescriptorSet::DescriptorSet(const VkDescriptorSet handle, vvl::DescriptorP
             case DescriptorClass::ImageSampler: {
                 auto binding = MakeBinding<ImageSamplerBinding>(free_binding++, *create_info, descriptor_count, flags);
                 if (auto immutable_sampler_handles = layout_->GetImmutableSamplerPtrFromIndex(i)) {
-                    for (uint32_t di = 0; di < descriptor_count; ++di) {
+                    // pImmutableSamplers only has the layout's descriptorCount entries so variable_count may be larger
+                    const uint32_t immutable_sampler_count = std::min(descriptor_count, create_info->descriptorCount);
+                    for (uint32_t di = 0; di < immutable_sampler_count; ++di) {
                         auto sampler = state_data->GetConstCastShared<vvl::Sampler>(immutable_sampler_handles[di]);
                         if (sampler) {
                             some_update_ = true;  // Immutable samplers are updated at creation
@@ -817,7 +825,9 @@ void vvl::DescriptorSet::PerformWriteUpdate(const VkWriteDescriptorSet& update) 
     // Perform update on a per-binding basis as consecutive updates roll over to next binding
     auto descriptors_remaining = update.descriptorCount;
     auto iter = FindDescriptor(update.dstBinding, update.dstArrayElement);
-    ASSERT_AND_RETURN(iter.IsValid());
+    if (!iter.IsValid()) {
+        return;  // to not crash if things are already invalid
+    }
     auto& orig_binding = iter.CurrentBinding();
 
     // Verify next consecutive binding matches type, stage flags & immutable sampler use and if AtEnd
@@ -845,9 +855,14 @@ void vvl::DescriptorSet::PerformWriteUpdate(const VkWriteDescriptorSet& update) 
 void vvl::DescriptorSet::PerformCopyUpdate(const VkCopyDescriptorSet& update, const DescriptorSet& src_set) {
     auto src_iter = src_set.FindDescriptor(update.srcBinding, update.srcArrayElement);
     auto dst_iter = FindDescriptor(update.dstBinding, update.dstArrayElement);
-    ASSERT_AND_RETURN(src_iter.IsValid() && dst_iter.IsValid());
+    if (!src_iter.IsValid() || !dst_iter.IsValid()) {
+        return;  // to not crash in PostCallRecord
+    }
     // Update parameters all look good so perform update
     for (uint32_t i = 0; i < update.descriptorCount; ++i, ++src_iter, ++dst_iter) {
+        if (src_iter.AtEnd() || dst_iter.AtEnd()) {
+            break;  // to not crash in PostCallRecord
+        }
         auto& src = *src_iter;
         auto& dst = *dst_iter;
         if (src_iter.updated()) {
@@ -933,7 +948,7 @@ void vvl::DescriptorSet::UpdateImageLayoutDrawStates(vvl::DeviceState* device_da
     }
 }
 
-// This is used to decide if we should validate the Descirptors on the CPU or GPU-AV
+// This is used to decide if we should validate the Descriptors on the CPU or GPU-AV
 bool vvl::DescriptorSet::ValidateBindingOnGPU(const DescriptorBinding& binding,
                                               const spirv::ResourceInterfaceVariable& variable) const {
     // Some applications (notably Doom Eternal) might have large non-bindless descriptors attached (basically doing Descriptor
@@ -1229,23 +1244,21 @@ bool vvl::TexelDescriptor::Invalid() const { return !buffer_view_state_ || buffe
 void vvl::AccelerationStructureDescriptor::WriteUpdate(DescriptorSet& set_state, const vvl::DeviceState& dev_data,
                                                        const VkWriteDescriptorSet& update, const uint32_t index, bool is_bindless) {
     const auto* acc_info = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureKHR>(update.pNext);
-    const auto* acc_info_nv = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureNV>(update.pNext);
     const auto* acc_info_partition_nv =
         vku::FindStructInPNextChain<VkWriteDescriptorSetPartitionedAccelerationStructureNV>(update.pNext);
-    assert(acc_info || acc_info_nv || acc_info_partition_nv);
 
     if (acc_info_partition_nv) {
+        // Partitioned AS are referenced by VkDeviceAddress, not by a handle, so there is no state object to track.
+        is_partition_nv_ = true;
         acc_partition_nv_ = acc_info_partition_nv->pAccelerationStructures[index];
-        ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_), is_bindless);
         return;
     }
-    is_khr_ = (acc_info != NULL);
+    is_partition_nv_ = false;
+    // VK_NV_ray_tracing acceleration structures are not tracked
+    is_khr_ = (acc_info != nullptr);
     if (is_khr_) {
         acc_ = acc_info->pAccelerationStructures[index];
         ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_), is_bindless);
-    } else {
-        acc_nv_ = acc_info_nv->pAccelerationStructures[index];
-        ReplaceStatePtr(set_state, acc_state_nv_, dev_data.GetConstCastShared<vvl::AccelerationStructureNV>(acc_nv_), is_bindless);
     }
 }
 
@@ -1253,25 +1266,23 @@ void vvl::AccelerationStructureDescriptor::CopyUpdate(DescriptorSet& set_state, 
                                                       const Descriptor& src, bool is_bindless, VkDescriptorType src_type) {
     if (src.GetClass() == DescriptorClass::Mutable) {
         auto& acc_desc = static_cast<const MutableDescriptor&>(src);
-        is_khr_ = acc_desc.IsAccelerationStructureKHR();
+        is_khr_ = acc_desc.IsKHR();
         if (is_khr_) {
             acc_ = acc_desc.GetAccelerationStructureKHR();
             ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_), is_bindless);
-        } else {
-            acc_nv_ = acc_desc.GetAccelerationStructureNV();
-            ReplaceStatePtr(set_state, acc_state_nv_, dev_data.GetConstCastShared<vvl::AccelerationStructureNV>(acc_nv_),
-                            is_bindless);
         }
         return;
     }
     auto acc_desc = static_cast<const AccelerationStructureDescriptor&>(src);
+    is_partition_nv_ = acc_desc.is_partition_nv_;
+    if (is_partition_nv_) {
+        acc_partition_nv_ = acc_desc.acc_partition_nv_;
+        return;
+    }
     is_khr_ = acc_desc.is_khr_;
     if (is_khr_) {
         acc_ = acc_desc.acc_;
         ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_), is_bindless);
-    } else {
-        acc_nv_ = acc_desc.acc_nv_;
-        ReplaceStatePtr(set_state, acc_state_nv_, dev_data.GetConstCastShared<vvl::AccelerationStructureNV>(acc_nv_), is_bindless);
     }
 }
 
@@ -1280,25 +1291,18 @@ bool vvl::AccelerationStructureDescriptor::AddParent(StateObject* state_object) 
     if (acc_state_) {
         result |= acc_state_->AddParent(state_object);
     }
-    if (acc_state_nv_) {
-        result |= acc_state_nv_->AddParent(state_object);
-    }
     return result;
 }
 void vvl::AccelerationStructureDescriptor::RemoveParent(StateObject* state_object) {
     if (acc_state_) {
         acc_state_->RemoveParent(state_object);
     }
-    if (acc_state_nv_) {
-        acc_state_nv_->RemoveParent(state_object);
-    }
 }
 bool vvl::AccelerationStructureDescriptor::Invalid() const {
-    if (is_khr_) {
-        return !acc_state_ || acc_state_->Invalid();
-    } else {
-        return !acc_state_nv_ || acc_state_nv_->Invalid();
+    if (is_partition_nv_ || !is_khr_) {
+        return false;  // no tracked AS object
     }
+    return !acc_state_ || acc_state_->Invalid();
 }
 
 vvl::MutableDescriptor::MutableDescriptor()
@@ -1351,7 +1355,7 @@ void vvl::MutableDescriptor::WriteUpdate(DescriptorSet& set_state, const vvl::De
                 offset_ = buffer_info.offset;
                 range_ = buffer_info.range;
                 // can be null if using nullDescriptors
-                const auto buffer_state = dev_data.GetConstCastShared<vvl::Buffer>(update.pBufferInfo->buffer);
+                const auto buffer_state = dev_data.GetConstCastShared<vvl::Buffer>(buffer_info.buffer);
                 if (buffer_state) {
                     buffer_size = buffer_state->GetSize();
                 }
@@ -1380,16 +1384,11 @@ void vvl::MutableDescriptor::WriteUpdate(DescriptorSet& set_state, const vvl::De
         }
         case DescriptorClass::AccelerationStructure: {
             const auto* acc_info = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureKHR>(update.pNext);
-            const auto* acc_info_nv = vku::FindStructInPNextChain<VkWriteDescriptorSetAccelerationStructureNV>(update.pNext);
-            assert(acc_info || acc_info_nv);
-            is_khr_ = (acc_info != NULL);
+            // VK_NV_ray_tracing acceleration structures are not tracked
+            is_khr_ = (acc_info != nullptr);
             if (is_khr_) {
                 acc_ = acc_info->pAccelerationStructures[index];
                 ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_),
-                                is_bindless);
-            } else {
-                acc_nv_ = acc_info_nv->pAccelerationStructures[index];
-                ReplaceStatePtr(set_state, acc_state_nv_, dev_data.GetConstCastShared<vvl::AccelerationStructureNV>(acc_nv_),
                                 is_bindless);
             }
             break;
@@ -1450,10 +1449,6 @@ void vvl::MutableDescriptor::CopyUpdate(DescriptorSet& set_state, const vvl::Dev
                 acc_ = acc_desc.GetAccelerationStructure();
                 ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_),
                                 is_bindless);
-            } else {
-                acc_nv_ = acc_desc.GetAccelerationStructureNV();
-                ReplaceStatePtr(set_state, acc_state_nv_, dev_data.GetConstCastShared<vvl::AccelerationStructureNV>(acc_nv_),
-                                is_bindless);
             }
             break;
         }
@@ -1494,10 +1489,6 @@ void vvl::MutableDescriptor::CopyUpdate(DescriptorSet& set_state, const vvl::Dev
                         acc_ = mutable_src.GetAccelerationStructureKHR();
                         ReplaceStatePtr(set_state, acc_state_, dev_data.GetConstCastShared<vvl::AccelerationStructureKHR>(acc_),
                                         is_bindless);
-                    } else {
-                        acc_nv_ = mutable_src.GetAccelerationStructureNV();
-                        ReplaceStatePtr(set_state, acc_state_nv_,
-                                        dev_data.GetConstCastShared<vvl::AccelerationStructureNV>(acc_nv_), is_bindless);
                     }
 
                 } break;
@@ -1510,10 +1501,10 @@ void vvl::MutableDescriptor::CopyUpdate(DescriptorSet& set_state, const vvl::Dev
             break;
         }
         case vvl::DescriptorClass::Tensor: {
-            const auto tensor_desc = static_cast<const MutableDescriptor*>(&src);
-            tensor_view_count_ = tensor_desc->GetTensorViewCount();
-            tensor_views_ = tensor_desc->GetTensorViews();
-            ReplaceStatePtr(set_state, tensor_view_state_, std::shared_ptr<vvl::TensorView>(), is_bindless);
+            const auto tensor_desc = static_cast<const MutableDescriptor&>(src);
+            tensor_view_count_ = tensor_desc.GetTensorViewCount();
+            tensor_views_ = tensor_desc.GetTensorViews();
+            ReplaceStatePtr(set_state, tensor_view_state_, tensor_desc.tensor_view_state_, is_bindless);
         } break;
         case vvl::DescriptorClass::InlineUniform:
         case vvl::DescriptorClass::Invalid:
@@ -1585,9 +1576,6 @@ bool vvl::MutableDescriptor::AddParent(StateObject* state_object) {
             if (acc_state_) {
                 result |= acc_state_->AddParent(state_object);
             }
-            if (acc_state_nv_) {
-                result |= acc_state_nv_->AddParent(state_object);
-            }
             break;
         case DescriptorClass::Tensor:
             if (tensor_view_state_) {
@@ -1617,9 +1605,6 @@ void vvl::MutableDescriptor::RemoveParent(StateObject* state_object) {
     if (acc_state_) {
         acc_state_->RemoveParent(state_object);
     }
-    if (acc_state_nv_) {
-        acc_state_nv_->RemoveParent(state_object);
-    }
     if (tensor_view_state_) {
         tensor_view_state_->RemoveParent(state_object);
     }
@@ -1643,11 +1628,8 @@ bool vvl::MutableDescriptor::Invalid() const {
             return !buffer_state_ || buffer_state_->Invalid();
 
         case DescriptorClass::AccelerationStructure:
-            if (is_khr_) {
-                return !acc_state_ || acc_state_->Invalid();
-            } else {
-                return !acc_state_nv_ || acc_state_nv_->Invalid();
-            }
+            // VK_NV_ray_tracing acceleration structures are not tracked
+            return is_khr_ && (!acc_state_ || acc_state_->Invalid());
         case DescriptorClass::Tensor:
             return !tensor_view_state_ || tensor_view_state_->Invalid() || !tensor_view_state_->tensor_state ||
                    tensor_view_state_->tensor_state->Invalid();
@@ -1683,16 +1665,16 @@ void vvl::TensorDescriptor::WriteUpdate(DescriptorSet& set_state, const DeviceSt
 void vvl::TensorDescriptor::CopyUpdate(DescriptorSet& set_state, const DeviceState& dev_data, const Descriptor& src,
                                        bool is_bindless, VkDescriptorType type) {
     if (src.GetClass() == vvl::DescriptorClass::Mutable) {
-        const auto tensor_desc = static_cast<const MutableDescriptor*>(&src);
-        tensor_view_count_ = tensor_desc->GetTensorViewCount();
-        tensor_views_ = tensor_desc->GetTensorViews();
-        ReplaceStatePtr(set_state, tensor_view_state_, std::shared_ptr<vvl::TensorView>(), is_bindless);
+        const auto tensor_desc = static_cast<const MutableDescriptor&>(src);
+        tensor_view_count_ = tensor_desc.GetTensorViewCount();
+        tensor_views_ = tensor_desc.GetTensorViews();
+        ReplaceStatePtr(set_state, tensor_view_state_, tensor_desc.GetSharedTensorView(), is_bindless);
         return;
     }
-    const auto tensor_desc = static_cast<const TensorDescriptor*>(&src);
-    tensor_view_count_ = tensor_desc->tensor_view_count_;
-    tensor_views_ = tensor_desc->tensor_views_;
-    ReplaceStatePtr(set_state, tensor_view_state_, std::shared_ptr<vvl::TensorView>(), is_bindless);
+    const auto tensor_desc = static_cast<const TensorDescriptor&>(src);
+    tensor_view_count_ = tensor_desc.tensor_view_count_;
+    tensor_views_ = tensor_desc.tensor_views_;
+    ReplaceStatePtr(set_state, tensor_view_state_, tensor_desc.tensor_view_state_, is_bindless);
 }
 
 const vvl::Tensor* vvl::TensorDescriptor::GetTensorState() const { return tensor_view_state_->tensor_state.get(); }

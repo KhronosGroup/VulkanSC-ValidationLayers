@@ -1141,6 +1141,13 @@ static VKAPI_ATTR void VKAPI_CALL StubCmdCudaLaunchKernelNV(VkCommandBuffer, con
 static VKAPI_ATTR void VKAPI_CALL StubCmdDispatchTileQCOM(VkCommandBuffer, const VkDispatchTileInfoQCOM*) {}
 static VKAPI_ATTR void VKAPI_CALL StubCmdBeginPerTileExecutionQCOM(VkCommandBuffer, const VkPerTileBeginInfoQCOM*) {}
 static VKAPI_ATTR void VKAPI_CALL StubCmdEndPerTileExecutionQCOM(VkCommandBuffer, const VkPerTileEndInfoQCOM*) {}
+static VKAPI_ATTR void VKAPI_CALL StubSetLatencySleepModeLegacyNV(VkDevice, VkBool32, VkBool32, uint32_t) {}
+static VKAPI_ATTR void VKAPI_CALL StubLatencySleepLegacyNV(VkDevice, VkSemaphore, uint64_t) {}
+static VKAPI_ATTR void VKAPI_CALL StubSetLatencyMarkerLegacyNV(VkDevice, uint64_t, uint32_t) {}
+static VKAPI_ATTR void VKAPI_CALL StubGetLatencyTimingsLegacyNV(VkDevice, void*) {}
+static VKAPI_ATTR void VKAPI_CALL StubQueueNotifyOutOfBandLegacyNV(VkQueue, uint32_t) {}
+static VKAPI_ATTR void VKAPI_CALL StubGetSleepStatusLegacyNV(VkDevice, VkBool32*) {}
+static VKAPI_ATTR void VKAPI_CALL StubShutdownLatencyDeviceLegacyNV(VkDevice) {}
 #ifdef VK_USE_PLATFORM_METAL_EXT
 static VKAPI_ATTR void VKAPI_CALL StubExportMetalObjectsEXT(VkDevice, VkExportMetalObjectsInfoEXT*) {}
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -1644,6 +1651,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL StubGetPhysicalDeviceQueueFamilyDataGraphO
 }
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetComputeOccupancyPriorityNV(VkCommandBuffer,
                                                                        const VkComputeOccupancyPriorityParametersNV*) {}
+static VKAPI_ATTR VkResult VKAPI_CALL StubGetPhysicalDeviceCooperativeMatrixProperties2EXT(
+    VkPhysicalDevice, const VkPhysicalDeviceCooperativeMatrixInfo2EXT*, uint32_t*, VkCooperativeMatrixProperties2EXT*) {
+    return VK_SUCCESS;
+}
 #ifdef VK_USE_PLATFORM_UBM_SEC
 static VKAPI_ATTR VkResult VKAPI_CALL StubCreateUbmSurfaceSEC(VkInstance, const VkUbmSurfaceCreateInfoSEC*,
                                                               const VkAllocationCallbacks*, VkSurfaceKHR*) {
@@ -1654,6 +1665,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL StubGetPhysicalDeviceUbmPresentationSuppor
     return VK_FALSE;
 }
 #endif  // VK_USE_PLATFORM_UBM_SEC
+static VKAPI_ATTR void VKAPI_CALL StubGetPhysicalDeviceInternalHandleNV(VkPhysicalDevice, VkInternalHandleNV*) {}
+static VKAPI_ATTR void VKAPI_CALL StubGetDeviceInternalHandleNV(VkDevice, VkInternalHandleNV*) {}
+static VKAPI_ATTR void VKAPI_CALL StubGetQueueInternalHandleNV(VkQueue, VkInternalHandleNV*) {}
+static VKAPI_ATTR void VKAPI_CALL StubGetCommandBufferInternalHandleNV(VkCommandBuffer, VkInternalHandleNV*) {}
 static VKAPI_ATTR void VKAPI_CALL StubCmdSetPrimitiveRestartIndexEXT(VkCommandBuffer, uint32_t) {}
 static VKAPI_ATTR VkResult VKAPI_CALL StubCreateAccelerationStructureKHR(VkDevice, const VkAccelerationStructureCreateInfoKHR*,
                                                                          const VkAllocationCallbacks*,
@@ -2144,6 +2159,13 @@ const auto& GetApiExtensionMap() {
         {"vkCmdDispatchTileQCOM", {vvl::Extension::_VK_QCOM_tile_shading}},
         {"vkCmdBeginPerTileExecutionQCOM", {vvl::Extension::_VK_QCOM_tile_shading}},
         {"vkCmdEndPerTileExecutionQCOM", {vvl::Extension::_VK_QCOM_tile_shading}},
+        {"vkSetLatencySleepModeLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
+        {"vkLatencySleepLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
+        {"vkSetLatencyMarkerLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
+        {"vkGetLatencyTimingsLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
+        {"vkQueueNotifyOutOfBandLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
+        {"vkGetSleepStatusLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
+        {"vkShutdownLatencyDeviceLegacyNV", {vvl::Extension::_VK_NV_low_latency}},
         {"vkExportMetalObjectsEXT", {vvl::Extension::_VK_EXT_metal_objects}},
         {"vkGetDescriptorSetLayoutSizeEXT", {vvl::Extension::_VK_EXT_descriptor_buffer}},
         {"vkGetDescriptorSetLayoutBindingOffsetEXT", {vvl::Extension::_VK_EXT_descriptor_buffer}},
@@ -2343,6 +2365,9 @@ const auto& GetApiExtensionMap() {
         {"vkCmdEndRendering2EXT", {vvl::Extension::_VK_EXT_fragment_density_map_offset}},
         {"vkCmdBeginCustomResolveEXT", {vvl::Extension::_VK_EXT_custom_resolve}},
         {"vkCmdSetComputeOccupancyPriorityNV", {vvl::Extension::_VK_NV_compute_occupancy_priority}},
+        {"vkGetDeviceInternalHandleNV", {vvl::Extension::_VK_NV_internal_handle}},
+        {"vkGetQueueInternalHandleNV", {vvl::Extension::_VK_NV_internal_handle}},
+        {"vkGetCommandBufferInternalHandleNV", {vvl::Extension::_VK_NV_internal_handle}},
         {"vkCmdSetPrimitiveRestartIndexEXT", {vvl::Extension::_VK_EXT_primitive_restart_index}},
         {"vkCreateAccelerationStructureKHR", {vvl::Extension::_VK_KHR_acceleration_structure}},
         {"vkDestroyAccelerationStructureKHR", {vvl::Extension::_VK_KHR_acceleration_structure}},
@@ -2377,10 +2402,10 @@ const auto& GetApiExtensionMap() {
 //   o  Determine if the API has an associated extension
 //   o  If it does, determine if that extension name is present in the passed-in set of device or instance enabled_ext_names
 //   If the APIname has no parent extension, OR its parent extension name is IN one of the sets, return TRUE, else FALSE
-bool ApiParentExtensionEnabled(const std::string api_name, const DeviceExtensions* device_extension_info) {
+bool ApiParentExtensionEnabled(const std::string& api_name, const DeviceExtensions* device_extension_info) {
     auto promoted_api = GetApiPromotedMap().find(api_name);
     if (promoted_api != GetApiPromotedMap().end()) {
-        auto info = GetDeviceVersionMap(promoted_api->second.c_str());
+        const auto& info = GetDeviceVersionMap(promoted_api->second.c_str());
         assert(info.state);
         return (device_extension_info->*(info.state) == kEnabledByCreateinfo);
     }
@@ -2390,7 +2415,7 @@ bool ApiParentExtensionEnabled(const std::string api_name, const DeviceExtension
     if (has_ext != GetApiExtensionMap().end()) {
         // Was the extension for this API enabled in the CreateDevice call?
         for (const auto& extension : has_ext->second) {
-            auto info = device_extension_info->GetInfo(extension);
+            const auto& info = device_extension_info->GetInfo(extension);
             if (info.state) {
                 if (device_extension_info->*(info.state) == kEnabledByCreateinfo ||
                     device_extension_info->*(info.state) == kEnabledByInteraction) {
@@ -2402,7 +2427,7 @@ bool ApiParentExtensionEnabled(const std::string api_name, const DeviceExtension
         // Was the extension for this API enabled in the CreateInstance call?
         auto instance_extension_info = static_cast<const InstanceExtensions*>(device_extension_info);
         for (const auto& extension : has_ext->second) {
-            auto info = instance_extension_info->GetInfo(extension);
+            const auto& info = instance_extension_info->GetInfo(extension);
             if (info.state) {
                 if (instance_extension_info->*(info.state) == kEnabledByCreateinfo ||
                     instance_extension_info->*(info.state) == kEnabledByInteraction) {
@@ -4285,6 +4310,34 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
     if (table->CmdEndPerTileExecutionQCOM == nullptr) {
         table->CmdEndPerTileExecutionQCOM = (PFN_vkCmdEndPerTileExecutionQCOM)StubCmdEndPerTileExecutionQCOM;
     }
+    table->SetLatencySleepModeLegacyNV = (PFN_vkSetLatencySleepModeLegacyNV)gpa(device, "vkSetLatencySleepModeLegacyNV");
+    if (table->SetLatencySleepModeLegacyNV == nullptr) {
+        table->SetLatencySleepModeLegacyNV = (PFN_vkSetLatencySleepModeLegacyNV)StubSetLatencySleepModeLegacyNV;
+    }
+    table->LatencySleepLegacyNV = (PFN_vkLatencySleepLegacyNV)gpa(device, "vkLatencySleepLegacyNV");
+    if (table->LatencySleepLegacyNV == nullptr) {
+        table->LatencySleepLegacyNV = (PFN_vkLatencySleepLegacyNV)StubLatencySleepLegacyNV;
+    }
+    table->SetLatencyMarkerLegacyNV = (PFN_vkSetLatencyMarkerLegacyNV)gpa(device, "vkSetLatencyMarkerLegacyNV");
+    if (table->SetLatencyMarkerLegacyNV == nullptr) {
+        table->SetLatencyMarkerLegacyNV = (PFN_vkSetLatencyMarkerLegacyNV)StubSetLatencyMarkerLegacyNV;
+    }
+    table->GetLatencyTimingsLegacyNV = (PFN_vkGetLatencyTimingsLegacyNV)gpa(device, "vkGetLatencyTimingsLegacyNV");
+    if (table->GetLatencyTimingsLegacyNV == nullptr) {
+        table->GetLatencyTimingsLegacyNV = (PFN_vkGetLatencyTimingsLegacyNV)StubGetLatencyTimingsLegacyNV;
+    }
+    table->QueueNotifyOutOfBandLegacyNV = (PFN_vkQueueNotifyOutOfBandLegacyNV)gpa(device, "vkQueueNotifyOutOfBandLegacyNV");
+    if (table->QueueNotifyOutOfBandLegacyNV == nullptr) {
+        table->QueueNotifyOutOfBandLegacyNV = (PFN_vkQueueNotifyOutOfBandLegacyNV)StubQueueNotifyOutOfBandLegacyNV;
+    }
+    table->GetSleepStatusLegacyNV = (PFN_vkGetSleepStatusLegacyNV)gpa(device, "vkGetSleepStatusLegacyNV");
+    if (table->GetSleepStatusLegacyNV == nullptr) {
+        table->GetSleepStatusLegacyNV = (PFN_vkGetSleepStatusLegacyNV)StubGetSleepStatusLegacyNV;
+    }
+    table->ShutdownLatencyDeviceLegacyNV = (PFN_vkShutdownLatencyDeviceLegacyNV)gpa(device, "vkShutdownLatencyDeviceLegacyNV");
+    if (table->ShutdownLatencyDeviceLegacyNV == nullptr) {
+        table->ShutdownLatencyDeviceLegacyNV = (PFN_vkShutdownLatencyDeviceLegacyNV)StubShutdownLatencyDeviceLegacyNV;
+    }
 #ifdef VK_USE_PLATFORM_METAL_EXT
     table->ExportMetalObjectsEXT = (PFN_vkExportMetalObjectsEXT)gpa(device, "vkExportMetalObjectsEXT");
     if (table->ExportMetalObjectsEXT == nullptr) {
@@ -5122,6 +5175,19 @@ void layer_init_device_dispatch_table(VkDevice device, VkLayerDispatchTable* tab
     if (table->CmdSetComputeOccupancyPriorityNV == nullptr) {
         table->CmdSetComputeOccupancyPriorityNV = (PFN_vkCmdSetComputeOccupancyPriorityNV)StubCmdSetComputeOccupancyPriorityNV;
     }
+    table->GetDeviceInternalHandleNV = (PFN_vkGetDeviceInternalHandleNV)gpa(device, "vkGetDeviceInternalHandleNV");
+    if (table->GetDeviceInternalHandleNV == nullptr) {
+        table->GetDeviceInternalHandleNV = (PFN_vkGetDeviceInternalHandleNV)StubGetDeviceInternalHandleNV;
+    }
+    table->GetQueueInternalHandleNV = (PFN_vkGetQueueInternalHandleNV)gpa(device, "vkGetQueueInternalHandleNV");
+    if (table->GetQueueInternalHandleNV == nullptr) {
+        table->GetQueueInternalHandleNV = (PFN_vkGetQueueInternalHandleNV)StubGetQueueInternalHandleNV;
+    }
+    table->GetCommandBufferInternalHandleNV =
+        (PFN_vkGetCommandBufferInternalHandleNV)gpa(device, "vkGetCommandBufferInternalHandleNV");
+    if (table->GetCommandBufferInternalHandleNV == nullptr) {
+        table->GetCommandBufferInternalHandleNV = (PFN_vkGetCommandBufferInternalHandleNV)StubGetCommandBufferInternalHandleNV;
+    }
     table->CmdSetPrimitiveRestartIndexEXT = (PFN_vkCmdSetPrimitiveRestartIndexEXT)gpa(device, "vkCmdSetPrimitiveRestartIndexEXT");
     if (table->CmdSetPrimitiveRestartIndexEXT == nullptr) {
         table->CmdSetPrimitiveRestartIndexEXT = (PFN_vkCmdSetPrimitiveRestartIndexEXT)StubCmdSetPrimitiveRestartIndexEXT;
@@ -5895,6 +5961,12 @@ void layer_init_instance_dispatch_table(VkInstance instance, VkLayerInstanceDisp
             (PFN_vkGetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM)
                 StubGetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM;
     }
+    table->GetPhysicalDeviceCooperativeMatrixProperties2EXT =
+        (PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT)gpa(instance, "vkGetPhysicalDeviceCooperativeMatrixProperties2EXT");
+    if (table->GetPhysicalDeviceCooperativeMatrixProperties2EXT == nullptr) {
+        table->GetPhysicalDeviceCooperativeMatrixProperties2EXT =
+            (PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT)StubGetPhysicalDeviceCooperativeMatrixProperties2EXT;
+    }
 #ifdef VK_USE_PLATFORM_UBM_SEC
     table->CreateUbmSurfaceSEC = (PFN_vkCreateUbmSurfaceSEC)gpa(instance, "vkCreateUbmSurfaceSEC");
     if (table->CreateUbmSurfaceSEC == nullptr) {
@@ -5907,6 +5979,11 @@ void layer_init_instance_dispatch_table(VkInstance instance, VkLayerInstanceDisp
             (PFN_vkGetPhysicalDeviceUbmPresentationSupportSEC)StubGetPhysicalDeviceUbmPresentationSupportSEC;
     }
 #endif  // VK_USE_PLATFORM_UBM_SEC
+    table->GetPhysicalDeviceInternalHandleNV =
+        (PFN_vkGetPhysicalDeviceInternalHandleNV)gpa(instance, "vkGetPhysicalDeviceInternalHandleNV");
+    if (table->GetPhysicalDeviceInternalHandleNV == nullptr) {
+        table->GetPhysicalDeviceInternalHandleNV = (PFN_vkGetPhysicalDeviceInternalHandleNV)StubGetPhysicalDeviceInternalHandleNV;
+    }
 }
 
 // NOLINTEND

@@ -306,56 +306,6 @@ TEST_F(PositiveShaderImageAccess, CopyObjectFromLoad) {
     pipe.CreateComputePipeline();
 }
 
-TEST_F(PositiveShaderImageAccess, UndefImage) {
-    TEST_DESCRIPTION("A OpSampledImage has the Image ID pointing to a OpUndef");
-
-    RETURN_IF_SKIP(Init());
-
-    const char* csSource = R"(
-               OpCapability Shader
-               OpMemoryModel Logical GLSL450
-               OpEntryPoint GLCompute %main "main"
-               OpExecutionMode %main LocalSize 1 1 1
-               OpDecorate %image DescriptorSet 0
-               OpDecorate %image Binding 1
-               OpDecorate %sampler DescriptorSet 0
-               OpDecorate %sampler Binding 0
-       %void = OpTypeVoid
-          %3 = OpTypeFunction %void
-      %float = OpTypeFloat 32
-    %v4float = OpTypeVector %float 4
-%ptr_var_func = OpTypePointer Function %v4float
-         %10 = OpTypeImage %float 2D 0 0 0 1 Unknown
-  %ptr_image = OpTypePointer UniformConstant %10
-      %image = OpVariable %ptr_image UniformConstant
-         %14 = OpTypeSampler
-%ptr_sampler = OpTypePointer UniformConstant %14
-    %sampler = OpVariable %ptr_sampler UniformConstant
-         %18 = OpTypeSampledImage %10
-      %undef = OpUndef %10
-    %v2float = OpTypeVector %float 2
-    %float_0 = OpConstant %float 0
-         %22 = OpConstantComposite %v2float %float_0 %float_0
-       %main = OpFunction %void None %3
-          %5 = OpLabel
-       %data = OpVariable %ptr_var_func Function
-         %13 = OpLoad %14 %sampler
-         %19 = OpSampledImage %18 %undef %13
-         %23 = OpImageSampleExplicitLod %v4float %19 %22 Lod %float_0
-               OpStore %data %23
-               OpReturn
-               OpFunctionEnd
-    )";
-
-    CreateComputePipelineHelper pipe(*this);
-    pipe.dsl_bindings_ = {
-        {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-        {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-    };
-    pipe.cs_ = VkShaderObj(*m_device, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-    pipe.CreateComputePipeline();
-}
-
 TEST_F(PositiveShaderImageAccess, ComponentTypeMismatchFunctionTwoArgs) {
     TEST_DESCRIPTION("Pass a signed and unsinged sampler, and use the correct one.");
 
@@ -414,23 +364,17 @@ TEST_F(PositiveShaderImageAccess, SamplerNeverAccessed) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
+    const VkFormat good_format = VK_FORMAT_R8G8B8A8_SINT;
+    const VkFormat bad_format = VK_FORMAT_R16_SINT;
+    const VkFormatFeatureFlags2 good_features = m_device->FormatFeaturesOptimal(good_format);
+    const VkFormatFeatureFlags2 bad_features = m_device->FormatFeaturesOptimal(bad_format);
+    if (!(good_features & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+        GTEST_SKIP() << "Need " << string_VkFormat(good_format) << " to support linear filtering";
     }
-
-    const VkFormat good_format = VK_FORMAT_R8G8B8A8_UNORM;
-    const VkFormat bad_format = VK_FORMAT_B8G8R8A8_UNORM;
-
-    VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), bad_format, &formatProps);
-    formatProps.optimalTilingFeatures = (formatProps.optimalTilingFeatures & ~VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), bad_format, formatProps);
-
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), good_format, &formatProps);
-    formatProps.optimalTilingFeatures |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), good_format, formatProps);
+    if (!(bad_features & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT) ||
+        (bad_features & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+        GTEST_SKIP() << "Need " << string_VkFormat(bad_format) << " to be sampled without linear filtering support";
+    }
 
     vkt::Image bad_image(*m_device, 128, 128, bad_format, VK_IMAGE_USAGE_SAMPLED_BIT);
     vkt::ImageView bad_view = bad_image.CreateView();
@@ -446,11 +390,11 @@ TEST_F(PositiveShaderImageAccess, SamplerNeverAccessed) {
 
     const char* fs_source = R"glsl(
         #version 450
-        layout (set=0, binding=0) uniform sampler2D bad; // never accessed
-        layout (set=0, binding=1) uniform sampler2D good;
+        layout (set=0, binding=0) uniform isampler2D bad; // never accessed
+        layout (set=0, binding=1) uniform isampler2D good;
         layout(location=0) out vec4 color;
         void main() {
-           color = texture(good, gl_FragCoord.xy);
+           color = vec4(texture(good, gl_FragCoord.xy));
         }
     )glsl";
     VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);

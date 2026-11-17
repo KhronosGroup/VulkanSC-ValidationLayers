@@ -26,6 +26,7 @@
 #include "generated/error_location_helper.h"
 #include "generated/spirv_grammar_helper.h"
 #include "generated/vk_extension_helper.h"
+#include "utils/math_utils.h"
 #include "state_tracker/shader_module.h"
 #include "state_tracker/state_tracker.h"
 
@@ -79,8 +80,8 @@ vvl::Field DescriptorBufferSizeField(bool robust, VkDescriptorType type) {
     return vvl::Field::Empty;
 }
 
-bool IsResourceVaribleInMapping(const VkDescriptorSetAndBindingMappingEXT& mapping,
-                                const spirv::ResourceInterfaceVariable& resource_variable) {
+bool IsResourceVariableInMapping(const VkDescriptorSetAndBindingMappingEXT& mapping,
+                                 const spirv::ResourceInterfaceVariable& resource_variable) {
     const uint32_t descriptor_set = resource_variable.decorations.set;
     const uint32_t descriptor_binding = resource_variable.decorations.binding;
     // bindingCount could be UINT32_MAX
@@ -95,7 +96,7 @@ bool ResourceTypeMatchesBinding(VkSpirvResourceTypeFlagsEXT resource_type,
         return true;
     }
 
-    const uint32_t opcode = resource_variable.base_type.Opcode();
+    const spv::Op opcode = static_cast<spv::Op>(resource_variable.base_type.Opcode());
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_SAMPLER_BIT_EXT) != 0 && opcode == spv::OpTypeSampler) {
         return true;
     }
@@ -147,21 +148,23 @@ bool ResourceTypeMatchesBinding(VkSpirvResourceTypeFlagsEXT resource_type,
 // Only currently want to report the first mismatch
 std::string DescribeResourceTypeMismatch(VkSpirvResourceTypeFlagsEXT resource_type,
                                          const spirv::ResourceInterfaceVariable& resource_variable) {
-    const uint32_t opcode = resource_variable.base_type.Opcode();
+    const spv::Op opcode = static_cast<spv::Op>(resource_variable.base_type.Opcode());
 
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_SAMPLER_BIT_EXT) != 0 && opcode != spv::OpTypeSampler) {
-        return "base type is " + std::string(string_SpvOpcode(opcode)) + ", not OpTypeSampler";
+        return "base type is " + std::string(spv::OpToString(opcode)) + ", not OpTypeSampler";
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_SAMPLED_IMAGE_BIT_EXT) != 0) {
-        if (opcode != spv::OpTypeImage) {
-            return "base type is " + std::string(string_SpvOpcode(opcode)) + ", not OpTypeImage";
+        if (opcode == spv::OpTypeSampledImage) {
+            return "base type is OpTypeSampledImage, not OpTypeImage (which would need COMBINED_SAMPLED_IMAGE_BIT)";
+        } else if (opcode != spv::OpTypeImage) {
+            return "base type is " + std::string(spv::OpToString(opcode)) + ", not OpTypeImage";
         } else if (resource_variable.base_type.Word(7) != 1) {
             return "OpTypeImage Sampled is " + std::to_string(resource_variable.base_type.Word(7)) + ", not 1";
         }
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_READ_ONLY_IMAGE_BIT_EXT) != 0) {
         if (opcode != spv::OpTypeImage) {
-            return "base type is " + std::string(string_SpvOpcode(opcode)) + ", not OpTypeImage";
+            return "base type is " + std::string(spv::OpToString(opcode)) + ", not OpTypeImage";
         } else if (resource_variable.base_type.Word(7) != 2) {
             return "OpTypeImage Sampled is " + std::to_string(resource_variable.base_type.Word(7)) + ", not 2";
         } else if (!resource_variable.decorations.Has(spirv::DecorationSet::nonwritable_bit)) {
@@ -169,6 +172,9 @@ std::string DescribeResourceTypeMismatch(VkSpirvResourceTypeFlagsEXT resource_ty
                 return "is not decorated with NonWritable on the OpVariable, but is in the OpTypeStruct. This likely is hitting a "
                        "known DXC code generation bug (DirectXShaderCompiler/issues/8492). Simple work around is to just use "
                        "VK_SPIRV_RESOURCE_TYPE_ALL_EXT here as that will give the desired behavior.";
+            } else if (resource_variable.is_input_attachment) {
+                return "is not decorated with NonWritable (Note: InputAttachments actually use READ_WRITE_IMAGE_BIT not "
+                       "READ_ONLY_IMAGE_BIT without NonWritable, but your shader toolchains is likely not supplying it.)";
             } else {
                 return "is not decorated with NonWritable";
             }
@@ -176,11 +182,11 @@ std::string DescribeResourceTypeMismatch(VkSpirvResourceTypeFlagsEXT resource_ty
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_READ_WRITE_IMAGE_BIT_EXT) != 0) {
         if (opcode != spv::OpTypeImage) {
-            return "base type is " + std::string(string_SpvOpcode(opcode)) + ", not OpTypeImage";
+            return "base type is " + std::string(spv::OpToString(opcode)) + ", not OpTypeImage";
         } else if (resource_variable.base_type.Word(7) != 2) {
             return "OpTypeImage Sampled is " + std::to_string(resource_variable.base_type.Word(7)) + ", not 2";
         } else if (resource_variable.decorations.Has(spirv::DecorationSet::nonwritable_bit)) {
-            return "is decorated with NonWritable";
+            return "is decorated with NonWritable (READ_ONLY_IMAGE_BIT would match)";
         }
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_COMBINED_SAMPLED_IMAGE_BIT_EXT) != 0 &&
@@ -212,8 +218,8 @@ std::string DescribeResourceTypeMismatch(VkSpirvResourceTypeFlagsEXT resource_ty
         }
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_READ_WRITE_STORAGE_BUFFER_BIT_EXT) != 0) {
-        if (!resource_variable.decorations.Has(spirv::DecorationSet::nonwritable_bit)) {
-            return "is decorated with NonWritable";
+        if (resource_variable.decorations.Has(spirv::DecorationSet::nonwritable_bit)) {
+            return "is decorated with NonWritable (READ_ONLY_STORAGE_BUFFER_BIT would match)";
         } else if (!resource_variable.type_struct_info) {
             return "is not a OpTypeStruct";
         } else if (!resource_variable.is_storage_buffer) {
@@ -222,10 +228,10 @@ std::string DescribeResourceTypeMismatch(VkSpirvResourceTypeFlagsEXT resource_ty
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_ACCELERATION_STRUCTURE_BIT_EXT) != 0 &&
         opcode == spv::OpTypeAccelerationStructureKHR) {
-        return "base type is " + std::string(string_SpvOpcode(opcode)) + ", not OpTypeAccelerationStructureKHR";
+        return "base type is " + std::string(spv::OpToString(opcode)) + ", not OpTypeAccelerationStructureKHR";
     }
     if ((resource_type & VK_SPIRV_RESOURCE_TYPE_TENSOR_BIT_ARM) != 0 && opcode == spv::OpTypeTensorARM) {
-        return "base type is " + std::string(string_SpvOpcode(opcode)) + ", not OpTypeTensorARM";
+        return "base type is " + std::string(spv::OpToString(opcode)) + ", not OpTypeTensorARM";
     }
 
     return "[UNKNOWN]";
@@ -289,22 +295,14 @@ bool HasCombinedImageSamplerIndex(const VkDescriptorSetAndBindingMappingEXT& map
     return false;
 }
 
-// Asking for more here https://gitlab.khronos.org/vulkan/vulkan/-/issues/4885
-uint32_t GetNullDescriptorDWord(const VkPhysicalDeviceProperties& phys_dev_props) {
-    if (phys_dev_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && phys_dev_props.vendorID == 0x8086) {
-        // For Intel Integrated GPUs (from Metorlake+ which support heaps) they have a special null descriptor
-        return 0xe0000000;
-
-        // Note: For Lavapipe, it has a special 64-byte sequence that will be different from each descriptor type
-        // For now not going to support it unless desired, but this debugging feature was never ment for Lavapipe
-    }
-    // Printing out the nullDescriptor (and confirm with driver dev) both NVIDIA and AMD use zero as a null descriptor
-    return 0;
-}
-
 void CachedDescriptorSize::Init(const vvl::DeviceState& device_state) {
     const VkPhysicalDevice gpu = device_state.physical_device;
     if (IsExtEnabled(device_state.extensions.vk_ext_descriptor_heap)) {
+        const VkPhysicalDeviceDescriptorHeapPropertiesEXT& props = device_state.phys_dev_ext_props.descriptor_heap_props;
+        sampler_size_of_ = Align(props.samplerDescriptorSize, props.samplerDescriptorAlignment);
+        image_size_of_ = Align(props.imageDescriptorSize, props.imageDescriptorAlignment);
+        buffer_size_of_ = Align(props.bufferDescriptorSize, props.bufferDescriptorAlignment);
+
         heap_size_[0] = DispatchGetPhysicalDeviceDescriptorSizeEXT(gpu, VK_DESCRIPTOR_TYPE_SAMPLER);
         heap_size_[2] = DispatchGetPhysicalDeviceDescriptorSizeEXT(gpu, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
         heap_size_[3] = DispatchGetPhysicalDeviceDescriptorSizeEXT(gpu, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
@@ -318,11 +316,7 @@ void CachedDescriptorSize::Init(const vvl::DeviceState& device_state) {
         } else {
             heap_size_[1] = 0;
         }
-        if (IsExtEnabled(device_state.extensions.vk_nv_ray_tracing)) {
-            heap_size_[8] = DispatchGetPhysicalDeviceDescriptorSizeEXT(gpu, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV);
-        } else {
-            heap_size_[8] = 0;
-        }
+        heap_size_[8] = 0;  // VK_NV_ray_tracing is not validated
         if (IsExtEnabled(device_state.extensions.vk_nv_partitioned_acceleration_structure)) {
             heap_size_[9] =
                 DispatchGetPhysicalDeviceDescriptorSizeEXT(gpu, VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV);
@@ -362,7 +356,7 @@ void CachedDescriptorSize::Init(const vvl::DeviceState& device_state) {
     }
 }
 
-VkDeviceSize CachedDescriptorSize::GetSize(VkDescriptorType type, bool use_heap) const {
+uint32_t CachedDescriptorSize::GetIndex(VkDescriptorType type) {
     uint32_t index = (uint32_t)type;
     if (type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
         // takes VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER value at index 1
@@ -385,7 +379,30 @@ VkDeviceSize CachedDescriptorSize::GetSize(VkDescriptorType type, bool use_heap)
                    VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT}));
     }
+    return index;
+}
+
+VkDeviceSize CachedDescriptorSize::GetSize(VkDescriptorType type, bool use_heap) const {
+    if (type == VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK) {
+        return 0;  // there is not size (allowed for descriptor buffers)
+    }
+    const uint32_t index = GetIndex(type);
     return use_heap ? heap_size_[index] : buffer_size_[index];
+}
+
+VkDeviceSize CachedDescriptorSize::GetConstantSizeOf(VkDescriptorType type) const {
+    switch (type) {
+        case VK_DESCRIPTOR_TYPE_SAMPLER:
+            return sampler_size_of_;
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
+        case VK_DESCRIPTOR_TYPE_PARTITIONED_ACCELERATION_STRUCTURE_NV:
+            return buffer_size_of_;
+        default:
+            return image_size_of_;
+    }
 }
 
 std::vector<VkDeviceSize> CachedDescriptorSize::GetAllSizes(bool use_heap) const {

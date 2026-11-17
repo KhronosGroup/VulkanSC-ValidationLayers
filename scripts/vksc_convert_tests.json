@@ -1,7 +1,7 @@
 {
     "disable": [
         {
-            "reason": "This test case are replaced with Vulkan SC specific ones",
+            "reason": "These test cases are replaced with Vulkan SC specific ones",
             "cases": [
                 "NegativeOther.SpecLinksImplicit",
                 "NegativeOther.SpecLinksExplicit",
@@ -10,6 +10,7 @@
                 "PositiveInstance.ValidationInstanceExtensions",
                 "NegativeMemory.BindMemory",
                 "NegativeObjectLifetime.LeakAnObject",
+                "NegativeObjectLifetime.LeakBufferAndBufferView",
                 "NegativePipeline.MissingEntrypoint",
                 "NegativePipeline.MissingEntrypoint2",
                 "NegativePipeline.NullStagepName",
@@ -32,6 +33,12 @@
             "cases": [
                 "NegativeMemory.AllocationCount",
                 "NegativeSampler.AllocationCount"
+            ]
+        },
+        {
+            "reason": "This test case does not cooperate well with the Vulkan SC limit maxRenderpassSubpasses",
+            "cases": [
+                "PositiveThreading.CreateDestroyRenderPass"
             ]
         },
         {
@@ -67,7 +74,8 @@
             "cases": [
                 "NegativeParent.PipelineShaderStageCreateInfo",
                 "NegativeShaderSpirv.VkShaderModuleCreateInfoPNext",
-                "NegativeShaderSpirv.NullShaderModuleCreateInfo"
+                "NegativeShaderSpirv.NullShaderModuleCreateInfo",
+                "NegativeLayerSettings.JsonEscapeParentheses"
             ]
         },
         {
@@ -109,7 +117,7 @@
             "cases": [
                 "NegativeGpuAV.*",
                 "PositiveGpuAV.*",
-                "PositiveGpuAVShaderObject.*",
+                "PositiveGpuAVShaderObjectEXT.*",
                 "NegativeDebugPrintf.*"
             ]
         },
@@ -261,7 +269,8 @@
                 "NegativeDescriptors.TemplatesInvalidBufferView",
                 "NegativeDescriptors.TemplatesInvalidCombinedImageSampler",
                 "NegativeDescriptors.TemplatesInvalidSampler",
-                "NegativeDescriptors.TemplatesInvalidStorageImage"
+                "NegativeDescriptors.TemplatesInvalidStorageImage",
+                "PositiveDescriptors.TemplateUpdateConsecutiveBindings"
             ]
         },
         {
@@ -457,6 +466,7 @@
                 "NegativeDescriptors.DescriptorSetSamplerDestroyed",
                 "NegativeDescriptors.DescriptorWriteFromReadAttachment",
                 "NegativeDescriptors.DispatchWithUnboundSet",
+                "NegativeDescriptors.DisturbedSetPushConstantRanges",
                 "NegativeDescriptors.DrawDescriptorSetBufferDestroyed",
                 "NegativeDescriptors.DynamicOffsetWithNullBuffer",
                 "NegativeDescriptors.ImageDescriptorLayoutMismatch",
@@ -492,6 +502,7 @@
                 "NegativeImageLayout.MultipleCommandDispatches",
                 "NegativeMultiview.UnboundResourcesAfterBeginRenderPassAndNextSubpass",
                 "NegativeObjectLifetime.BufferViewInUseDestroyed",
+                "NegativeObjectLifetime.CmdBufferInvalidationChainMessage",
                 "NegativeObjectLifetime.CmdBufferBufferViewDestroyed",
                 "NegativeObjectLifetime.ImageViewInUseDestroyed",
                 "NegativeObjectLifetime.SamplerInUseDestroyed",
@@ -510,6 +521,7 @@
                 "NegativeProtectedMemory.MixingProtectedResources",
                 "NegativeSampler.CustomBorderColorFormatUndefined",
                 "NegativeSampler.CustomBorderColorFormatUndefinedNonCombined",
+                "NegativeSampler.LinearReductionModeMinMax",
                 "NegativeSampler.ShareOpSampledImage",
                 "NegativeSampler.UnnormalizedCoordinatesCombinedSampler",
                 "NegativeSampler.UnnormalizedCoordinatesCopyObject",
@@ -573,6 +585,11 @@
                 "NegativeShaderInterface.VsFsTypeMismatchBlockStructOuterArraySize",
                 "NegativeShaderInterface.VsFsTypeMismatchInBlock",
                 "NegativeShaderInterface.VsFsTypeMismatchVectorSize",
+                "NegativeShaderLimits.ComputeSharedMemoryInterfaceNotUsed",
+                "NegativeShaderLimits.ComputeSharedMemoryOtherEntryPointSpirv13",
+                "NegativeShaderLimits.MaxClipDistances",
+                "NegativeShaderLimits.MaxCombinedClipAndCullDistances",
+                "NegativeShaderLimits.MaxCullDistances",
                 "NegativeShaderLimits.MaxSampleMaskWordsInput",
                 "NegativeShaderLimits.MaxSampleMaskWordsOutput",
                 "NegativeShaderLimits.MaxFragmentDualSrcAttachments",
@@ -614,7 +631,6 @@
                 "NegativeSubpass.SubpassInputNotBoundDescriptorSet",
                 "NegativeSyncVal.CmdDispatchBase",
                 "NegativeSyncVal.CopyVsShaderDescriptorAccess",
-                "NegativeSyncVal.ExternalDependencyDoesNotSyncLayoutTransition",
                 "NegativeSyncVal.RenderPassAsyncHazard",
                 "NegativeSyncVal.SampledImageDescriptorHazard",
                 "NegativeSyncVal.StageAccessExpansion",
@@ -626,6 +642,8 @@
                 "NegativeSyncVal.TexelBufferDescriptorHazard",
                 "NegativeSyncVal.UniformBufferDescriptorHazard",
                 "PositiveSyncVal.AtomicAccessFromTwoSubmits2",
+                "PositiveSyncVal.RenderPassLayoutTransitionAndSecondaryCmdBuffer2",
+                "NegativeSyncValRenderPass.ExternalDependencyDoesNotSyncFinalLayoutTransition",
                 "NegativeSyncValRenderPass.InputAttachmentRAW",
                 "NegativeSyncValRenderPass.InputAttachmentReadAndResolveWrite",
                 "NegativeSyncValRenderPass.InputAttachmentWAR",

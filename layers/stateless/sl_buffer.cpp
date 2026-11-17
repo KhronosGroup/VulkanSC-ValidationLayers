@@ -20,6 +20,7 @@
 #include "stateless/stateless_validation.h"
 #include "containers/container_utils.h"
 #include "generated/enum_flag_bits.h"
+#include "generated/extended_flags_helper_generator.h"
 #include "utils/image_utils.h"
 #include "utils/math_utils.h"
 #include <vulkan/utility/vk_format_utils.h>
@@ -54,13 +55,12 @@ bool Device::manual_PreCallValidateCreateBuffer(VkDevice device, const VkBufferC
         }
     }
 
-    const auto* usage_flags2 = vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfo>(pCreateInfo->pNext);
-    if (!usage_flags2) {
+    if (!vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfo>(pCreateInfo->pNext)) {
         skip |= context.ValidateFlags(create_info_loc.dot(Field::usage), vvl::FlagBitmask::VkBufferUsageFlagBits,
                                       AllVkBufferUsageFlagBits, pCreateInfo->usage, kRequiredFlags,
                                       "VUID-VkBufferCreateInfo-None-09499", "VUID-VkBufferCreateInfo-None-09500");
     }
-    const VkBufferUsageFlags2 usage = usage_flags2 ? usage_flags2->usage : pCreateInfo->usage;
+    const VkBufferUsageFlags2 usage = GetBufferUsageFlags(*pCreateInfo);
 
     if (pCreateInfo->flags & VK_BUFFER_CREATE_PROTECTED_BIT) {
         const VkBufferUsageFlags2 invalid =
@@ -77,7 +77,8 @@ bool Device::manual_PreCallValidateCreateBuffer(VkDevice device, const VkBufferC
         if ((usage & VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT) != 0 &&
             !phys_dev_ext_props.descriptor_heap_props.protectedDescriptorHeaps) {
             skip |= LogError("VUID-VkBufferCreateInfo-flags-11277", device, create_info_loc.dot(Field::flags),
-                             "includes VK_BUFFER_CREATE_PROTECTED_BIT, but the usage is %s.",
+                             "includes VK_BUFFER_CREATE_PROTECTED_BIT, and the usage (%s) includes "
+                             "VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT, but protectedDescriptorHeaps is VK_FALSE.",
                              string_VkBufferUsageFlags2(usage).c_str());
         }
     }
@@ -87,7 +88,7 @@ bool Device::manual_PreCallValidateCreateBuffer(VkDevice device, const VkBufferC
         auto dedicated_allocation_buffer = vku::FindStructInPNextChain<VkDedicatedAllocationBufferCreateInfoNV>(pCreateInfo->pNext);
         if (dedicated_allocation_buffer && dedicated_allocation_buffer->dedicatedAllocation == VK_TRUE) {
             skip |= LogError("VUID-VkBufferCreateInfo-pNext-01571", device, create_info_loc.dot(Field::flags),
-                             "%s when VkDedicatedAllocationBufferCreateInfoNV::dedicatedAllocation is VK_TRUE.",
+                             "is %s, but VkDedicatedAllocationBufferCreateInfoNV::dedicatedAllocation is VK_TRUE.",
                              string_VkBufferCreateFlags(pCreateInfo->flags).c_str());
         }
         if ((usage & VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT) != 0 &&
@@ -112,6 +113,7 @@ bool Device::manual_PreCallValidateCreateBuffer(VkDevice device, const VkBufferC
     skip |= ValidateCreateBufferFlags(pCreateInfo->flags, create_info_loc.dot(Field::flags));
     skip |= ValidateCreateBufferBufferDeviceAddress(*pCreateInfo, create_info_loc);
     skip |= ValidateCreateBufferTileMemory(*pCreateInfo, create_info_loc);
+    skip |= ValidateCreateBufferDeviceAddressAllocationAlignment(*pCreateInfo, create_info_loc);
 
     return skip;
 }
@@ -136,8 +138,8 @@ bool Device::manual_PreCallValidateCreateBufferView(VkDevice device, const VkBuf
         // see https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/4849
         skip |= LogError("UNASSIGNED-VkBufferViewCreateInfo-depthStencil-format", pCreateInfo->buffer,
                          create_info_loc.dot(Field::format),
-                         "is a depth/stencil format (%s) but depth/stencil formats do not have a "
-                         "defined sizes for alignment, replace with a color format.",
+                         "is a depth/stencil format (%s), but depth/stencil formats do not have a "
+                         "defined size for alignment, replace with a color format.",
                          string_VkFormat(format));
     }
 
@@ -146,9 +148,9 @@ bool Device::manual_PreCallValidateCreateBufferView(VkDevice device, const VkBuf
         const VkDeviceSize texels_per_block = static_cast<VkDeviceSize>(vkuFormatTexelsPerBlock(format));
         const VkDeviceSize texel_block_size = static_cast<VkDeviceSize>(GetTexelBufferFormatSize(format));
 
-        if (range <= 0) {
+        if (range == 0) {
             skip |= LogError("VUID-VkBufferViewCreateInfo-range-00928", pCreateInfo->buffer, create_info_loc.dot(Field::range),
-                             "(%" PRIuLEAST64 ") does not equal VK_WHOLE_SIZE, range must be greater than 0.", range);
+                             "is 0, but must either be greater than 0 or VK_WHOLE_SIZE.");
         }
 
         if (!IsIntegerMultipleOf(range, texel_block_size)) {
@@ -162,8 +164,8 @@ bool Device::manual_PreCallValidateCreateBufferView(VkDevice device, const VkBuf
         if (texels > static_cast<VkDeviceSize>(phys_dev_props.limits.maxTexelBufferElements)) {
             skip |= LogError("VUID-VkBufferViewCreateInfo-range-00930", pCreateInfo->buffer, create_info_loc.dot(Field::range),
                              "(%" PRIuLEAST64 "), %s texel block size (%" PRIuLEAST64 "), and texels per block (%" PRIuLEAST64
-                             ") is a total of (%" PRIuLEAST64
-                             ") texels which is more than VkPhysicalDeviceLimits::maxTexelBufferElements (%" PRIuLEAST32 ").",
+                             ") is a total of %" PRIuLEAST64
+                             " texels which is more than VkPhysicalDeviceLimits::maxTexelBufferElements (%" PRIuLEAST32 ").",
                              range, string_VkFormat(format), texel_block_size, texels_per_block, texels,
                              phys_dev_props.limits.maxTexelBufferElements);
         }
@@ -173,9 +175,10 @@ bool Device::manual_PreCallValidateCreateBufferView(VkDevice device, const VkBuf
         if (IsValueIn(pCreateInfo->format,
                       {VK_FORMAT_G8_B8R8_2PLANE_444_UNORM, VK_FORMAT_G10X6_B10X6R10X6_2PLANE_444_UNORM_3PACK16,
                        VK_FORMAT_G12X4_B12X4R12X4_2PLANE_444_UNORM_3PACK16, VK_FORMAT_G16_B16R16_2PLANE_444_UNORM})) {
-            skip |= LogError("VUID-VkBufferViewCreateInfo-None-12278", device,
-                             context.error_obj.location.dot(Field::pCreateInfo).dot(Field::format), "is %s.",
-                             string_VkFormat(pCreateInfo->format));
+            skip |= LogError(
+                "VUID-VkBufferViewCreateInfo-None-12278", pCreateInfo->buffer, create_info_loc.dot(Field::format),
+                "is %s.\nHint: This format can be used with Vulkan 1.3 or if the ycbcr2plane444Formats feature is enabled.",
+                string_VkFormat(pCreateInfo->format));
         }
     }
 
@@ -255,12 +258,81 @@ bool Device::ValidateCreateBufferBufferDeviceAddress(const VkBufferCreateInfo& c
     return skip;
 }
 
+bool Device::ValidateCreateBufferDeviceAddressAllocationAlignment(const VkBufferCreateInfo& create_info,
+                                                                  const Location& create_info_loc) const {
+    bool skip = false;
+
+    const auto* alignment_info = vku::FindStructInPNextChain<VkBufferDeviceAddressAlignmentAllocateInfoVALVE>(create_info.pNext);
+    if (!alignment_info) {
+        return skip;
+    }
+    const Location alignment_loc = create_info_loc.pNext(Struct::VkBufferDeviceAddressAlignmentAllocateInfoVALVE, Field::alignment);
+    skip |= ValidateBufferDeviceAddressAlignmentAllocateInfo(*alignment_info, alignment_loc);
+
+    if (alignment_info->alignment == 0) {
+        return skip;  // "If alignment is 0, this alignment request is ignored"
+    }
+
+    if ((create_info.flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT) == 0) {
+        skip |= LogError("VUID-VkBufferCreateInfo-flags-12515", device, alignment_loc,
+                         "is %" PRIu32
+                         " (not zero), but VkBufferCreateInfo::flags (%s) does not include VK_BUFFER_CREATE_SPARSE_BINDING_BIT.",
+                         alignment_info->alignment, string_VkBufferCreateFlags(create_info.flags).c_str());
+    }
+
+    const VkBufferUsageFlags2 usage = GetBufferUsageFlags(create_info);
+    if ((usage & VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT) == 0) {
+        skip |=
+            LogError("VUID-VkBufferCreateInfo-alignment-12516", device, alignment_loc,
+                     "is %" PRIu32
+                     " (not zero), but the effective usage flags (%s) do not include VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT.",
+                     alignment_info->alignment, string_VkBufferUsageFlags2(usage).c_str());
+    }
+
+    if (const auto* opaque_addr_info = vku::FindStructInPNextChain<VkBufferOpaqueCaptureAddressCreateInfo>(create_info.pNext)) {
+        if (opaque_addr_info->opaqueCaptureAddress != 0) {
+            skip |= LogError("VUID-VkBufferCreateInfo-alignment-12517", device, alignment_loc,
+                             "is %" PRIu32 " (not zero), but VkBufferOpaqueCaptureAddressCreateInfo::opaqueCaptureAddress (%" PRIu64
+                             ") is not 0.",
+                             alignment_info->alignment, opaque_addr_info->opaqueCaptureAddress);
+        }
+    }
+
+    return skip;
+}
+
+bool Device::ValidateBufferDeviceAddressAlignmentAllocateInfo(const VkBufferDeviceAddressAlignmentAllocateInfoVALVE& alignment_info,
+                                                              const Location& alignment_loc) const {
+    bool skip = false;
+    if (alignment_info.alignment == 0) {
+        return skip;  // "If alignment is 0, this alignment request is ignored"
+    }
+    if (!IsPowerOfTwo(alignment_info.alignment)) {
+        skip |= LogError("VUID-VkBufferDeviceAddressAlignmentAllocateInfoVALVE-alignment-12512", device, alignment_loc,
+                         "(%" PRIu32 ") is not a power of two.", alignment_info.alignment);
+    }
+    if (!enabled_features.bufferDeviceAddressAllocationAlignment) {
+        skip |= LogError("VUID-VkBufferDeviceAddressAlignmentAllocateInfoVALVE-alignment-12513", device, alignment_loc,
+                         "is %" PRIu32 " (not zero), but the bufferDeviceAddressAllocationAlignment feature is not enabled.",
+                         alignment_info.alignment);
+    } else {
+        const uint32_t max_alignment =
+            phys_dev_ext_props.buffer_device_address_allocation_alignment_props.maxBufferDeviceAddressAllocationAlignment;
+        if (alignment_info.alignment > max_alignment) {
+            skip |= LogError("VUID-VkBufferDeviceAddressAlignmentAllocateInfoVALVE-alignment-12514", device, alignment_loc,
+                             "(%" PRIu32 ") is greater than maxBufferDeviceAddressAllocationAlignment (%" PRIu32 ").",
+                             alignment_info.alignment, max_alignment);
+        }
+    }
+    return skip;
+}
+
 bool Device::ValidateCreateBufferTileMemory(const VkBufferCreateInfo& create_info, const Location& create_info_loc) const {
     bool skip = false;
 
     const VkBufferCreateFlags flags = create_info.flags;
-    const auto* usage_flags2 = vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfo>(create_info.pNext);
-    const VkBufferUsageFlags2 usage = usage_flags2 ? usage_flags2->usage : create_info.usage;
+    const VkBufferUsageFlags2 usage = GetBufferUsageFlags(create_info);
+    const Location usage_loc = GetUsageLocation(create_info, create_info_loc);
 
     if (usage & VK_BUFFER_USAGE_TILE_MEMORY_BIT_QCOM) {
         const VkBufferCreateFlags invalid_flag_mask =
@@ -279,19 +351,19 @@ bool Device::ValidateCreateBufferTileMemory(const VkBufferCreateInfo& create_inf
         const VkBufferUsageFlags2 invalid_usage = (usage & ~valid_usage_mask);
 
         if (!enabled_features.tileMemoryHeap) {
-            skip |= LogError("VUID-VkBufferCreateInfo-tileMemoryHeap-10762", device, create_info_loc.dot(Field::usage),
+            skip |= LogError("VUID-VkBufferCreateInfo-tileMemoryHeap-10762", device, usage_loc,
                              "has VK_BUFFER_USAGE_TILE_MEMORY_BIT_QCOM set but the "
                              "tileMemoryHeap device feature is not enabled.");
         }
 
         if (invalid_flags) {
-            skip |= LogError("VUID-VkBufferCreateInfo-usage-10763", device, create_info_loc.dot(Field::usage),
+            skip |= LogError("VUID-VkBufferCreateInfo-usage-10763", device, usage_loc,
                              "contains VK_BUFFER_USAGE_TILE_MEMORY_BIT_QCOM but flags contains %s\nAll create flags: (%s)",
                              string_VkBufferCreateFlags(invalid_flags).c_str(), string_VkBufferCreateFlags(flags).c_str());
         }
 
         if (invalid_usage) {
-            skip |= LogError("VUID-VkBufferCreateInfo-usage-10764", device, create_info_loc.dot(Field::usage),
+            skip |= LogError("VUID-VkBufferCreateInfo-usage-10764", device, usage_loc,
                              "contains VK_BUFFER_USAGE_TILE_MEMORY_BIT_QCOM but usage contains %s\nAll usage flags: (%s)",
                              string_VkBufferUsageFlags2(invalid_usage).c_str(), string_VkBufferUsageFlags2(usage).c_str());
         }

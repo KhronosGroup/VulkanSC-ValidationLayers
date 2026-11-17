@@ -102,7 +102,7 @@ static void RecordRenderPassDAG(const VkRenderPassCreateInfo2* pCreateInfo, vvl:
 
     //
     // Determine "asynchrononous" subpassess
-    // syncronization is only interested in asyncronous stages *earlier* that the current one... so we'll only look towards those.
+    // synchronization is only interested in asynchronous stages *earlier* that the current one... so we'll only look towards those.
     // NOTE: This is O(N^3), which we could shrink to O(N^2logN) using sets instead of arrays, but given that N is likely to be
     // small and the K for |= from the prev is must less than for set, we'll accept the brute force.
     std::vector<std::vector<bool>> pass_depends(pCreateInfo->subpassCount);
@@ -198,16 +198,18 @@ struct AttachmentTracker {  // This is really only of local interest, but a bit 
         for (uint32_t j = 0; j < count; j++) {
             const auto attachment = attach_ref[j].attachment;
             if (attachment != VK_ATTACHMENT_UNUSED) {
-                const auto layout = attach_ref[j].layout;
-                const auto initial_layout = rp.create_info.pAttachments[attachment].initialLayout;
+                const VkImageLayout layout = attach_ref[j].layout;
+                const VkImageLayout initial_layout = rp.create_info.pAttachments[attachment].initialLayout;
                 bool no_external_transition = true;
 
                 // Initial transition
                 bool first_transition = true;
-                for (uint32_t subpass_per_view : first[attachment]) {
+                const vvl::RenderPass::SubpassPerView& first_subpass_per_view = first[attachment];
+                for (uint32_t first_subpass : first_subpass_per_view) {
                     // Check if earlier or this subpass already registered transition
-                    if (subpass_per_view != VK_SUBPASS_EXTERNAL) {
-                        assert(subpass_per_view <= subpass);
+                    // (first state is updated at the end of this iteration)
+                    if (first_subpass != VK_SUBPASS_EXTERNAL) {
+                        assert(first_subpass <= subpass);
                         first_transition = false;
                         break;
                     }
@@ -269,9 +271,11 @@ struct AttachmentTracker {  // This is really only of local interest, but a bit 
         // Final transitions
         const uint32_t attachment_count = rp.create_info.attachmentCount;
         for (uint32_t attachment = 0; attachment < attachment_count; ++attachment) {
-            const auto final_layout = rp.create_info.pAttachments[attachment].finalLayout;
+            const VkImageLayout final_layout = rp.create_info.pAttachments[attachment].finalLayout;
             const uint32_t last_transition_subpass = get_last_subpass(last[attachment]);
-            if (last_transition_subpass != VK_SUBPASS_EXTERNAL && final_layout != attachment_layout[attachment]) {
+            if (final_layout != attachment_layout[attachment]) {
+                // NOTE: If last_transition_subpass is VK_SUBPASS_EXTERNAL, the attachment is unused.
+                // The spec still requires its initialLayout -> finalLayout transition.
                 auto& final_transitions = subpass_transitions[rp.create_info.subpassCount];
                 final_transitions.emplace_back(vvl::RenderPass::AttachmentTransition{last_transition_subpass, attachment,
                                                                                      attachment_layout[attachment], final_layout});
@@ -425,6 +429,14 @@ uint32_t RenderPass::GetDynamicRenderingViewMask() const {
         return dynamic_rendering_begin_rendering_info.viewMask;
     }
     return 0;
+}
+
+uint32_t RenderPass::GetDynamicRenderingLayerCount() const {
+    const VkRenderingInfo& rendering_info = *dynamic_rendering_begin_rendering_info.ptr();
+    if (rendering_info.viewMask != 0) {
+        return static_cast<uint32_t>(MostSignificantBit(rendering_info.viewMask)) + 1;
+    }
+    return rendering_info.layerCount;
 }
 
 VkRenderingFlags RenderPass::GetRenderingFlags() const {

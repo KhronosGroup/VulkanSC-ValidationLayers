@@ -33,6 +33,27 @@ const uint kDebugInputBindlessMaxDescriptors = 1024u * 1024u * 4u;
 
 #endif
 
+// Offsets into the error buffer
+// -----------------------------
+
+// Flags controlling the behavior of instrumentation code
+const uint error_buffer_flags_member_offset = 0;
+
+// Values stored at output_flags_offset
+const uint inst_buffer_oob_enabled = 0x1;
+
+// Error buffer size
+const uint error_buffer_u32_size_member_offset = 1;
+
+// Used error buffer size.
+// Shaders will atomically read and update this value so as not to
+// overwrite each others records. This value must be initialized to zero
+const uint error_buffer_used_size_member_offset = 2;
+
+// Start of the stream of records written by the instrumented shaders.
+// Each record represents a validation error. The format of the records is documented below.
+const uint error_buffer_data_member_offset = 3;
+
 // Maximum errors a cmd is allowed to log
 const uint kMaxErrorsPerCmd = 6;
 
@@ -44,6 +65,8 @@ const uint kMaxErrorsPerCmd = 6;
 // (Basically our own implementaiton of Specialization Constant)
 const uint kLinkShaderId = 0x0DEAD001;
 const uint kInstErrorBufferLengthId = 0x0DEAD002;
+// Set by VK_LAYER_DESCRIPTOR_HASHING_TOTAL_DESCRIPTORS
+const uint kDescriptorHashingCapacity = 0x0DEAD003;
 
 // This is just a placeholder, honestly could be anything, will be replaced when linking to the runtime descriptor set choosen
 const int kInstDefaultDescriptorSet = 7;
@@ -57,14 +80,15 @@ const int kBindingInstErrorBuffer = 1;
 const int kBindingInstPostProcess = 2;
 // Each check that requires additional input to be sent must reserve its own binding slot
 const int kBindingInstDescriptorIndexingOOB = 3;
-// TODO - We could just combine kBindingInstDescriptorIndexingOOB and kBindingInstDescriptorHeap
-const int kBindingInstDescriptorHeap = 4;
-const int kBindingInstBufferDeviceAddress = 5;
-const int kBindingInstActionIndex = 6;
-const int kBindingInstCmdResourceIndex = 7;
-const int kBindingInstCmdErrorsCount = 8;
-const int kBindingInstVertexAttributeFetchLimits = 9;
-const int kTotalBindings = 10;
+// TODO - We could just combine kBindingInstDescriptorIndexingOOB and kBindingInstDescriptorHeap and kBindingInstDescriptorBuffer
+const int kBindingInstDescriptorBuffer = 4;
+const int kBindingInstDescriptorHeap = 5;
+const int kBindingInstBufferDeviceAddress = 6;
+const int kBindingInstActionIndex = 7;
+const int kBindingInstCmdResourceIndex = 8;
+const int kBindingInstCmdErrorsCount = 9;
+const int kBindingInstVertexAttributeFetchLimits = 10;
+const int kTotalBindings = 11;
 
 // Validation pipelines
 // ---
@@ -79,6 +103,7 @@ const int kBindingDiagErrorBuffer = 0;
 const int kBindingDiagActionIndex = 1;
 const int kBindingDiagCmdResourceIndex = 2;
 const int kBindingDiagCmdErrorsCount = 3;
+const int kBindingDiagCount = 4;
 
 // Direct Input Buffer Offsets
 //
@@ -140,7 +165,7 @@ const int kDebugInputBuffAddrLengthOffset = 0;
 // We make some assumptions from profiling that we can maintain these limits and squeeze all this information in a single dword
 // these values are asserted for and can be adjusted if we edge cases that matter
 //
-// cst::indices_count is set at 1u << 13 (8192) used to set the action cmd index
+// glsl::indices_count is set at 1u << 13 (8192) used to set the action cmd index
 //
 // // We use a single bit mark if this descriptor was accessed or not
 const uint kPostProcessMetaMaskAccessed = 1u << 31;

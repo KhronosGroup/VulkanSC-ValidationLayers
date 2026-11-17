@@ -11,6 +11,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <mutex>
 #include <thread>
 #include <vector>
 #include "layer_validation_tests.h"
@@ -319,8 +320,7 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
     // Transition and clear image
     const VkImageSubresourceRange subresource_range = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
     const auto barrier = image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, subresource_range);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     const VkClearColorValue color = {};
     vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &color, 1, &subresource_range);
 
@@ -361,8 +361,7 @@ TEST_F(PositiveMemory, BindMemory2) {
     // Transition and clear image
     const VkImageSubresourceRange subresource_range = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
     const auto barrier = image.LayoutTransitionBarrier(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, subresource_range);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     const VkClearColorValue color = {};
     vk::CmdClearColorImage(m_command_buffer, image, VK_IMAGE_LAYOUT_GENERAL, &color, 1, &subresource_range);
 
@@ -776,4 +775,93 @@ TEST_F(PositiveMemory, ZeroInitializeDeviceMemory) {
 
     vkt::DeviceMemory memory(*m_device, alloc_info);
     vk::BindImageMemory(device(), image, memory, 0);
+}
+
+TEST_F(PositiveMemory, BufferDeviceAddressAllocationAlignment) {
+    AddRequiredExtensions(VK_VALVE_BUFFER_DEVICE_ADDRESS_ALLOCATION_ALIGNMENT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddressAllocationAlignment);
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    RETURN_IF_SKIP(Init());
+
+    VkBufferDeviceAddressAlignmentAllocateInfoVALVE alignment_info = vku::InitStructHelper();
+    alignment_info.alignment = 4;
+
+    {
+        VkBufferCreateInfo sparse_buffer_ci = vku::InitStructHelper(&alignment_info);
+        sparse_buffer_ci.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
+        sparse_buffer_ci.size = 4096;
+        sparse_buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        vkt::Buffer sparse_buffer(*m_device, sparse_buffer_ci, vkt::no_mem);
+    }
+
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+    buffer_create_info.size = 4096;
+    buffer_create_info.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
+
+    VkMemoryRequirements buffer_mem_reqs = {};
+    vk::GetBufferMemoryRequirements(device(), buffer, &buffer_mem_reqs);
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper(&alignment_info);
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alloc_flags);
+    alloc_info.allocationSize = buffer_mem_reqs.size;
+    m_device->Physical().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &alloc_info, 0);
+
+    vkt::DeviceMemory memory(*m_device, alloc_info);
+    vk::BindBufferMemory(device(), buffer, memory, 0);
+}
+
+TEST_F(PositiveMemory, DeviceMemoryReportObjectHandle) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13329");
+    AddRequiredExtensions(VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::deviceMemoryReport);
+    RETURN_IF_SKIP(InitFramework());
+
+    // static because the driver can call the callback until the device is destroyed
+    // which happens after the test body
+    static std::mutex records_lock;
+    static std::vector<VkDeviceMemoryReportCallbackDataEXT> records;
+    records.clear();
+
+    VkDeviceDeviceMemoryReportCreateInfoEXT report_ci = vku::InitStructHelper();
+    report_ci.pfnUserCallback = [](const VkDeviceMemoryReportCallbackDataEXT* pCallbackData, void*) {
+        std::lock_guard<std::mutex> guard(records_lock);
+        records.emplace_back(*pCallbackData);
+    };
+    RETURN_IF_SKIP(InitState(nullptr, &report_ci));
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.allocationSize = 4096;
+    alloc_info.memoryTypeIndex = 0;
+    uint64_t memory_handle = 0;
+    {
+        vkt::DeviceMemory memory(*m_device, alloc_info);
+        memory_handle = CastToUint64(memory.handle());
+    }
+
+    bool device_memory_reported = false;
+    bool allocate_found = false;
+    bool free_found = false;
+    {
+        std::lock_guard<std::mutex> guard(records_lock);
+        for (const auto& record : records) {
+            if (record.objectType != VK_OBJECT_TYPE_DEVICE_MEMORY) {
+                continue;
+            }
+            device_memory_reported = true;
+            if (record.objectHandle != memory_handle) {
+                continue;
+            }
+            allocate_found |= record.type == VK_DEVICE_MEMORY_REPORT_EVENT_TYPE_ALLOCATE_EXT;
+            free_found |= record.type == VK_DEVICE_MEMORY_REPORT_EVENT_TYPE_FREE_EXT;
+        }
+    }
+    if (!device_memory_reported) {
+        GTEST_SKIP() << "Driver did not report any VkDeviceMemory events";
+    }
+    ASSERT_TRUE(allocate_found);
+    ASSERT_TRUE(free_found);
 }

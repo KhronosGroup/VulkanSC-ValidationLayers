@@ -43,6 +43,7 @@ const int kErrorGroup_InstMeshShading = 13;
 const int kErrorGroup_SharedMemoryDataRace = 15;
 const int kErrorGroup_TraceRay = 16;
 const int kErrorGroup_InstDescriptorHeap = 17;
+const int kErrorGroup_InstDescriptorBuffer = 18;
 
 // We just take ExecutionModel and normalize it so we only use 5 bits to store it
 const int kExecutionModel_Vertex = 0;
@@ -91,6 +92,13 @@ const int kErrorSubCode_DescriptorHeap_AddressBufferAlignment = 7;
 const int kErrorSubCode_DescriptorHeap_InvalidDeviceAddress = 8;
 const int kErrorSubCode_DescriptorHeap_InvalidDeviceAddressResource = 9;
 const int kErrorSubCode_DescriptorHeap_HeapBufferAlignment = 10;
+const int kErrorSubCode_DescriptorHeap_DescriptorHashing_None = 11;
+const int kErrorSubCode_DescriptorHeap_DescriptorHashing_Wrong = 12;
+
+// Descriptor Buffer
+//
+const int kErrorSubCode_DescriptorBuffer_DescriptorHashing_None = 1;
+const int kErrorSubCode_DescriptorBuffer_DescriptorHashing_Wrong = 2;
 
 // Buffer Device Address
 //
@@ -230,6 +238,7 @@ const int kErrorSubCode_PreBuildAccelerationStructures_Transform = 11;
 const int kErrorSubCode_PreBuildAccelerationStructures_IndexBufferUpdated = 12;
 const int kErrorSubCode_PreBuildAccelerationStructures_VertexBufferActiveStatusUpdated = 13;
 const int kErrorSubCode_PreBuildAccelerationStructures_AabbBufferActiveStatusUpdated = 14;
+const int kErrorSubCode_PreBuildAccelerationStructures_BlasNotBuilt = 15;
 
 #ifdef __cplusplus
 }  // namespace glsl

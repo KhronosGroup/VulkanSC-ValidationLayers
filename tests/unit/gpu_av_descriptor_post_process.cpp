@@ -176,10 +176,10 @@ TEST_F(NegativeGpuAVDescriptorPostProcess, PostProcesingOnlyShaderObject) {
     descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler);
     descriptor_set.UpdateDescriptorSets();
 
-    const vkt::Shader vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl),
-                         &descriptor_set.layout_.handle());
-    const vkt::Shader fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source),
-                         &descriptor_set.layout_.handle());
+    const vkt::ShaderEXT vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT,
+                            GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexDrawPassthroughGlsl), &descriptor_set.layout_.handle());
+    const vkt::ShaderEXT fs(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source),
+                            &descriptor_set.layout_.handle());
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
@@ -191,7 +191,7 @@ TEST_F(NegativeGpuAVDescriptorPostProcess, PostProcesingOnlyShaderObject) {
                                             VK_SHADER_STAGE_FRAGMENT_BIT};
     const VkShaderEXT shaders[] = {vs, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, fs};
     vk::CmdBindShadersEXT(m_command_buffer, 5u, stages, shaders);
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -1138,15 +1138,14 @@ TEST_F(NegativeGpuAVDescriptorPostProcess, NonMultisampleMismatchWithShaderObjec
         }
     )glsl";
 
-    const vkt::Shader cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
-                         &descriptor_set.layout_.handle());
+    const vkt::ShaderEXT cs(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
+                            &descriptor_set.layout_.handle());
 
     m_command_buffer.Begin();
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
                               nullptr);
 
-    VkShaderStageFlagBits shader_stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    vk::CmdBindShadersEXT(m_command_buffer, 1, shader_stages, &cs.handle());
+    m_command_buffer.BindCompShaderEXT(cs);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
@@ -1385,8 +1384,7 @@ TEST_F(NegativeGpuAVDescriptorPostProcess, MultipleCommandBuffersSameDescriptorS
     descriptor_set.WriteDescriptorImageInfo(1, good_view, sampler);
     descriptor_set.UpdateDescriptorSets();
     m_default_queue->Submit(cb_0);
-    m_default_queue->Submit(cb_1);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(cb_1);
 }
 
 TEST_F(NegativeGpuAVDescriptorPostProcess, AliasImageBindingRuntimeArray) {
@@ -2708,18 +2706,8 @@ TEST_F(NegativeGpuAVDescriptorPostProcess, DualShaderLibraryDuplicateLayoutsDyna
     frag_out_lib.InitFragmentOutputLibInfo(&pipeline_rendering_info);
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[2] = {
-        combined_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout_link;
-    exe_pipe_ci.flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {combined_lib, frag_out_lib}, pipeline_layout_link, VK_NULL_HANDLE,
+                           VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
@@ -2810,18 +2798,8 @@ TEST_F(NegativeGpuAVDescriptorPostProcess, DualShaderLibraryDuplicateLayoutsImmu
     ds_link.WriteDescriptorBufferInfo(1, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     ds_link.UpdateDescriptorSets();
 
-    VkPipeline libraries[2] = {
-        combined_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout_link;
-    exe_pipe_ci.flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {combined_lib, frag_out_lib}, pipeline_layout_link, VK_NULL_HANDLE,
+                           VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);

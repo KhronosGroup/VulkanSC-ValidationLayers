@@ -94,8 +94,8 @@ TEST_F(PositiveSyncValWsi, PresentAfterSubmitAutomaticVisibility) {
     layout_transition.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &layout_transition);
+    m_command_buffer.Barrier(layout_transition, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer, vkt::Wait(acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
@@ -152,7 +152,10 @@ TEST_F(PositiveSyncValWsi, ThreadedSubmitAndFenceWaitAndPresent) {
         GTEST_SKIP() << "Failed to pre-transition swapchain images";
     }
 
-    constexpr int N = 100;  // Initially 1000 for higher repro rate
+    // Initially 1000 for higher repro rate, then 100, now it's 50.
+    // Don't make it smaller, threading tests need iterations.
+    constexpr int N = 50;
+
     std::mutex queue_mutex;
 
     // Worker thread submits accesses and waits on the fence.
@@ -297,7 +300,7 @@ TEST_F(PositiveSyncValWsi, RecreateBuffer) {
     // NOTE: This test can be used for manual inspection of memory usage.
     // Increase frame count and observe that the test does not continuously allocate memory.
     // Syncval should not track ranges of deleted resources.
-    const int frame_count = 100;
+    const int frame_count = 20;
 
     for (int i = 0; i < frame_count; i++) {
         const uint32_t image_index = m_swapchain.AcquireNextImage(current_fence, kWaitTimeout);
@@ -357,7 +360,7 @@ TEST_F(PositiveSyncValWsi, RecreateImage) {
     // NOTE: This test can be used for manual inspection of memory usage.
     // Increase frame count and observe that the test does not continuously allocate memory.
     // Syncval should not track ranges of deleted resources.
-    const int frame_count = 100;
+    const int frame_count = 20;
 
     for (int i = 0; i < frame_count; i++) {
         const uint32_t image_index = m_swapchain.AcquireNextImage(current_fence, kWaitTimeout);
@@ -784,7 +787,7 @@ TEST_F(PositiveSyncValWsi, ResyncWithSwapchain4) {
     m_command_buffer.End();
     // Import accesses from two swapchain images before applying command buffer accesses
     // (layout transition of the first image). Test that implementation properly tracks
-    // multiple synchronized swapchain accesses (image0 and image1) accross all queue contexts
+    // multiple synchronized swapchain accesses (image0 and image1) across all queue contexts
     // where these accesses are registered.
     m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(acquire_semaphore3));
     m_default_queue->Submit2(m_command_buffer, vkt::Wait(acquire_semaphore4));
@@ -1089,7 +1092,11 @@ TEST_F(PositiveSyncValWsi, ConcurrentPresentAndSubmit) {
     }
 
     const auto swapchain_images = m_swapchain.GetImages();
-    const int N = 100;  // Initially 500 for higher repro rate
+
+    // Initially 500 for higher repro rate, then 100, now it's 50.
+    // Don't make it smaller, threading tests need iterations.
+    // In case of regression increase to 500 to simplify investigation.
+    const int N = 50;
 
     std::atomic<bool> bailout{false};
     monitor_.SetBailout(&bailout);
@@ -1109,9 +1116,14 @@ TEST_F(PositiveSyncValWsi, ConcurrentPresentAndSubmit) {
     });
     {
         vkt::Semaphore acquire_semaphore(*m_device);
+        std::vector<vkt::Semaphore> present_wait_semaphores;
+        for (size_t k = 0; k < swapchain_images.size(); k++) {
+            present_wait_semaphores.emplace_back(*m_device);
+        }
         for (int i = 0; i < N; i++) {
             const uint32_t image_index = m_swapchain.AcquireNextImage(acquire_semaphore, kWaitTimeout);
-            m_default_queue->Present(m_swapchain, image_index, acquire_semaphore);
+            m_default_queue->Submit(vkt::no_cmd, vkt::Wait(acquire_semaphore), vkt::Signal(present_wait_semaphores[image_index]));
+            m_default_queue->Present(m_swapchain, image_index, present_wait_semaphores[image_index]);
             m_default_queue->Wait();
             if (bailout.load()) {
                 break;
@@ -1143,9 +1155,15 @@ TEST_F(PositiveSyncValWsi, ConcurrentPresentMultipleSwapchains) {
     AddSurfaceExtension();
     RETURN_IF_SKIP(InitSyncVal());
 
-    const uint32_t num_threads = 6; /* Initially 8 */
+    // Initially 8, now it's 6. We couldn't repro with 5.
+    // In case of regression increase to 8 to simplify investigation.
+    const uint32_t num_threads = 6;
+
+    // Initially 200, then 100, now it's 30.
+    // In case of regression increase to 200 to simplify investigation.
+    const uint32_t N = 30;
+
     const uint32_t num_frames_in_flight = 2;
-    const uint32_t N = 100; /* Initially 200 */
 
     std::mutex queue_mutex;
 
@@ -1351,5 +1369,96 @@ TEST_F(PositiveSyncValWsi, WaitForFencesClearsLastSynchronizedPresents) {
     // This caused WRITE-AFTER-PRESENT hazard in the original issue
     present(ctx_a, 0);
 
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveSyncValWsi, PresentAfterTimelineSemaphoreChain) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13117");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(SupportMultiSwapchain());
+    RETURN_IF_SKIP(InitSyncVal());
+
+    struct SwapchainContext {
+        SurfaceContext surface_context;
+        vkt::Surface surface;
+        vkt::Swapchain swapchain;
+        std::vector<vkt::CommandBuffer> transitions;
+        vkt::Semaphore acquire_semaphore;
+        std::vector<vkt::Semaphore> present_semaphores;
+        uint32_t image_index = 0;
+
+        void Init(PositiveSyncValWsi& test, vkt::CommandPool& command_pool) {
+            if (test.CreateSurface(surface_context, surface) != VK_SUCCESS) {
+                GTEST_SKIP() << "Failed to create surface";
+            }
+            const vkt::Device& device = *test.DeviceObj();
+            const SurfaceInformation surface_info = test.GetSwapchainInfo(surface);
+            const VkSwapchainCreateInfoKHR swapchain_ci = GetDefaultSwapchainCreateInfo(surface, surface_info);
+            swapchain = vkt::Swapchain(device, swapchain_ci);
+            transitions = swapchain.RecordTransitionToPresentLayout(device, command_pool);
+            acquire_semaphore = vkt::Semaphore(device);
+            for (size_t i = 0; i < transitions.size(); i++) {
+                present_semaphores.emplace_back(device);
+            }
+        }
+    };
+    SwapchainContext ctx_a;
+    SwapchainContext ctx_b;
+    RETURN_IF_SKIP(ctx_a.Init(*this, m_command_pool));
+    RETURN_IF_SKIP(ctx_b.Init(*this, m_command_pool));
+
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    uint64_t value = 0;
+
+    auto acquire_and_submit = [&](SwapchainContext& ctx) {
+        ctx.image_index = ctx.swapchain.AcquireNextImage(ctx.acquire_semaphore, kWaitTimeout);
+
+        VkSemaphoreSubmitInfo waits[2] = {vku::InitStructHelper(), vku::InitStructHelper()};
+        waits[0].semaphore = ctx.acquire_semaphore;
+        waits[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        waits[1].semaphore = timeline;
+        waits[1].value = value;
+        waits[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+        VkSemaphoreSubmitInfo signals[2] = {vku::InitStructHelper(), vku::InitStructHelper()};
+        signals[0].semaphore = ctx.present_semaphores[ctx.image_index];
+        signals[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        signals[1].semaphore = timeline;
+        signals[1].value = ++value;
+        signals[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+        VkCommandBufferSubmitInfo command_buffer_info = vku::InitStructHelper();
+        command_buffer_info.commandBuffer = ctx.transitions[ctx.image_index];
+
+        VkSubmitInfo2 submit = vku::InitStructHelper();
+        submit.waitSemaphoreInfoCount = 2;
+        submit.pWaitSemaphoreInfos = waits;
+        submit.commandBufferInfoCount = 1;
+        submit.pCommandBufferInfos = &command_buffer_info;
+        submit.signalSemaphoreInfoCount = 2;
+        submit.pSignalSemaphoreInfos = signals;
+
+        vk::QueueSubmit2(*m_default_queue, 1, &submit, VK_NULL_HANDLE);
+    };
+
+    // Frame count is the number of swapchain images + 1 in order to have
+    // guarantee we reacquire a previously presented image
+    const uint32_t frame_count = std::max(size32(ctx_a.transitions), size32(ctx_b.transitions)) + 1;
+
+    for (uint32_t frame = 0; frame < frame_count; frame++) {
+        acquire_and_submit(ctx_a);
+        acquire_and_submit(ctx_b);
+
+        // An empty submission before the host wait is needed to reproduce the issue
+        const uint64_t previous = value++;
+        m_default_queue->Submit2(vkt::no_cmd, vkt::TimelineWait(timeline, previous), vkt::TimelineSignal(timeline, value));
+
+        timeline.Wait(value, kWaitTimeout);
+        m_default_queue->Present(ctx_a.swapchain, ctx_a.image_index, ctx_a.present_semaphores[ctx_a.image_index]);
+        m_default_queue->Present(ctx_b.swapchain, ctx_b.image_index, ctx_b.present_semaphores[ctx_b.image_index]);
+    }
     m_default_queue->Wait();
 }

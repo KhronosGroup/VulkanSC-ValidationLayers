@@ -244,8 +244,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     // Insert memory barrier to guarantee copy order
     VkMemoryBarrier mem_barrier = {VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr, VK_ACCESS_TRANSFER_WRITE_BIT,
                                    VK_ACCESS_TRANSFER_READ_BIT};
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &mem_barrier, 0,
-                           nullptr, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, mem_barrier);
     vk::CmdCopyBuffer(m_command_buffer, buffer_import, buffer_output, 1, &copy_info);
     m_command_buffer.End();
     m_default_queue->SubmitAndWait(m_command_buffer);
@@ -710,4 +709,49 @@ TEST_F(PositiveExternalMemorySync, BinarySyncDependsOnExternalTimelineSignal) {
     m_default_queue->Submit2(vkt::no_cmd, vkt::TimelineWait(semaphore, 2), vkt::Signal(binary_semaphore));
     m_default_queue->Submit2(vkt::no_cmd, vkt::Wait(binary_semaphore));
     m_device->Wait();
+}
+
+TEST_F(PositiveExternalMemorySync, D3D11ImageBarrierExternalQueueFamilyLayout) {
+    TEST_DESCRIPTION("Ownership transfer to/from VK_QUEUE_FAMILY_EXTERNAL of a D3D11 texture");
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5431
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+
+    VkExternalMemoryImageCreateInfo external_image_info = vku::InitStructHelper();
+    external_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT;
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    image_ci.pNext = &external_image_info;
+
+    const auto compatible_types = GetCompatibleHandleTypes(Gpu(), image_ci, VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT);
+    if ((compatible_types & external_image_info.handleTypes) == 0) {
+        GTEST_SKIP() << "Image does not support VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT";
+    }
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
+
+    VkMemoryDedicatedAllocateInfo dedicated_info = vku::InitStructHelper();
+    dedicated_info.image = image;
+    image.AllocateAndBindMemory(*m_device, 0, &dedicated_info);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+
+    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.srcQueueFamilyIndex = m_device->graphics_queue_node_index_;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+    // VK_IMAGE_LAYOUT_UNDEFINED is explicitly allowed when acquiring
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
+    barrier.dstQueueFamilyIndex = m_device->graphics_queue_node_index_;
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+    m_command_buffer.End();
 }

@@ -44,10 +44,10 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/debug_printf_shader_debug_info.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
-    converted/descriptor_heap.cpp
-    converted/descriptor_heap_positive.cpp
-    converted/descriptor_heap_untyped.cpp
-    converted/descriptor_heap_untyped_positive.cpp
+    converted/descriptor_heap_ext.cpp
+    converted/descriptor_heap_ext_positive.cpp
+    converted/descriptor_heap_untyped_ext.cpp
+    converted/descriptor_heap_untyped_ext_positive.cpp
     converted/descriptor_indexing.cpp
     converted/descriptor_indexing_positive.cpp
     converted/descriptors.cpp
@@ -96,8 +96,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_descriptor_class_general_buffer_positive.cpp
     converted/gpu_av_descriptor_class_texel_buffer.cpp
     converted/gpu_av_descriptor_class_texel_buffer_positive.cpp
-    converted/gpu_av_descriptor_heap.cpp
-    converted/gpu_av_descriptor_heap_positive.cpp
+    converted/gpu_av_descriptor_heap_ext.cpp
+    converted/gpu_av_descriptor_heap_ext_positive.cpp
     converted/gpu_av_descriptor_indexing.cpp
     converted/gpu_av_descriptor_indexing_positive.cpp
     converted/gpu_av_descriptor_post_process.cpp
@@ -115,8 +115,10 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_ray_query_positive.cpp
     converted/gpu_av_ray_tracing.cpp
     converted/gpu_av_ray_tracing_positive.cpp
+    converted/gpu_av_scoped.cpp
+    converted/gpu_av_scoped_positive.cpp
     converted/gpu_av_shader_debug_info.cpp
-    converted/gpu_av_shader_object_positive.cpp
+    converted/gpu_av_shader_object_ext_positive.cpp
     converted/gpu_av_shader_sanitizer.cpp
     converted/gpu_av_shader_sanitizer_positive.cpp
     converted/gpu_av_shared_memory_data_race.cpp
@@ -176,11 +178,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/ray_tracing.cpp
     converted/ray_tracing_micromap.cpp
     converted/ray_tracing_micromap_positive.cpp
-    converted/ray_tracing_nv.cpp
     converted/ray_tracing_pipeline.cpp
-    converted/ray_tracing_pipeline_nv.cpp
     converted/ray_tracing_pipeline_positive.cpp
-    converted/ray_tracing_pipeline_positive_nv.cpp
     converted/ray_tracing_positive.cpp
     converted/ray_tracing_spheres.cpp
     converted/ray_tracing_spheres_positive.cpp
@@ -209,8 +208,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_limits_positive.cpp
     converted/shader_mesh.cpp
     converted/shader_mesh_positive.cpp
-    converted/shader_object.cpp
-    converted/shader_object_positive.cpp
+    converted/shader_object_ext.cpp
+    converted/shader_object_ext_positive.cpp
     converted/shader_push_constants.cpp
     converted/shader_push_constants_positive.cpp
     converted/shader_spirv.cpp
@@ -281,6 +280,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/video_encode_positive.cpp
     converted/video_encode_quantization_map.cpp
     converted/video_encode_quantization_map_positive.cpp
+    converted/video_encode_rgb_conversion.cpp
     converted/video_positive.cpp
     converted/viewport_inheritance.cpp
     converted/wsi.cpp

@@ -33,7 +33,7 @@
 #include "utils/math_utils.h"
 #include "utils/image_utils.h"
 
-using RangeGenerator = subresource_adapter::RangeGenerator;
+using RangeGenerator = vvl::SubresourceRangeGenerator;
 
 static VkExternalMemoryHandleTypeFlags GetExternalHandleTypes(const VkImageCreateInfo* pCreateInfo) {
     const auto* external_memory_info = vku::FindStructInPNextChain<VkExternalMemoryImageCreateInfo>(pCreateInfo->pNext);
@@ -161,8 +161,9 @@ Image::Image(const vvl::DeviceState& dev_data, VkImage img, const VkImageCreateI
           dev_data.physical_device, vku::FindStructInPNextChain<VkVideoProfileListInfoKHR>(pCreateInfo->pNext))) {
     if (create_flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) {
         bool is_resident = (create_flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) != 0;
-        tracker_.emplace<BindableSparseMemoryTracker>(requirements.data(), is_resident);
-        SetMemoryTracker(&std::get<BindableSparseMemoryTracker>(tracker_));
+        auto& sparse_tracker = tracker_.emplace<std::unique_ptr<BindableSparseMemoryTracker>>(
+            std::make_unique<BindableSparseMemoryTracker>(requirements.data(), is_resident));
+        SetMemoryTracker(sparse_tracker.get());
     } else if (create_flags & VK_IMAGE_CREATE_DISJOINT_BIT) {
         tracker_.emplace<BindableMultiplanarMemoryTracker>(requirements.data(), vkuFormatPlaneCount(pCreateInfo->format));
         SetMemoryTracker(&std::get<BindableMultiplanarMemoryTracker>(tracker_));
@@ -376,6 +377,29 @@ VkPhysicalDeviceImageFormatInfo2 Image::GetImageFormatInfo2(void* pNext) const {
     return image_format_info;
 }
 
+// We print how we get this info in ImageView::DescribeImageUsage()
+VkImageUsageFlags2KHR Image::GetInheritedUsage(const VkImageViewCreateInfo& ci) const {
+    if (const auto usage_create_info_2 = vku::FindStructInPNextChain<VkImageViewUsage2CreateInfoKHR>(ci.pNext)) {
+        return usage_create_info_2->usage;
+    } else if (const auto usage_create_info = vku::FindStructInPNextChain<VkImageViewUsageCreateInfo>(ci.pNext)) {
+        return usage_create_info->usage;
+    }
+
+    VkImageUsageFlags2KHR inherited_usage = usage;
+
+    // We can't apply the stencil usage until we get the aspectMask to know how to appply it
+    if (stencil_usage.has_value()) {
+        const bool stencil_aspect = (ci.subresourceRange.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
+        const bool depth_aspect = (ci.subresourceRange.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+        if (stencil_aspect && !depth_aspect) {
+            inherited_usage = stencil_usage.value();
+        } else if (stencil_aspect && depth_aspect) {
+            inherited_usage &= stencil_usage.value();
+        }
+    }
+    return inherited_usage;
+}
+
 VkExtent3D Image::GetEffectiveSubresourceExtent(const VkImageSubresourceLayers& sub) const {
     return GetEffectiveSubresourceExtent(sub.aspectMask, sub.mipLevel);
 }
@@ -385,6 +409,8 @@ VkExtent3D Image::GetEffectiveSubresourceExtent(const VkImageSubresource& sub) c
 }
 
 VkExtent3D Image::GetEffectiveSubresourceExtent(const VkImageSubresourceRange& range) const {
+    // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4918
+    // When dealing with ranges you use only the base level
     return GetEffectiveSubresourceExtent(range.aspectMask, range.baseMipLevel);
 }
 
@@ -445,7 +471,7 @@ uint32_t Image::NormalizeLayerCount(const VkImageSubresourceLayers& resource) co
 VkImageSubresourceRange Image::GetSubresourceEncoderRange(const DeviceState& device_state,
                                                           const VkImageSubresourceRange& full_range) {
     VkImageSubresourceRange encoder_range = full_range;
-    if (CanTransitionDepthSlices(device_state.extensions, GetImageType(), create_flags)) {
+    if (CanTransitionDepthSlices(device_state.enabled_features, GetImageType(), create_flags)) {
         encoder_range.layerCount = create_info.extent.depth;
     }
     return encoder_range;
@@ -545,29 +571,6 @@ static VkSamplerYcbcrConversion GetSamplerConversion(const VkImageViewCreateInfo
     return conversion_info ? conversion_info->conversion : VK_NULL_HANDLE;
 }
 
-// We print how we get this info in ImageView::DescribeImageUsage()
-static VkImageUsageFlags2KHR GetInheritedUsage(const VkImageViewCreateInfo& ci, const vvl::Image& image_state) {
-    if (const auto usage_create_info_2 = vku::FindStructInPNextChain<VkImageViewUsage2CreateInfoKHR>(ci.pNext)) {
-        return usage_create_info_2->usage;
-    } else if (const auto usage_create_info = vku::FindStructInPNextChain<VkImageViewUsageCreateInfo>(ci.pNext)) {
-        return usage_create_info->usage;
-    }
-
-    VkImageUsageFlags2KHR usage = image_state.usage;
-
-    // We can't apply the stencil usage until we get the aspectMask to know how to appply it
-    if (image_state.stencil_usage.has_value()) {
-        const bool stencil_aspect = (ci.subresourceRange.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
-        const bool depth_aspect = (ci.subresourceRange.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
-        if (stencil_aspect && !depth_aspect) {
-            usage = image_state.stencil_usage.value();
-        } else if (stencil_aspect && depth_aspect) {
-            usage &= image_state.stencil_usage.value();
-        }
-    }
-    return usage;
-}
-
 static float GetImageViewMinLod(const VkImageViewCreateInfo& ci) {
     auto image_view_min_lod = vku::FindStructInPNextChain<VkImageViewMinLodCreateInfoEXT>(ci.pNext);
     return (image_view_min_lod) ? image_view_min_lod->minLod : 0.0f;
@@ -601,14 +604,15 @@ ImageView::ImageView(const DeviceState& device_state, const std::shared_ptr<vvl:
       metal_imageview_export(GetMetalExport(create_info)),
 #endif
       is_depth_sliced(IsDepthSliceView(image_state->GetImageType(), image_state->create_flags, create_info.viewType)),
+      filter_cubic(cubic_props.filterCubic == VK_TRUE),
+      filter_cubic_minmax(cubic_props.filterCubicMinmax == VK_TRUE),
       normalized_subresource_range(ImageView::NormalizeImageViewSubresourceRange(*image_state, create_info)),
-      range_generator(image_state->subresource_encoder, GetRangeGeneratorRange(device_state.extensions)),
+      image_layout_range(GetImageLayoutRange(device_state.enabled_features)),
       samples(image_state->GetSamples()),
       sampler_conversion(GetSamplerConversion(create_info)),
-      filter_cubic_props(cubic_props),
       min_lod(GetImageViewMinLod(create_info)),
       format_features(ff),
-      inherited_usage(GetInheritedUsage(create_info, *image_state)) {
+      inherited_usage(image_state->GetInheritedUsage(create_info)) {
 }
 
 void ImageView::NotifyInvalidate(const StateObject::NodeList& invalid_nodes, bool unlink) {
@@ -653,7 +657,7 @@ VkImageSubresourceRange ImageView::NormalizeImageViewSubresourceRange(const Imag
     return range;
 }
 
-VkImageSubresourceRange ImageView::GetRangeGeneratorRange(const DeviceExtensions& extensions) const {
+VkImageSubresourceRange ImageView::GetImageLayoutRange(const DeviceFeatures& features) const {
     VkImageSubresourceRange subres_range = create_info.subresourceRange;
 
     // if we're mapping a 3D image to a 2d image view, convert the view's subresource range to be compatible with the
@@ -666,7 +670,7 @@ VkImageSubresourceRange ImageView::GetRangeGeneratorRange(const DeviceExtensions
     //     If the maintenance9 feature is not enabled, any layout transitions performed on such an attachment view during a render
     //     pass instance still apply to the entire subresource referenced which includes all the slices of the selected mip level.
     //
-    if (is_depth_sliced && !CanTransitionDepthSlices(extensions, image_state->GetImageType(), image_state->create_flags)) {
+    if (is_depth_sliced && !CanTransitionDepthSlices(features, image_state->GetImageType(), image_state->create_flags)) {
         subres_range.baseArrayLayer = 0;
         subres_range.layerCount = 1;
     }
@@ -739,8 +743,9 @@ std::string ImageView::DescribeImageUsage(const Logger& logger) const {
                 ss << ", but VkImageStencilUsageCreateInfo overwrote it with " << string_VkImageUsageFlags2KHR(stencilUsage)
                    << " because the image view has VK_IMAGE_ASPECT_STENCIL_BIT only";
             } else if (stencil_aspect && depth_aspect) {
-                ss << ", but VkImageStencilUsageCreateInfo added " << string_VkImageUsageFlags2KHR(stencilUsage)
-                   << " because the image view has both VK_IMAGE_ASPECT_STENCIL_BIT and VK_IMAGE_ASPECT_DEPTH_BIT";
+                ss << ", but intersected with VkImageStencilUsageCreateInfo::stencilUsage ("
+                   << string_VkImageUsageFlags2KHR(stencilUsage)
+                   << ") because the image view has both VK_IMAGE_ASPECT_STENCIL_BIT and VK_IMAGE_ASPECT_DEPTH_BIT";
             }
         }
     }

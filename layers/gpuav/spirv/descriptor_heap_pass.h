@@ -15,7 +15,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "type_manager.h"
+#include <vulkan/vulkan_core.h>
 #include "pass.h"
 
 struct VkDescriptorSetAndBindingMappingEXT;
@@ -23,7 +23,7 @@ struct VkDescriptorSetAndBindingMappingEXT;
 namespace gpuav {
 namespace spirv {
 
-struct DescriptorInterface;
+struct AccessPath;
 
 class DescriptorHeapPass : public Pass {
   public:
@@ -33,18 +33,39 @@ class DescriptorHeapPass : public Pass {
     void PrintDebugInfo() const final;
 
   private:
+    struct UntypedLayout {
+        // If zero, means it is implicitly zero
+        uint32_t offset_id = 0;
+        uint32_t array_stride_id = 0;
+        // Temp value until we properly support MultidimensionalArray
+        bool is_multidimensional_array = false;
+    };
+
     struct InstructionMeta {
         const Instruction* target_instruction = nullptr;
 
-        AccessPath access_path;
+        const AccessPath* access_path;
 
         // Internal encoded index to map into InstrumentationStatus::Device
         uint32_t mapping_index_resource = 0;
         uint32_t mapping_index_sampler = 0;
+
+        // This is information we "could" find at CreateFunctionCall but want done earlier to so we can hash it
+        // ----
+        // Null if untyped pointers
+        const VkDescriptorSetAndBindingMappingEXT* mapping_ptr = nullptr;
+        const VkDescriptorSetAndBindingMappingEXT* mapping_ptr_sampler = nullptr;
+        UntypedLayout untyped_layout_resource;
+        UntypedLayout untyped_layout_sampler;
+        uint32_t Hash(const uint32_t descriptor_index, VkDescriptorType vk_type) const;
+
+        bool instrument_separate_sampler = false;
     };
 
     bool RequiresInstrumentation(const Function& function, const Instruction& inst, InstructionMeta& meta);
-    uint32_t CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta, bool is_seperate_sampler);
+    uint32_t CreateFunctionCall(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta, bool is_separate_sampler);
+    uint32_t CreateFunctionCallSampler(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta,
+                                       uint32_t non_sampler_result);
     uint32_t CreateFunctionCallCombinedSampler(BasicBlock& block, InstructionIt* inst_it, const InstructionMeta& meta,
                                                const VkDescriptorSetAndBindingMappingEXT& mapping,
                                                const uint32_t descriptor_index_id);
@@ -53,6 +74,8 @@ class DescriptorHeapPass : public Pass {
                                     bool is_sampler) const;
     uint32_t GetMapping(const AccessPath& access_path, bool is_sampler) const;
     uint32_t GetMinBufferAlignment(const InstructionMeta& meta) const;
+
+    UntypedLayout GetUntypedLayout(const Type& pointer_type, uint32_t heap_offset_member_index, bool has_heap_offset_member_index);
 
     // < original ID, new CopyObject ID >
     vvl::unordered_map<uint32_t, uint32_t> copy_object_map_;
@@ -68,7 +91,8 @@ class DescriptorHeapPass : public Pass {
         MAPPING_PUSH_ADDRESS = 6,
         MAPPING_INDIRECT_ADDRESS = 7,
         UNTYPED = 8,
-        FUNC_COUNT = 9,
+        DESCRIPTOR_HASHING = 9,
+        FUNC_COUNT = 10,
     };
     uint32_t link_function_id_[FUNC_COUNT]{};
     uint32_t GetLinkFunctionId(const FunctionNames func_name);

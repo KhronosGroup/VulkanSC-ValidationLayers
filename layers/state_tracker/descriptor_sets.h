@@ -45,7 +45,6 @@ class BufferView;
 class Tensor;
 class TensorView;
 class Pipeline;
-class AccelerationStructureNV;
 class AccelerationStructureKHR;
 struct AllocateDescriptorSetsData;
 
@@ -266,7 +265,7 @@ class DescriptorSetLayoutDef {
     // The vector is allocated only if there is at least one binding with immutable samplers
     std::vector<size_t> immutable_sampler_combined_hashes_;
 
-    // Help detect if any of the the immutable samplers used are YCbCr
+    // Help detect if any of the immutable samplers used are YCbCr
     bool has_ycbcr_samplers_;
 
     // Track if task/mesh shader in the set (saves looking at draw time)
@@ -640,13 +639,12 @@ class AccelerationStructureDescriptor : public Descriptor {
                      bool is_bindless) override;
     VkAccelerationStructureKHR GetAccelerationStructure() const { return acc_; }
     const vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
-    vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() { return acc_state_.get(); }
-    VkAccelerationStructureNV GetAccelerationStructureNV() const { return acc_nv_; }
-    const vvl::AccelerationStructureNV *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
-    vvl::AccelerationStructureNV *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
+    vvl::AccelerationStructureKHR* GetAccelerationStructureStateKHR() { return acc_state_.get(); }
     void CopyUpdate(DescriptorSet &set_state, const DeviceState &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     bool IsKHR() const { return is_khr_; }
+    bool IsPartitionedNV() const { return is_partition_nv_; }
+    VkDeviceAddress GetPartitionedAccelerationStructureNV() const { return acc_partition_nv_; }
 
     bool AddParent(StateObject *state_object) override;
     void RemoveParent(StateObject *state_object) override;
@@ -654,12 +652,10 @@ class AccelerationStructureDescriptor : public Descriptor {
 
   private:
     bool is_khr_{false};
+    bool is_partition_nv_{false};
     VkAccelerationStructureKHR acc_{VK_NULL_HANDLE};
     std::shared_ptr<vvl::AccelerationStructureKHR> acc_state_;
-    VkAccelerationStructureNV acc_nv_{VK_NULL_HANDLE};
-    std::shared_ptr<vvl::AccelerationStructureNV> acc_state_nv_;
     VkDeviceAddress acc_partition_nv_{0};
-    std::shared_ptr<VkDeviceAddress> acc_state_partition_nv_;
 };
 
 class MutableDescriptor : public Descriptor {
@@ -686,17 +682,7 @@ class MutableDescriptor : public Descriptor {
     std::shared_ptr<vvl::TensorView> GetSharedTensorView() const { return tensor_view_state_; }
     VkAccelerationStructureKHR GetAccelerationStructureKHR() const { return acc_; }
     const vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
-    vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() { return acc_state_.get(); }
-    VkAccelerationStructureNV GetAccelerationStructureNV() const { return acc_nv_; }
-    const vvl::AccelerationStructureNV *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
-    vvl::AccelerationStructureNV *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
-    // Returns true if there is a stored KHR acceleration structure and false if there is a stored NV acceleration structure.
-    // Asserts that there is only one of the two.
-    bool IsAccelerationStructureKHR() const {
-        auto acc_khr = GetAccelerationStructureKHR();
-        assert((acc_khr != VK_NULL_HANDLE) ^ (GetAccelerationStructureNV() != VK_NULL_HANDLE));
-        return acc_khr != VK_NULL_HANDLE;
-    }
+    vvl::AccelerationStructureKHR* GetAccelerationStructureStateKHR() { return acc_state_.get(); }
 
     void UpdateImageLayoutDrawState(vvl::CommandBuffer &cb_state) override;
     uint32_t GetTensorViewCount() const { return tensor_view_count_; }
@@ -731,8 +717,6 @@ class MutableDescriptor : public Descriptor {
     bool is_khr_{false};
     VkAccelerationStructureKHR acc_{VK_NULL_HANDLE};
     std::shared_ptr<vvl::AccelerationStructureKHR> acc_state_;
-    VkAccelerationStructureNV acc_nv_{VK_NULL_HANDLE};
-    std::shared_ptr<vvl::AccelerationStructureNV> acc_state_nv_;
     // Tensor Descriptor
     uint32_t tensor_view_count_{0};
     const VkTensorViewARM *tensor_views_{VK_NULL_HANDLE};
@@ -854,7 +838,6 @@ struct DecodedTemplateUpdate {
     std::vector<VkWriteDescriptorSet> desc_writes;
     std::vector<VkWriteDescriptorSetInlineUniformBlock> inline_infos;
     std::vector<VkWriteDescriptorSetAccelerationStructureKHR> inline_infos_khr;
-    std::vector<VkWriteDescriptorSetAccelerationStructureNV> inline_infos_nv;
     std::vector<VkWriteDescriptorSetPartitionedAccelerationStructureNV> inline_infos_ptlas;
     DecodedTemplateUpdate(const DeviceState &device_data, VkDescriptorSet descriptorSet,
                           const DescriptorUpdateTemplate &template_state, const void *pData,
@@ -1021,7 +1004,9 @@ class DescriptorSet : public StateObject, public SubStateManager<DescriptorSetSu
 
         DescriptorIterator(DescriptorSet &descriptor_set, uint32_t binding, uint32_t index = 0)
             : iter_(descriptor_set.FindBinding(binding)), end_(descriptor_set.end()), index_(0) {
-            if (index < (*iter_)->count) {
+            if (AtEnd()) {
+                return;  // to not crash if things are already invalid
+            } else if (index < (*iter_)->count) {
                 index_ = index;
             } else {
                 // This is a consecutive binding updates and need to find first used binding
@@ -1043,7 +1028,9 @@ class DescriptorSet : public StateObject, public SubStateManager<DescriptorSetSu
 
         DescriptorIterator(const DescriptorSet &descriptor_set, uint32_t binding, uint32_t index = 0)
             : iter_(descriptor_set.FindBinding(binding)), end_(descriptor_set.end()), index_(0) {
-            if (index < (*iter_)->count) {
+            if (AtEnd()) {
+                return;  // to not crash if things are already invalid
+            } else if (index < (*iter_)->count) {
                 index_ = index;
             } else {
                 // This is a consecutive binding updates and need to find first used binding
@@ -1154,7 +1141,7 @@ class DescriptorSet : public StateObject, public SubStateManager<DescriptorSetSu
     std::atomic<bool> some_update_;  // has any part of the set ever been updated?
     vvl::DescriptorPool *pool_state_;
     const std::shared_ptr<DescriptorSetLayout const> layout_;
-    // NOTE: the the backing store for the bindings must be declared *before* it so it will be destructed *after* it
+    // NOTE: the backing store for the bindings must be declared *before* it so it will be destructed *after* it
     // "Destructors for nonstatic member objects are called in the reverse order in which they appear in the class declaration."
     std::vector<BindingBackingStore> bindings_store_;
     std::vector<BindingPtr> bindings_;

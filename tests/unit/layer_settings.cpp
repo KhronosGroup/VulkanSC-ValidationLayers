@@ -14,6 +14,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include "layer_validation_tests.h"
+#include "pipeline_helper.h"
 
 class NegativeLayerSettings : public VkLayerTest {};
 
@@ -452,7 +453,7 @@ TEST_F(NegativeLayerSettings, ReportFlags3) {
     Monitor().VerifyFound();
 }
 
-#ifndef WIN32
+#ifndef _WIN32
 TEST_F(NegativeLayerSettings, LogFilename) {
     const char* path[] = {"/fake/path"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "log_filename", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, path};
@@ -529,8 +530,25 @@ TEST_F(NegativeLayerSettings, MaxIndicesCountOverLimit) {
     VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
     Monitor().ExpectSuccess(kErrorBit | kWarningBit);
     Monitor().SetDesiredWarning(
-        "VK_LAYER_GPUAV_MAX_INDICES_COUNT (gpuav_max_indices_count) is being set to 65534, the max value supported");
+        "VK_LAYER_GPUAV_MAX_INDICES_COUNT (gpuav_max_indices_count) was set to 66000 but is being set to 65534, the max value "
+        "supported currently");
     RETURN_IF_SKIP(InitFramework(&create_info));
     RETURN_IF_SKIP(InitState());
     Monitor().VerifyFound();
+}
+
+TEST_F(NegativeLayerSettings, JsonEscapeParentheses) {
+    TEST_DESCRIPTION("http://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12791");
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_format_json", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1, &kVkTrue};
+    VkLayerSettingsCreateInfoEXT create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    RETURN_IF_SKIP(InitFramework(&create_info));
+    RETURN_IF_SKIP(InitState());
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
+                           "foo");
+    // VUID-VkPipelineShaderStageCreateInfo-pName-00707
+    m_errorMonitor->SetDesiredError("\\\"foo\\\"");
+    pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
 }

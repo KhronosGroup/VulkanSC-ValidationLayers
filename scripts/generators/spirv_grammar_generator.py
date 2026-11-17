@@ -30,19 +30,12 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
         BaseGenerator.__init__(self)
 
         self.opcodes = dict()
-        self.opnames = []
         self.atomicsOps = []
         self.groupOps = []
         self.imageGatherOps = []
         self.imageSampleOps = []
         self.imageFetchOps = []
         self.typeOps = [] # OpType*
-        self.storageClassList = [] # list of storage classes
-        self.executionModelList = []
-        self.executionModeList = []
-        self.decorationList = []
-        self.builtInList = []
-        self.dimList = []
         self.cooperativeMatrixList = []
         self.rayFlagsList = []
         self.fpEncodingList = []
@@ -56,6 +49,7 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
         self.executionScopePosition = [[] for i in range(4)]
         self.imageOperandsPosition = [[] for i in range(8)]
         self.imageAccessOperand = [[] for i in range(4)]
+        self.accelerationStructureAccessOperand = [[] for i in range(4)]
 
         self.kindId = [] # "category" : "Id"
         self.kindLiteral = [] # "category" : "Literal"
@@ -103,12 +97,6 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
                         count = 0  if 'parameters' not in enum else len(enum['parameters'])
                         self.imageOperandsParamCount[count].append(enum['enumerant'])
 
-                self.addToStringList(operandKind, 'StorageClass', self.storageClassList)
-                self.addToStringList(operandKind, 'ExecutionModel', self.executionModelList)
-                self.addToStringList(operandKind, 'ExecutionMode', self.executionModeList)
-                self.addToStringList(operandKind, 'Decoration', self.decorationList)
-                self.addToStringList(operandKind, 'BuiltIn', self.builtInList)
-                self.addToStringList(operandKind, 'Dim', self.dimList)
                 self.addToStringList(operandKind, 'CooperativeMatrixOperands', self.cooperativeMatrixList, ['NoneKHR'])
                 self.addToStringList(operandKind, 'RayFlags', self.rayFlagsList, ['NoneKHR'])
                 self.addToStringList(operandKind, 'FPEncoding', self.fpEncodingList)
@@ -134,8 +122,6 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
                     if notSupported:
                         continue # If just 'Kernel' capabilites then it's meant for OpenCL and skip instruction
 
-                self.opnames.append(opname)
-
                 self.opcodes[opcode] = {
                     'imageRefPosition' : 0,
                     'sampledImageRefPosition' : 0,
@@ -157,7 +143,7 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
                 if re.search(r'OpImageSample.*', opname) is not None:
                     self.imageSampleOps.append(opname)
                 if re.search(r'OpType.*', opname) is not None:
-                    # Currently this is for GPU-AV which doesn't supporrt provisional extensions
+                    # Currently this is for GPU-AV which doesn't support provisional extensions
                     if opname not in self.provisionalList:
                         self.typeOps.append(opname)
                 if 'operands' in instruction:
@@ -209,6 +195,9 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
                                 self.opcodes[opcode]['imageRefPosition'] = index + 1
                             elif operand['name'] == 'Sampled Image':
                                 self.opcodes[opcode]['sampledImageRefPosition'] = index + 1
+                            # The grammar uses both names, OpConvertUToAccelerationStructureKHR also calls its uint64 input 'Accel'
+                            elif operand['name'] in ['Accel', 'Acceleration Structure'] and opname != 'OpConvertUToAccelerationStructureKHR':
+                                self.accelerationStructureAccessOperand[index + 1].append(opname)
 
                 if re.search(r'OpImage*', opname) is not None:
                     info = self.opcodes[opcode]
@@ -285,13 +274,6 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
             #include <vector>
             #include <spirv/unified1/spirv.hpp>
 
-            const char* string_SpvOpcode(uint32_t opcode);
-            const char* string_SpvStorageClass(uint32_t storage_class);
-            const char* string_SpvExecutionModel(uint32_t execution_model);
-            const char* string_SpvExecutionMode(uint32_t execution_mode);
-            const char* string_SpvDecoration(uint32_t decoration);
-            const char* string_SpvBuiltIn(spv::BuiltIn built_in);
-            const char* string_SpvDim(uint32_t dim);
             std::string string_SpvCooperativeMatrixOperands(uint32_t mask);
             std::string string_SpvRayFlagsMask(uint32_t mask);
             const char* string_SpvFPEncoding(spv::FPEncoding value);
@@ -484,6 +466,25 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
             ''')
 
         out.append('''
+            // Return operand position of the 'Acceleration Structure' IdRef or zero if there is none.
+            static constexpr uint32_t OpcodeAccelerationStructureAccessPosition(uint32_t opcode) {
+                uint32_t position = 0;
+                switch (opcode) {
+            ''')
+        for index, opcodes in enumerate(self.accelerationStructureAccessOperand):
+            for opcode in opcodes:
+                out.append(f'        case spv::{opcode}:\n')
+            if len(opcodes) != 0:
+                out.append(f'            return {index};\n')
+        out.append('''
+                    default:
+                        break;
+                }
+                return position;
+            }
+            ''')
+
+        out.append('''
             // All valid OpType*
             enum class SpvType {
                 Empty = 0,
@@ -532,100 +533,6 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
             ''')
 
         out.append(f'''
-            const char* string_SpvOpcode(uint32_t opcode) {{
-                switch(opcode) {{
-            {"".join([f"""        case spv::{x}:
-                        return "{x}";
-            """ for x in self.opnames if x not in self.provisionalList])}
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-            {"".join([f"""        case spv::{x}:
-                        return "{x}";
-            """ for x in self.opnames if x in self.provisionalList])}#endif
-                    default:
-                        return "Unknown Opcode";
-                }}
-            }}
-
-            const char* string_SpvStorageClass(uint32_t storage_class) {{
-                switch(storage_class) {{
-            {"".join([f"""        case spv::StorageClass{x}:
-                        return "{x}";
-            """ for x in self.storageClassList if x not in self.provisionalList])}
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-            {"".join([f"""        case spv::StorageClass{x}:
-                        return "{x}";
-            """ for x in self.storageClassList if x in self.provisionalList])}#endif
-                    default:
-                        return "Unknown Storage Class";
-                }}
-            }}
-
-            const char* string_SpvExecutionModel(uint32_t execution_model) {{
-                switch(execution_model) {{
-            {"".join([f"""        case spv::ExecutionModel{x}:
-                        return "{x}";
-            """ for x in self.executionModelList if x not in self.provisionalList])}
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-            {"".join([f"""        case spv::ExecutionModel{x}:
-                        return "{x}";
-            """ for x in self.executionModelList if x in self.provisionalList])}#endif
-                    default:
-                        return "Unknown Execution Model";
-                }}
-            }}
-
-            const char* string_SpvExecutionMode(uint32_t execution_mode) {{
-                switch(execution_mode) {{
-            {"".join([f"""        case spv::ExecutionMode{x}:
-                        return "{x}";
-            """ for x in self.executionModeList if x not in self.provisionalList])}
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-            {"".join([f"""        case spv::ExecutionMode{x}:
-                        return "{x}";
-            """ for x in self.executionModeList if x in self.provisionalList])}#endif
-                    default:
-                        return "Unknown Execution Mode";
-                }}
-            }}
-
-            const char* string_SpvDecoration(uint32_t decoration) {{
-                switch(decoration) {{
-            {"".join([f"""        case spv::Decoration{x}:
-                        return "{x}";
-            """ for x in self.decorationList if x not in self.provisionalList])}
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-            {"".join([f"""        case spv::Decoration{x}:
-                        return "{x}";
-            """ for x in self.decorationList if x in self.provisionalList])}#endif
-                    default:
-                        return "Unknown Decoration";
-                }}
-            }}
-
-            const char* string_SpvBuiltIn(spv::BuiltIn built_in) {{
-                switch(built_in) {{
-            {"".join([f"""        case spv::BuiltIn{x}:
-                        return "{x}";
-            """ for x in self.builtInList if x not in self.provisionalList])}
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-            {"".join([f"""        case spv::BuiltIn{x}:
-                        return "{x}";
-            """ for x in self.builtInList if x in self.provisionalList])}#endif
-                    default:
-                        return "Unknown BuiltIn";
-                }}
-            }}
-
-            const char* string_SpvDim(uint32_t dim) {{
-                switch(dim) {{
-            {"".join([f"""        case spv::Dim{x}:
-                        return "{x}";
-            """ for x in self.dimList if x not in self.provisionalList])}
-                    default:
-                        return "Unknown Dim";
-                }}
-            }}
-
             static const char* string_SpvCooperativeMatrixOperandsMask(spv::CooperativeMatrixOperandsMask mask) {{
                 switch(mask) {{
                     case spv::CooperativeMatrixOperandsMaskNone:
@@ -700,7 +607,7 @@ class SpirvGrammarHelperOutputGenerator(BaseGenerator):
         for info in self.opcodes.values():
             opname = info['opname']
             if opname in self.provisionalList:
-                continue # Currently this is for GPU-AV which doesn't supporrt provisional extensions
+                continue # Currently this is for GPU-AV which doesn't support provisional extensions
             kinds = ", ".join([f"OperandKind::{f}" for f in info['operands']])
             out.append(f'        {{spv::{opname}, {{{{{kinds}}}}}}},\n')
         out.append('''    }; // clang-format on

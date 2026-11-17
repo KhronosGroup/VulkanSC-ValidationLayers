@@ -24,10 +24,41 @@
 #include "state_tracker/queue_state.h"
 #include "state_tracker/event_state.h"
 #include "state_tracker/shader_stage_state.h"
+#include "error_message/error_location.h"
 
 class CoreChecks;
 
 namespace core {
+
+// State shared by the deferred query_updates callbacks of a single command buffer.
+//
+// Here |core| instead of |vvl| because we define the vector of them in this file
+struct QueryUpdateState {
+    // on QueueSubState::Retire we will want to update the state
+    // we have two modes for the callbacks
+    enum class Mode { StateOnly, Validate };
+    const Mode mode;
+    bool Validate() const { return mode == Mode::Validate; }
+
+    // copy from CommandBufferSubmitState
+    // will be updated in SetQueryState()
+    QueryMap* local_query_to_state_map = nullptr;
+
+    // VK_KHR_performance_query
+    const uint32_t perf_query_pass;
+
+    // The vkQueueSubmit(2) call submitted with (needed for selecting VUID)
+    // Will be Func::Empty in |StateOnly|.
+    const vvl::Func submit_func;
+
+    // The first performance query seen
+    // will be set in ValidatePerformanceQuery
+    VkQueryPool first_perf_query_pool = VK_NULL_HANDLE;
+
+    QueryUpdateState(Mode mode, QueryMap* query_map, uint32_t perf_pass, vvl::Func func)
+        : mode(mode), local_query_to_state_map(query_map), perf_query_pass(perf_pass), submit_func(func) {}
+};
+using QueryUpdate = std::function<bool(vvl::CommandBuffer& cb_state, QueryUpdateState& query_state)>;
 
 // CommandBuffer is over 3 times larger than the next largest state object struct, but the majority of the state is only used in
 // CoreChecks. This state object is used by everyone else (best practice, sync val, GPU-AV, etc). For this reason, we have
@@ -127,8 +158,10 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     void RecordDecodeVideo(vvl::VideoSession &vs_state, const VkVideoDecodeInfoKHR &decode_info, const Location &loc) final;
     void RecordEncodeVideo(vvl::VideoSession &vs_state, const VkVideoEncodeInfoKHR &encode_info, const Location &loc) final;
 
+    QueryMap GetLocalQueryMap(uint32_t perf_submit_pass) const;
     // Only need to retire for core checks to track queries
-    void Retire(uint32_t perf_submit_pass, const std::function<bool(const QueryObject &)> &is_query_updated_after);
+    using QuerySubmissionSnapshot = std::vector<std::pair<uint32_t, std::shared_ptr<vvl::CommandBuffer>>>;
+    void RetireQueries(uint32_t perf_submit_pass, const QuerySubmissionSnapshot& submission_snapshot);
 
     void Reset(const Location &loc) final;
     void Destroy() final;
@@ -136,7 +169,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     void RecordExecuteCommand(vvl::CommandBuffer &secondary_command_buffer, uint32_t cmd_index, const Location &loc) final;
 
     // Called from the Command Buffer state
-    void Submit(vvl::Queue &queue_state, uint32_t perf_submit_pass, const Location &loc) final;
+    void Submit(vvl::Queue& queue_state, const vvl::QueueSubmission& queue_submission, uint32_t cb_index) final;
 
     CoreChecks &validator;
 
@@ -207,7 +240,8 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     std::vector<WaitEvent2SubmitInfo> wait_event2_submit_infos;
 
     // Validation functions run at primary CB queue submit time
-    using QueueCallback = std::function<bool(const class vvl::Queue &queue_state, const vvl::CommandBuffer &cb_state)>;
+    using QueueCallback =
+        std::function<bool(const class vvl::Queue& queue_state, const vvl::QueueSubmission& submission, uint32_t cb_index)>;
     std::vector<QueueCallback> queue_submit_functions;
 
     // Validation functions run when secondary CB is executed in primary
@@ -215,9 +249,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
         std::function<bool(const vvl::CommandBuffer &secondary, const vvl::CommandBuffer *primary, const vvl::Framebuffer *)>>
         cmd_execute_commands_functions;
 
-    std::vector<std::function<bool(vvl::CommandBuffer &cb_state, bool do_validate, VkQueryPool &first_perf_query_pool,
-                                   uint32_t perf_query_pass, QueryMap *local_query_to_state_map)>>
-        query_updates;
+    std::vector<QueryUpdate> query_updates;
 
   private:
     void ResetCBState();
@@ -255,6 +287,39 @@ class QueueSubState : public vvl::QueueSubState {
     void Retire(vvl::QueueSubmission&) override;
 
     vvl::SubmitTimeTracker* submit_time_tracker = nullptr;
+};
+
+// When validating vkCmdBeginRendering we need to loop the Color attachments, depth, stencil and their resolve attachments as well
+// The goal is to have a single object so we only need to walk these attachments once and then all the various checks can use the
+// same data
+struct RenderingAttachment {
+    enum class Type {
+        Empty = 0,
+        Color,
+        Depth,
+        Stencil,
+    };
+
+    RenderingAttachment(const vvl::CommandBuffer& cb_state, const VkRenderingInfo& rendering_info,
+                        const VkRenderingAttachmentInfo& info, const Location& loc, Type type);
+
+    const vvl::CommandBuffer& cb_state;
+    const VkRenderingInfo& rendering_info;
+
+    const VkRenderingAttachmentInfo& info;
+    vvl::LocationCapture loc;
+    const Type type;
+
+    std::shared_ptr<const vvl::ImageView> image_view_state;
+    std::shared_ptr<const vvl::ImageView> resolve_view_state;
+
+    const Location& Loc() const { return loc.Get(); }
+    LogObjectList GetObjectList() const;
+    LogObjectList GetObjectList(const core::RenderingAttachment& other_attachment) const;
+
+    bool IsColor() const { return type == Type::Color; }
+    bool IsDepth() const { return type == Type::Depth; }
+    bool IsStencil() const { return type == Type::Stencil; }
 };
 
 }  // namespace core

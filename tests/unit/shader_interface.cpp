@@ -1171,13 +1171,13 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
         }
     )glsl";
 
-    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource));
-    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fsSource));
+    const vkt::ShaderEXT vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vsSource);
+    const vkt::ShaderEXT fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, fsSource);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vertShader, fragShader);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vertShader, fragShader);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpEntryPoint-07754");
     vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -1210,13 +1210,13 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSizeShaderObject) {
         }
     )glsl";
 
-    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource));
-    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fsSource));
+    const vkt::ShaderEXT vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, vsSource);
+    const vkt::ShaderEXT fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, fsSource);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vertShader, fragShader);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vertShader, fragShader);
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maintenance4-06817");
     vk::CmdDraw(m_command_buffer, 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -1737,12 +1737,8 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRendering) {
     )glsl";
     VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({VK_FORMAT_B8G8R8A8_UNORM});
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
     pipe.CreateGraphicsPipeline();
@@ -1771,13 +1767,13 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotWrittenDynamicRenderingShaderOb
         void main() {}
     )glsl";
 
-    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl));
-    const vkt::Shader frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fs_source));
+    const vkt::ShaderEXT vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    const vkt::ShaderEXT frag_shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, fs_source);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
-    SetDefaultDynamicStatesExclude();
-    m_command_buffer.BindShaders(vert_shader, frag_shader);
+    SetDefaultDynamicStatesExcludeEXT();
+    m_command_buffer.BindShadersEXT(vert_shader, frag_shader);
     VkColorComponentFlags color_write_mask = 0xf;  // all
     vk::CmdSetColorWriteMaskEXT(m_command_buffer, 0, 1, &color_write_mask);
     m_errorMonitor->SetDesiredWarning("Undefined-Value-OutputNotWritten-DynamicRendering");
@@ -1923,12 +1919,8 @@ TEST_F(NegativeShaderInterface, FragmentOutputTypeMismatchDynamicRendering) {
 
     VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({VK_FORMAT_B8G8R8A8_UNORM});
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
     pipe.CreateGraphicsPipeline();
@@ -2097,12 +2089,8 @@ TEST_F(NegativeShaderInterface, FragmentOutputNotConsumedDynamicRendering) {
     )glsl";
     VkShaderObj fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({VK_FORMAT_B8G8R8A8_UNORM});
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
     pipe.CreateGraphicsPipeline();
@@ -2560,8 +2548,135 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexShaderObject) {
                                        });
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-09558");
-    const vkt::Shader frag_shader(*m_device,
-                                  ShaderCreateInfo(spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, &descriptor_set.layout_.handle()));
+    const vkt::ShaderEXT frag_shader(*m_device,
+                                     ShaderCreateInfoEXT(spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, &descriptor_set.layout_.handle()));
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, InputAttachmentIndexMaxPerStage) {
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+
+    const uint32_t max_per_stage = m_device->Physical().limits_.maxPerStageDescriptorInputAttachments;
+    if (max_per_stage == vvl::kU32Max) {
+        GTEST_SKIP() << "maxPerStageDescriptorInputAttachments is uint32_t max";
+    }
+
+    // layout(input_attachment_index=<limit>, set=0, binding=0) uniform subpassInput xs;
+    // layout(location=0) out vec4 color;
+    // void main() {
+    //     color = subpassLoad(xs);
+    // }
+    const std::string fs_source = R"(
+               OpCapability Shader
+               OpCapability InputAttachment
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %color
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %color Location 0
+               OpDecorate %xs DescriptorSet 0
+               OpDecorate %xs Binding 0
+               OpDecorate %xs InputAttachmentIndex )" +
+                                  std::to_string(max_per_stage) + R"(
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output
+         %10 = OpTypeImage %float SubpassData 0 0 0 2 Unknown
+%_ptr_UniformConstant_10 = OpTypePointer UniformConstant %10
+         %xs = OpVariable %_ptr_UniformConstant_10 UniformConstant
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %v2int = OpTypeVector %int 2
+         %17 = OpConstantComposite %v2int %int_0 %int_0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %13 = OpLoad %10 %xs
+         %18 = OpImageRead %v4float %13 %17
+               OpStore %color %18
+               OpReturn
+               OpFunctionEnd
+    )";
+    std::vector<uint32_t> spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, fs_source.c_str(), spv);
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                       });
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-12551");
+    const vkt::ShaderEXT frag_shader(*m_device,
+                                     ShaderCreateInfoEXT(spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, &descriptor_set.layout_.handle()));
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, InputAttachmentIndexMaxInputAttachmentIndex) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_12_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::maintenance12);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceMaintenance12PropertiesKHR maintenance12_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(maintenance12_props);
+    const uint32_t max_index = maintenance12_props.maxInputAttachmentIndex;
+    if (max_index == vvl::kU32Max) {
+        GTEST_SKIP() << "maxInputAttachmentIndex is uint32_t max";
+    }
+
+    // layout(input_attachment_index=<limit>, set=0, binding=0) uniform subpassInput xs;
+    // layout(location=0) out vec4 color;
+    // void main() {
+    //     color = subpassLoad(xs);
+    // }
+    const std::string fs_source = R"(
+               OpCapability Shader
+               OpCapability InputAttachment
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %color
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %color Location 0
+               OpDecorate %xs DescriptorSet 0
+               OpDecorate %xs Binding 0
+               OpDecorate %xs InputAttachmentIndex )" +
+                                  std::to_string(max_index) + R"(
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output
+         %10 = OpTypeImage %float SubpassData 0 0 0 2 Unknown
+%_ptr_UniformConstant_10 = OpTypePointer UniformConstant %10
+         %xs = OpVariable %_ptr_UniformConstant_10 UniformConstant
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %v2int = OpTypeVector %int 2
+         %17 = OpConstantComposite %v2int %int_0 %int_0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %13 = OpLoad %10 %xs
+         %18 = OpImageRead %v4float %13 %17
+               OpStore %color %18
+               OpReturn
+               OpFunctionEnd
+    )";
+    std::vector<uint32_t> spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, fs_source.c_str(), spv);
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                       });
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maxInputAttachmentIndex-12552");
+    const vkt::ShaderEXT frag_shader(*m_device,
+                                     ShaderCreateInfoEXT(spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, &descriptor_set.layout_.handle()));
     m_errorMonitor->VerifyFound();
 }
 

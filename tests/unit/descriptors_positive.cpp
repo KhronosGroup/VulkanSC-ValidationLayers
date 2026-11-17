@@ -1486,7 +1486,7 @@ TEST_F(PositiveDescriptors, WriteMutableDescriptorSet) {
     VkDescriptorSetLayoutBinding dsl_bindings[2]{{0, VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                  {2, VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 1, VK_SHADER_STAGE_ALL, nullptr}};
 
-    VkDescriptorType types_0[1] = {VK_DESCRIPTOR_TYPE_SAMPLER};
+    VkDescriptorType types_0[1] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
     VkDescriptorType types_2[2] = {
         VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -1556,7 +1556,7 @@ TEST_F(PositiveDescriptors, WriteMutableDescriptorSet2) {
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
     };
     // map to binding 0
-    VkDescriptorType types_1[1] = {VK_DESCRIPTOR_TYPE_SAMPLER};
+    VkDescriptorType types_1[1] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
 
     VkMutableDescriptorTypeListEXT type_list[2] = {
         {2, types_0},
@@ -1628,6 +1628,44 @@ TEST_F(PositiveDescriptors, WriteDescriptorSetTypeStageMatch) {
     descriptor_write.dstArrayElement = 1;
     descriptor_write.descriptorCount = 3;
     vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
+}
+
+TEST_F(PositiveDescriptors, CopyMutableDescriptorPastDstBinding) {
+    TEST_DESCRIPTION("Copy with dstArrayElement past the end of dstBinding, skipping over a binding with no descriptors");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::mutableDescriptorType);
+    RETURN_IF_SKIP(Init());
+
+    VkDescriptorType mutable_types[2] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+    VkMutableDescriptorTypeListEXT type_lists[3] = {{2, mutable_types}, {2, mutable_types}, {2, mutable_types}};
+    VkMutableDescriptorTypeCreateInfoEXT mutable_ci = vku::InitStructHelper();
+    mutable_ci.mutableDescriptorTypeListCount = 3;
+    mutable_ci.pMutableDescriptorTypeLists = type_lists;
+
+    // Binding 1 has no descriptors, bindings 0 and 2 have one each
+    OneOffDescriptorSet dst_set(m_device,
+                                {{0, VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                 {1, VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 0, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                 {2, VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}},
+                                0, &mutable_ci, 0, nullptr, &mutable_ci);
+    OneOffDescriptorSet src_set(m_device, {{0, VK_DESCRIPTOR_TYPE_MUTABLE_EXT, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}}, 0,
+                                &mutable_ci, 0, nullptr, &mutable_ci);
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    src_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE);
+    src_set.UpdateDescriptorSets();
+
+    // Element 1 of binding 0 skips the empty binding 1, so this writes element 0 of binding 2
+    VkCopyDescriptorSet copy = vku::InitStructHelper();
+    copy.srcSet = src_set.set_;
+    copy.srcBinding = 0;
+    copy.srcArrayElement = 0;
+    copy.dstSet = dst_set.set_;
+    copy.dstBinding = 0;
+    copy.dstArrayElement = 1;
+    copy.descriptorCount = 1;
+    vk::UpdateDescriptorSets(device(), 0, nullptr, 1, &copy);
 }
 
 TEST_F(PositiveDescriptors, AllocateOverDescriptorCount) {
@@ -2569,11 +2607,8 @@ TEST_F(PositiveDescriptors, TransitionImageUnusedByShader) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     const VkFormat attachment_format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &attachment_format;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({attachment_format});
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout;
     pipe.CreateGraphicsPipeline();
@@ -2608,4 +2643,37 @@ TEST_F(PositiveDescriptors, TransitionImageUnusedByShader) {
     m_command_buffer.EndRendering();
     m_command_buffer.Barrier(transition);
     m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, TemplateUpdateConsecutiveBindings) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                     {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4, VK_SHADER_STAGE_ALL, nullptr},
+                                                 });
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+    VkDescriptorUpdateTemplateEntry update_template_entry = {};
+    update_template_entry.dstBinding = 0u;
+    update_template_entry.dstArrayElement = 0u;
+    update_template_entry.descriptorCount = 6u;
+    update_template_entry.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    update_template_entry.offset = 0u;
+    update_template_entry.stride = sizeof(VkDescriptorBufferInfo);
+
+    VkDescriptorUpdateTemplateCreateInfo update_template_ci = vku::InitStructHelper();
+    update_template_ci.descriptorUpdateEntryCount = 1u;
+    update_template_ci.pDescriptorUpdateEntries = &update_template_entry;
+    update_template_ci.templateType = VK_DESCRIPTOR_UPDATE_TEMPLATE_TYPE_DESCRIPTOR_SET;
+    update_template_ci.descriptorSetLayout = descriptor_set.layout_;
+    vkt::DescriptorUpdateTemplate update_template(*m_device, update_template_ci);
+
+    VkDescriptorBufferInfo buffer_infos[6];
+    for (auto& buffer_info : buffer_infos) {
+        buffer_info = {buffer, 0, VK_WHOLE_SIZE};
+    }
+    vk::UpdateDescriptorSetWithTemplate(device(), descriptor_set.set_, update_template, buffer_infos);
 }

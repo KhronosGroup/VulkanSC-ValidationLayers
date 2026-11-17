@@ -15,6 +15,7 @@
 
 #include "mesh_shading_pass.h"
 #include <vulkan/vulkan_core.h>
+#include "access_path.h"
 #include "containers/container_utils.h"
 #include "module.h"
 #include <cassert>
@@ -72,10 +73,8 @@ bool MeshShading::RequiresInstrumentation(const Function& function, const Instru
         meta.function_id = SET_MESH_OUTPUT;
         return true;
     } else if (guard_all_task_payloads_ && (IsValueIn(opcode, {spv::OpLoad, spv::OpStore}) || AtomicOperation(opcode))) {
-        const AccessPath access_path = type_manager_.BuildAccessPath(function, inst);
-        if (!access_path.IsValid()) {
-            return false;
-        } else if (access_path.variable->StorageClass() != spv::StorageClassTaskPayloadWorkgroupEXT) {
+        const AccessPath* access_path = module_.GetAccessPath(function, inst);
+        if (!access_path || !access_path->IsValid(spv::StorageClassTaskPayloadWorkgroupEXT)) {
             return false;
         }
 
@@ -144,6 +143,11 @@ bool MeshShading::Instrument() {
 
                 if (!module_.settings_.safe_mode) {
                     CreateFunctionCall(current_block, &inst_it, meta);
+                } else if (meta.function_id == SET_MESH_OUTPUT) {
+                    // Rather than branching around OpSetMeshOutputsEXT, clamp its counts to the OutputVertices/OutputPrimitivesEXT
+                    // values, so it is still called exactly once and never exceeds the output storage the driver allocated
+                    CreateFunctionCall(current_block, &inst_it, meta);
+                    ClampMeshOutputCounts(current_block, &inst_it);
                 } else {
                     InjectConditionalData ic_data = InjectFunctionPre(function, block_it, inst_it);
                     ic_data.function_result_id = CreateFunctionCall(current_block, nullptr, meta);
@@ -158,6 +162,32 @@ bool MeshShading::Instrument() {
     }
 
     return instrumentations_count_ != 0;
+}
+
+void MeshShading::ClampMeshOutputCounts(BasicBlock& block, InstructionIt* inst_it) {
+    Instruction& set_mesh_outputs_inst = ***inst_it;
+    const uint32_t uint32_type_id = type_manager_.GetTypeInt(32, false).Id();
+    const uint32_t bool_type_id = type_manager_.GetTypeBool().Id();
+
+    // Clamp vertices
+    {
+        const uint32_t count_id = set_mesh_outputs_inst.Word(1);
+        const uint32_t in_range_id = module_.TakeNextId();
+        const uint32_t clamped_id = module_.TakeNextId();
+        block.CreateInstruction(spv::OpULessThanEqual, {bool_type_id, in_range_id, count_id, output_vertices_id_}, inst_it);
+        block.CreateInstruction(spv::OpSelect, {uint32_type_id, clamped_id, in_range_id, count_id, output_vertices_id_}, inst_it);
+        set_mesh_outputs_inst.UpdateWord(1, clamped_id);
+    }
+
+    // Clamp primitives
+    {
+        const uint32_t count_id = set_mesh_outputs_inst.Word(2);
+        const uint32_t in_range_id = module_.TakeNextId();
+        const uint32_t clamped_id = module_.TakeNextId();
+        block.CreateInstruction(spv::OpULessThanEqual, {bool_type_id, in_range_id, count_id, output_primitives_id_}, inst_it);
+        block.CreateInstruction(spv::OpSelect, {uint32_type_id, clamped_id, in_range_id, count_id, output_primitives_id_}, inst_it);
+        set_mesh_outputs_inst.UpdateWord(2, clamped_id);
+    }
 }
 
 void MeshShading::PrintDebugInfo() const { std::cout << "MeshShading instrumentation count: " << instrumentations_count_ << '\n'; }

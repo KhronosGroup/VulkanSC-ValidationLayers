@@ -1386,6 +1386,19 @@ ValidValue stateless::Context::IsValidEnumValue(VkComponentTypeKHR value) const 
 }
 
 template <>
+ValidValue stateless::Context::IsValidEnumValue(VkScopeKHR value) const {
+    switch (value) {
+        case VK_SCOPE_DEVICE_KHR:
+        case VK_SCOPE_WORKGROUP_KHR:
+        case VK_SCOPE_SUBGROUP_KHR:
+        case VK_SCOPE_QUEUE_FAMILY_KHR:
+            return ValidValue::Valid;
+        default:
+            return ValidValue::NotFound;
+    };
+}
+
+template <>
 ValidValue stateless::Context::IsValidEnumValue(VkVideoEncodeAV1PredictionModeKHR value) const {
     switch (value) {
         case VK_VIDEO_ENCODE_AV1_PREDICTION_MODE_INTRA_ONLY_KHR:
@@ -2581,6 +2594,29 @@ ValidValue stateless::Context::IsValidEnumValue(VkNeuralAcceleratorStatisticsMod
 }
 
 template <>
+ValidValue stateless::Context::IsValidEnumValue(VkImageTilingControlEXT value) const {
+    switch (value) {
+        case VK_IMAGE_TILING_CONTROL_DEFAULT_EXT:
+        case VK_IMAGE_TILING_CONTROL_MIN_SIZE_EXT:
+        case VK_IMAGE_TILING_CONTROL_MAX_PERFORMANCE_EXT:
+            return ValidValue::Valid;
+        default:
+            return ValidValue::NotFound;
+    };
+}
+
+template <>
+ValidValue stateless::Context::IsValidEnumValue(VkHdrSmpteSt209450PowerPreferenceGOOGLE value) const {
+    switch (value) {
+        case VK_HDR_SMPTE_ST_209450_POWER_PREFERENCE_COLOR_ACCURACY_GOOGLE:
+        case VK_HDR_SMPTE_ST_209450_POWER_PREFERENCE_LOW_POWER_GOOGLE:
+            return ValidValue::Valid;
+        default:
+            return ValidValue::NotFound;
+    };
+}
+
+template <>
 ValidValue stateless::Context::IsValidEnumValue(VkBuildAccelerationStructureModeKHR value) const {
     switch (value) {
         case VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR:
@@ -3570,6 +3606,15 @@ const char* stateless::Context::DescribeEnum(VkComponentTypeKHR value) const {
 }
 
 template <>
+vvl::Extensions stateless::Context::GetEnumExtensions(VkScopeKHR value) const {
+    return {};
+}
+template <>
+const char* stateless::Context::DescribeEnum(VkScopeKHR value) const {
+    return nullptr;
+}
+
+template <>
 vvl::Extensions stateless::Context::GetEnumExtensions(VkVideoEncodeAV1PredictionModeKHR value) const {
     return {};
 }
@@ -4417,6 +4462,24 @@ vvl::Extensions stateless::Context::GetEnumExtensions(VkNeuralAcceleratorStatist
 }
 template <>
 const char* stateless::Context::DescribeEnum(VkNeuralAcceleratorStatisticsModeARM value) const {
+    return nullptr;
+}
+
+template <>
+vvl::Extensions stateless::Context::GetEnumExtensions(VkImageTilingControlEXT value) const {
+    return {};
+}
+template <>
+const char* stateless::Context::DescribeEnum(VkImageTilingControlEXT value) const {
+    return nullptr;
+}
+
+template <>
+vvl::Extensions stateless::Context::GetEnumExtensions(VkHdrSmpteSt209450PowerPreferenceGOOGLE value) const {
+    return {};
+}
+template <>
+const char* stateless::Context::DescribeEnum(VkHdrSmpteSt209450PowerPreferenceGOOGLE value) const {
     return nullptr;
 }
 

@@ -11,6 +11,7 @@
  */
 
 #include "pipeline_helper.h"
+#include <cstdint>
 
 CreatePipelineHelper::CreatePipelineHelper(VkLayerTest& test, void* pNext) : layer_test_(test) {
     // default VkDevice, can be overwritten if multi-device tests
@@ -82,7 +83,7 @@ CreatePipelineHelper::CreatePipelineHelper(VkLayerTest& test, void* pNext) : lay
     cb_ci_.attachmentCount = 1;
     cb_ci_.pAttachments = &cb_attachments_;
     for (int i = 0; i < 4; i++) {
-        cb_ci_.blendConstants[0] = 1.0F;
+        cb_ci_.blendConstants[i] = 1.0F;
     }
 
     pc_ci_ = vku::InitStructHelper();
@@ -152,6 +153,36 @@ void CreatePipelineHelper::AddDynamicState(VkDynamicState dynamic_state) {
     dyn_state_ci_.dynamicStateCount = dynamic_states_.size();
     // Set here and don't have have to worry about late bind setting it
     gp_ci_.pDynamicState = &dyn_state_ci_;
+}
+
+void CreatePipelineHelper::SetDynamicRendering(const std::vector<VkFormat>& color_formats, VkFormat depth_format,
+                                               VkFormat stencil_format) {
+    const bool already_chained = IsValidVkStruct(pipeline_rendering_ci_);
+    const void* pnext = already_chained ? pipeline_rendering_ci_.pNext : gp_ci_.pNext;
+
+    color_formats_ = color_formats;
+    pipeline_rendering_ci_ = vku::InitStructHelper(const_cast<void*>(pnext));
+    pipeline_rendering_ci_.colorAttachmentCount = static_cast<uint32_t>(color_formats_.size());
+    pipeline_rendering_ci_.pColorAttachmentFormats = color_formats_.data();
+    pipeline_rendering_ci_.depthAttachmentFormat = depth_format;
+    pipeline_rendering_ci_.stencilAttachmentFormat = stencil_format;
+    pipeline_rendering_ci_.viewMask = 0;
+
+    if (!already_chained) {
+        gp_ci_.pNext = &pipeline_rendering_ci_;
+    }
+    gp_ci_.renderPass = VK_NULL_HANDLE;
+    if (color_formats_.size() <= 1) {
+        cb_ci_.attachmentCount = pipeline_rendering_ci_.colorAttachmentCount;
+    }
+}
+
+void CreatePipelineHelper::SetVertexInput(const VkVertexInputBindingDescription& binding,
+                                          const VkVertexInputAttributeDescription& attribute) {
+    vi_ci_.vertexBindingDescriptionCount = 1;
+    vi_ci_.pVertexBindingDescriptions = &binding;
+    vi_ci_.vertexAttributeDescriptionCount = 1;
+    vi_ci_.pVertexAttributeDescriptions = &attribute;
 }
 
 void CreatePipelineHelper::InitVertexInputLibInfo(void* p_next) {
@@ -232,7 +263,6 @@ void CreatePipelineHelper::InitShaderLibInfo(std::vector<VkPipelineShaderStageCr
 
     gp_ci_ = vku::InitStructHelper(&gpl_info);
     gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
-    gp_ci_.pViewportState = &vp_state_ci_;
     gp_ci_.pViewportState = &vp_state_ci_;
     gp_ci_.pRasterizationState = &rs_state_ci_;
 
@@ -468,9 +498,9 @@ SimpleGPL::SimpleGPL(VkLayerTest& test, VkPipelineLayout layout, const char* ver
     pipe_.Init(*device, exe_pipe_ci);
 }
 
-HeapComputePipeline::HeapComputePipeline(vkt::Device& device, const char* source, const spv_target_env env,
-                                         const VkShaderDescriptorSetAndBindingMappingInfoEXT* mapping_info,
-                                         SpvSourceType source_type, const VkSpecializationInfo* specialization_info) {
+HeapComputePipelineEXT::HeapComputePipelineEXT(vkt::Device& device, const char* source, const spv_target_env env,
+                                               const VkShaderDescriptorSetAndBindingMappingInfoEXT* mapping_info,
+                                               SpvSourceType source_type, const VkSpecializationInfo* specialization_info) {
     VkShaderObj cs_module(device, source, VK_SHADER_STAGE_COMPUTE_BIT, env, source_type, specialization_info);
 
     VkPipelineCreateFlags2CreateInfoKHR flags2_ci = vku::InitStructHelper();
@@ -481,6 +511,35 @@ HeapComputePipeline::HeapComputePipeline(vkt::Device& device, const char* source
     pipe_ci.layout = VK_NULL_HANDLE;
     pipe_ci.stage = cs_module.GetStageCreateInfo((void*)mapping_info);
     pipe_.Init(device, pipe_ci);
+}
+
+HeapGraphicsPipelineEXT::HeapGraphicsPipelineEXT(VkLayerTest& test, const VkPipelineShaderStageCreateInfo* stages,
+                                                 uint32_t stage_count, void* pNext, VkRenderPass render_pass)
+    : pipe_(test) {
+    Init(stages, stage_count, pNext, render_pass);
+}
+
+HeapGraphicsPipelineEXT::HeapGraphicsPipelineEXT(VkLayerTest& test, const VkPipelineShaderStageCreateInfo& vert,
+                                                 const VkPipelineShaderStageCreateInfo& frag)
+    : pipe_(test) {
+    VkPipelineShaderStageCreateInfo stages[2] = {vert, frag};
+    Init(stages, 2, nullptr, VK_NULL_HANDLE);
+}
+
+void HeapGraphicsPipelineEXT::Init(const VkPipelineShaderStageCreateInfo* stages, uint32_t stage_count, void* pNext,
+                                   VkRenderPass render_pass) {
+    VkPipelineCreateFlags2CreateInfoKHR flags2_ci = vku::InitStructHelper(pNext);
+    flags2_ci.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+
+    pipe_.gp_ci_.pNext = &flags2_ci;
+    pipe_.gp_ci_.layout = VK_NULL_HANDLE;
+    // Assume default render pass from InitRenderTarget()
+    if (render_pass != VK_NULL_HANDLE) {
+        pipe_.gp_ci_.renderPass = render_pass;
+    }
+    pipe_.gp_ci_.stageCount = stage_count;
+    pipe_.gp_ci_.pStages = stages;
+    pipe_.CreateGraphicsPipeline(false);
 }
 
 }  // namespace vkt

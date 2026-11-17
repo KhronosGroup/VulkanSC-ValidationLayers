@@ -736,6 +736,13 @@ PFN_vkCmdCudaLaunchKernelNV CmdCudaLaunchKernelNV;
 PFN_vkCmdDispatchTileQCOM CmdDispatchTileQCOM;
 PFN_vkCmdBeginPerTileExecutionQCOM CmdBeginPerTileExecutionQCOM;
 PFN_vkCmdEndPerTileExecutionQCOM CmdEndPerTileExecutionQCOM;
+PFN_vkSetLatencySleepModeLegacyNV SetLatencySleepModeLegacyNV;
+PFN_vkLatencySleepLegacyNV LatencySleepLegacyNV;
+PFN_vkSetLatencyMarkerLegacyNV SetLatencyMarkerLegacyNV;
+PFN_vkGetLatencyTimingsLegacyNV GetLatencyTimingsLegacyNV;
+PFN_vkQueueNotifyOutOfBandLegacyNV QueueNotifyOutOfBandLegacyNV;
+PFN_vkGetSleepStatusLegacyNV GetSleepStatusLegacyNV;
+PFN_vkShutdownLatencyDeviceLegacyNV ShutdownLatencyDeviceLegacyNV;
 #ifdef VK_USE_PLATFORM_METAL_EXT
 PFN_vkExportMetalObjectsEXT ExportMetalObjectsEXT;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -940,10 +947,15 @@ PFN_vkCmdEndRendering2EXT CmdEndRendering2EXT;
 PFN_vkCmdBeginCustomResolveEXT CmdBeginCustomResolveEXT;
 PFN_vkGetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM GetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM;
 PFN_vkCmdSetComputeOccupancyPriorityNV CmdSetComputeOccupancyPriorityNV;
+PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT GetPhysicalDeviceCooperativeMatrixProperties2EXT;
 #ifdef VK_USE_PLATFORM_UBM_SEC
 PFN_vkCreateUbmSurfaceSEC CreateUbmSurfaceSEC;
 PFN_vkGetPhysicalDeviceUbmPresentationSupportSEC GetPhysicalDeviceUbmPresentationSupportSEC;
 #endif  // VK_USE_PLATFORM_UBM_SEC
+PFN_vkGetPhysicalDeviceInternalHandleNV GetPhysicalDeviceInternalHandleNV;
+PFN_vkGetDeviceInternalHandleNV GetDeviceInternalHandleNV;
+PFN_vkGetQueueInternalHandleNV GetQueueInternalHandleNV;
+PFN_vkGetCommandBufferInternalHandleNV GetCommandBufferInternalHandleNV;
 PFN_vkCmdSetPrimitiveRestartIndexEXT CmdSetPrimitiveRestartIndexEXT;
 PFN_vkCreateAccelerationStructureKHR CreateAccelerationStructureKHR;
 PFN_vkDestroyAccelerationStructureKHR DestroyAccelerationStructureKHR;
@@ -973,7 +985,7 @@ PFN_vkCmdDrawMeshTasksIndirectCountEXT CmdDrawMeshTasksIndirectCountEXT;
 
 void InitCore(const char *api_name) {
 
-#if defined(WIN32)
+#if defined(_WIN32)
     std::string filename = std::string(api_name) + "-1.dll";
     auto lib_handle = open_library(filename.c_str());
 #elif(__APPLE__)
@@ -2465,6 +2477,17 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 CmdEndPerTileExecutionQCOM = reinterpret_cast<PFN_vkCmdEndPerTileExecutionQCOM>(GetDeviceProcAddr(device, "vkCmdEndPerTileExecutionQCOM"));
             }
         },
+        {
+            "VK_NV_low_latency", [](VkInstance , VkDevice device) {
+                SetLatencySleepModeLegacyNV = reinterpret_cast<PFN_vkSetLatencySleepModeLegacyNV>(GetDeviceProcAddr(device, "vkSetLatencySleepModeLegacyNV"));
+                LatencySleepLegacyNV = reinterpret_cast<PFN_vkLatencySleepLegacyNV>(GetDeviceProcAddr(device, "vkLatencySleepLegacyNV"));
+                SetLatencyMarkerLegacyNV = reinterpret_cast<PFN_vkSetLatencyMarkerLegacyNV>(GetDeviceProcAddr(device, "vkSetLatencyMarkerLegacyNV"));
+                GetLatencyTimingsLegacyNV = reinterpret_cast<PFN_vkGetLatencyTimingsLegacyNV>(GetDeviceProcAddr(device, "vkGetLatencyTimingsLegacyNV"));
+                QueueNotifyOutOfBandLegacyNV = reinterpret_cast<PFN_vkQueueNotifyOutOfBandLegacyNV>(GetDeviceProcAddr(device, "vkQueueNotifyOutOfBandLegacyNV"));
+                GetSleepStatusLegacyNV = reinterpret_cast<PFN_vkGetSleepStatusLegacyNV>(GetDeviceProcAddr(device, "vkGetSleepStatusLegacyNV"));
+                ShutdownLatencyDeviceLegacyNV = reinterpret_cast<PFN_vkShutdownLatencyDeviceLegacyNV>(GetDeviceProcAddr(device, "vkShutdownLatencyDeviceLegacyNV"));
+            }
+        },
 #ifdef VK_USE_PLATFORM_METAL_EXT
         {
             "VK_EXT_metal_objects", [](VkInstance , VkDevice device) {
@@ -2924,6 +2947,19 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
         {
             "VK_NV_compute_occupancy_priority", [](VkInstance , VkDevice device) {
                 CmdSetComputeOccupancyPriorityNV = reinterpret_cast<PFN_vkCmdSetComputeOccupancyPriorityNV>(GetDeviceProcAddr(device, "vkCmdSetComputeOccupancyPriorityNV"));
+            }
+        },
+        {
+            "VK_EXT_cooperative_matrix_maintenance1", [](VkInstance instance, VkDevice ) {
+                GetPhysicalDeviceCooperativeMatrixProperties2EXT = reinterpret_cast<PFN_vkGetPhysicalDeviceCooperativeMatrixProperties2EXT>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixProperties2EXT"));
+            }
+        },
+        {
+            "VK_NV_internal_handle", [](VkInstance instance, VkDevice device) {
+                GetDeviceInternalHandleNV = reinterpret_cast<PFN_vkGetDeviceInternalHandleNV>(GetDeviceProcAddr(device, "vkGetDeviceInternalHandleNV"));
+                GetQueueInternalHandleNV = reinterpret_cast<PFN_vkGetQueueInternalHandleNV>(GetDeviceProcAddr(device, "vkGetQueueInternalHandleNV"));
+                GetCommandBufferInternalHandleNV = reinterpret_cast<PFN_vkGetCommandBufferInternalHandleNV>(GetDeviceProcAddr(device, "vkGetCommandBufferInternalHandleNV"));
+                GetPhysicalDeviceInternalHandleNV = reinterpret_cast<PFN_vkGetPhysicalDeviceInternalHandleNV>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceInternalHandleNV"));
             }
         },
         {
@@ -3402,6 +3438,13 @@ void ResetAllExtensions() {
     CmdDispatchTileQCOM = nullptr;
     CmdBeginPerTileExecutionQCOM = nullptr;
     CmdEndPerTileExecutionQCOM = nullptr;
+    SetLatencySleepModeLegacyNV = nullptr;
+    LatencySleepLegacyNV = nullptr;
+    SetLatencyMarkerLegacyNV = nullptr;
+    GetLatencyTimingsLegacyNV = nullptr;
+    QueueNotifyOutOfBandLegacyNV = nullptr;
+    GetSleepStatusLegacyNV = nullptr;
+    ShutdownLatencyDeviceLegacyNV = nullptr;
 #ifdef VK_USE_PLATFORM_METAL_EXT
     ExportMetalObjectsEXT = nullptr;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -3606,10 +3649,15 @@ void ResetAllExtensions() {
     CmdBeginCustomResolveEXT = nullptr;
     GetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM = nullptr;
     CmdSetComputeOccupancyPriorityNV = nullptr;
+    GetPhysicalDeviceCooperativeMatrixProperties2EXT = nullptr;
 #ifdef VK_USE_PLATFORM_UBM_SEC
     CreateUbmSurfaceSEC = nullptr;
     GetPhysicalDeviceUbmPresentationSupportSEC = nullptr;
 #endif  // VK_USE_PLATFORM_UBM_SEC
+    GetPhysicalDeviceInternalHandleNV = nullptr;
+    GetDeviceInternalHandleNV = nullptr;
+    GetQueueInternalHandleNV = nullptr;
+    GetCommandBufferInternalHandleNV = nullptr;
     CmdSetPrimitiveRestartIndexEXT = nullptr;
     CreateAccelerationStructureKHR = nullptr;
     DestroyAccelerationStructureKHR = nullptr;

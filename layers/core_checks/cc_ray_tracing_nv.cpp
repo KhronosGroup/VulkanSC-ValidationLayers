@@ -32,367 +32,6 @@
 #include "state_tracker/pipeline_state.h"
 #include "containers/container_utils.h"
 
-bool CoreChecks::PreCallValidateCreateAccelerationStructureNV(VkDevice device,
-                                                              const VkAccelerationStructureCreateInfoNV* pCreateInfo,
-                                                              const VkAllocationCallbacks* pAllocator,
-                                                              VkAccelerationStructureNV* pAccelerationStructure,
-                                                              const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (pCreateInfo != nullptr && pCreateInfo->info.type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV) {
-        for (uint32_t i = 0; i < pCreateInfo->info.geometryCount; i++) {
-            skip |= ValidateGeometryNV(pCreateInfo->info.pGeometries[i],
-                                       error_obj.location.dot(Field::pCreateInfo).dot(Field::info).dot(Field::pGeometries, i));
-        }
-    }
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateBindAccelerationStructureMemoryNV(VkDevice device, uint32_t bindInfoCount,
-                                                                  const VkBindAccelerationStructureMemoryInfoNV* pBindInfos,
-                                                                  const ErrorObject& error_obj) const {
-    bool skip = false;
-    for (uint32_t i = 0; i < bindInfoCount; i++) {
-        const Location bind_info_loc = error_obj.location.dot(Field::pBindInfos, i);
-        const VkBindAccelerationStructureMemoryInfoNV& info = pBindInfos[i];
-        auto as_state = Get<vvl::AccelerationStructureNV>(info.accelerationStructure);
-        ASSERT_AND_CONTINUE(as_state);
-
-        if (as_state->HasFullRangeBound()) {
-            skip |= LogError("VUID-VkBindAccelerationStructureMemoryInfoNV-accelerationStructure-03620", info.accelerationStructure,
-                             bind_info_loc.dot(Field::accelerationStructure), "must not already be backed by a memory object.");
-        }
-
-        // Validate bound memory range information
-        auto mem_info = Get<vvl::DeviceMemory>(info.memory);
-        if (mem_info) {
-            skip |=
-                ValidateInsertMemoryRange(VulkanTypedHandle(info.accelerationStructure, kVulkanObjectTypeAccelerationStructureNV),
-                                          *mem_info, info.memoryOffset, bind_info_loc);
-            skip |= ValidateMemoryTypes(*mem_info, as_state->memory_requirements.memoryTypeBits,
-                                        bind_info_loc.dot(Field::accelerationStructure),
-                                        "VUID-VkBindAccelerationStructureMemoryInfoNV-memory-03622");
-        }
-
-        // Validate memory requirements alignment
-        if (!IsIntegerMultipleOf(info.memoryOffset, as_state->memory_requirements.alignment)) {
-            skip |= LogError("VUID-VkBindAccelerationStructureMemoryInfoNV-memoryOffset-03623", info.accelerationStructure,
-                             bind_info_loc.dot(Field::memoryOffset),
-                             "(%" PRIu64 ") must be a multiple of the alignment (%" PRIu64
-                             ") member of the VkMemoryRequirements structure returned from "
-                             "a call to vkGetAccelerationStructureMemoryRequirementsNV with accelerationStructure %s and type of "
-                             "VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV",
-                             info.memoryOffset, as_state->memory_requirements.alignment,
-                             FormatHandle(info.accelerationStructure).c_str());
-        }
-
-        if (mem_info) {
-            // Validate memory requirements size
-            if (as_state->memory_requirements.size > (mem_info->allocate_info.allocationSize - info.memoryOffset)) {
-                skip |= LogError("VUID-VkBindAccelerationStructureMemoryInfoNV-size-03624", info.accelerationStructure,
-                                 bind_info_loc.dot(Field::memory),
-                                 "required size (%" PRIu64 ") minus %s (%" PRIu64 ") is %" PRIu64
-                                 ", but the size member of the VkMemoryRequirements structure returned from a call to "
-                                 "vkGetAccelerationStructureMemoryRequirementsNV with accelerationStructure %s and type of "
-                                 "VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV is %" PRIu64 ".",
-                                 as_state->memory_requirements.size, bind_info_loc.dot(Field::memoryOffset).Fields().c_str(),
-                                 info.memoryOffset, mem_info->allocate_info.allocationSize - info.memoryOffset,
-                                 FormatHandle(info.accelerationStructure).c_str(), as_state->memory_requirements.size);
-            }
-        }
-    }
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateGetAccelerationStructureHandleNV(VkDevice device, VkAccelerationStructureNV accelerationStructure,
-                                                                 size_t dataSize, void* pData, const ErrorObject& error_obj) const {
-    bool skip = false;
-
-    if (auto as_state = Get<vvl::AccelerationStructureNV>(accelerationStructure)) {
-        skip |= VerifyBoundMemoryIsValid(as_state->MemoryState(), LogObjectList(accelerationStructure), as_state->Handle(),
-                                         error_obj.location.dot(Field::accelerationStructure),
-                                         "VUID-vkGetAccelerationStructureHandleNV-accelerationStructure-02787");
-    }
-
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuffer commandBuffer,
-                                                                const VkAccelerationStructureInfoNV* pInfo, VkBuffer instanceData,
-                                                                VkDeviceSize instanceOffset, VkBool32 update,
-                                                                VkAccelerationStructureNV dst, VkAccelerationStructureNV src,
-                                                                VkBuffer scratch, VkDeviceSize scratchOffset,
-                                                                const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    bool skip = false;
-
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-
-    if (pInfo != nullptr && pInfo->type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV) {
-        for (uint32_t i = 0; i < pInfo->geometryCount; i++) {
-            skip |= ValidateGeometryNV(pInfo->pGeometries[i], error_obj.location.dot(Field::pInfo).dot(Field::pGeometries, i));
-        }
-    }
-
-    if (pInfo != nullptr && pInfo->geometryCount > phys_dev_ext_props.ray_tracing_props_nv.maxGeometryCount) {
-        skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-geometryCount-02241", commandBuffer,
-                         error_obj.location.dot(Field::pInfo).dot(Field::geometryCount),
-                         "geometryCount [%" PRIu32
-                         "] must be less than or equal to "
-                         "VkPhysicalDeviceRayTracingPropertiesNV::maxGeometryCount.",
-                         pInfo->geometryCount);
-    }
-
-    auto dst_as_state = Get<vvl::AccelerationStructureNV>(dst);
-    auto src_as_state = Get<vvl::AccelerationStructureNV>(src);
-
-    if (dst_as_state && pInfo) {
-        if (dst_as_state->create_info.info.type != pInfo->type) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                             "create info VkAccelerationStructureInfoNV::type"
-                             "[%s] must be identical to build info VkAccelerationStructureInfoNV::type [%s].",
-                             string_VkAccelerationStructureTypeKHR(dst_as_state->create_info.info.type),
-                             string_VkAccelerationStructureTypeKHR(pInfo->type));
-        }
-        if (dst_as_state->create_info.info.flags != pInfo->flags) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                             "create info VkAccelerationStructureInfoNV::flags"
-                             "[%s] must be identical to build info VkAccelerationStructureInfoNV::flags [%s].",
-                             string_VkBuildAccelerationStructureFlagsKHR(dst_as_state->create_info.info.flags).c_str(),
-                             string_VkBuildAccelerationStructureFlagsKHR(pInfo->flags).c_str());
-        }
-        if (dst_as_state->create_info.info.instanceCount < pInfo->instanceCount) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                             "create info VkAccelerationStructureInfoNV::instanceCount "
-                             "[%" PRIu32
-                             "] must be greater than or equal to build info VkAccelerationStructureInfoNV::instanceCount [%" PRIu32
-                             "].",
-                             dst_as_state->create_info.info.instanceCount, pInfo->instanceCount);
-        }
-        if (dst_as_state->create_info.info.geometryCount < pInfo->geometryCount) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                             "create info VkAccelerationStructureInfoNV::geometryCount"
-                             "[%" PRIu32
-                             "] must be greater than or equal to build info VkAccelerationStructureInfoNV::geometryCount [%" PRIu32
-                             "].",
-                             dst_as_state->create_info.info.geometryCount, pInfo->geometryCount);
-        } else {
-            for (uint32_t i = 0; i < pInfo->geometryCount; i++) {
-                const VkGeometryDataNV& create_geometry_data = dst_as_state->create_info.info.pGeometries[i].geometry;
-                const VkGeometryDataNV& build_geometry_data = pInfo->pGeometries[i].geometry;
-                if (create_geometry_data.triangles.vertexCount < build_geometry_data.triangles.vertexCount) {
-                    skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                                     "create info pGeometries[%" PRIu32 "].geometry.triangles.vertexCount [%" PRIu32
-                                     "]"
-                                     "must be greater than or equal to build info pGeometries[%" PRIu32
-                                     "].geometry.triangles.vertexCount [%" PRIu32 "].",
-                                     i, create_geometry_data.triangles.vertexCount, i, build_geometry_data.triangles.vertexCount);
-                    break;
-                }
-                if (create_geometry_data.triangles.indexCount < build_geometry_data.triangles.indexCount) {
-                    skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                                     "create info pGeometries[%" PRIu32 "].geometry.triangles.indexCount [%" PRIu32
-                                     "]"
-                                     "must be greater than or equal to build info pGeometries[%" PRIu32
-                                     "].geometry.triangles.indexCount [%" PRIu32 "].",
-                                     i, create_geometry_data.triangles.indexCount, i, build_geometry_data.triangles.indexCount);
-                    break;
-                }
-                if (create_geometry_data.aabbs.numAABBs < build_geometry_data.aabbs.numAABBs) {
-                    skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-dst-02488", commandBuffer, error_obj.location,
-                                     "create info pGeometries[%" PRIu32 "].geometry.aabbs.numAABBs [%" PRIu32
-                                     "]"
-                                     "must be greater than or equal to build info pGeometries[%" PRIu32
-                                     "].geometry.aabbs.numAABBs [%" PRIu32 "].",
-                                     i, create_geometry_data.aabbs.numAABBs, i, build_geometry_data.aabbs.numAABBs);
-                    break;
-                }
-            }
-        }
-    }
-
-    if (dst_as_state) {
-        skip |= VerifyBoundMemoryIsValid(dst_as_state->MemoryState(), LogObjectList(commandBuffer, dst), dst_as_state->Handle(),
-                                         error_obj.location.dot(Field::dst), "VUID-vkCmdBuildAccelerationStructureNV-dst-07787");
-    }
-
-    auto scratch_buffer_state = Get<vvl::Buffer>(scratch);
-    if (update == VK_TRUE) {
-        if (src == VK_NULL_HANDLE) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-update-02489", commandBuffer, error_obj.location,
-                             "If update is VK_TRUE, src must not be VK_NULL_HANDLE.");
-        } else {
-            if (!src_as_state || !src_as_state->built ||
-                !(src_as_state->build_info.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV)) {
-                skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-update-02490", commandBuffer, error_obj.location,
-                                 "If update is VK_TRUE, src must have been built before "
-                                 "with VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV set in "
-                                 "VkAccelerationStructureInfoNV::flags.");
-            }
-        }
-        if (scratch_buffer_state && dst_as_state &&
-            dst_as_state->update_scratch_memory_requirements.size > (scratch_buffer_state->GetSize() - scratchOffset)) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-update-02492", commandBuffer, error_obj.location,
-                             "If update is VK_TRUE, The size member of the "
-                             "VkMemoryRequirements structure returned from a call to "
-                             "vkGetAccelerationStructureMemoryRequirementsNV with "
-                             "VkAccelerationStructureMemoryRequirementsInfoNV::accelerationStructure set to dst and "
-                             "VkAccelerationStructureMemoryRequirementsInfoNV::type set to "
-                             "VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_UPDATE_SCRATCH_NV must be less than "
-                             "or equal to the size of scratch minus scratchOffset");
-        }
-    } else {
-        if (scratch_buffer_state && dst_as_state &&
-            dst_as_state->build_scratch_memory_requirements.size > (scratch_buffer_state->GetSize() - scratchOffset)) {
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructureNV-update-02491", commandBuffer, error_obj.location,
-                             "If update is VK_FALSE, The size member of the "
-                             "VkMemoryRequirements structure returned from a call to "
-                             "vkGetAccelerationStructureMemoryRequirementsNV with "
-                             "VkAccelerationStructureMemoryRequirementsInfoNV::accelerationStructure set to dst and "
-                             "VkAccelerationStructureMemoryRequirementsInfoNV::type set to "
-                             "VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV must be less than "
-                             "or equal to the size of scratch minus scratchOffset");
-        }
-    }
-    if (instanceData != VK_NULL_HANDLE) {
-        if (auto buffer_state = Get<vvl::Buffer>(instanceData)) {
-            skip |= ValidateBufferUsageFlags(
-                LogObjectList(commandBuffer, instanceData), *buffer_state, VK_BUFFER_USAGE_2_RAY_TRACING_BIT_NV, true,
-                "VUID-VkAccelerationStructureInfoNV-instanceData-02782", error_obj.location.dot(Field::instanceData));
-        }
-    }
-    if (scratch_buffer_state) {
-        skip |= ValidateBufferUsageFlags(
-            LogObjectList(commandBuffer, scratch), *scratch_buffer_state, VK_BUFFER_USAGE_2_RAY_TRACING_BIT_NV, true,
-            "VUID-VkAccelerationStructureInfoNV-scratch-02781", error_obj.location.dot(Field::scratch));
-    }
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateCmdCopyAccelerationStructureNV(VkCommandBuffer commandBuffer, VkAccelerationStructureNV dst,
-                                                               VkAccelerationStructureNV src,
-                                                               VkCopyAccelerationStructureModeNV mode,
-                                                               const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    bool skip = false;
-
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-    auto dst_as_state = Get<vvl::AccelerationStructureNV>(dst);
-    auto src_as_state = Get<vvl::AccelerationStructureNV>(src);
-
-    if (dst_as_state) {
-        const LogObjectList objlist(commandBuffer, dst);
-        skip |= VerifyBoundMemoryIsDeviceVisible(dst_as_state->MemoryState(), objlist, dst_as_state->Handle(),
-                                                 error_obj.location.dot(Field::dst),
-                                                 "VUID-vkCmdCopyAccelerationStructureNV-buffer-03719");
-    }
-    if (src_as_state) {
-        const LogObjectList objlist(commandBuffer, src);
-        skip |= VerifyBoundMemoryIsDeviceVisible(src_as_state->MemoryState(), objlist, src_as_state->Handle(),
-                                                 error_obj.location.dot(Field::src),
-                                                 "VUID-vkCmdCopyAccelerationStructureNV-buffer-03718");
-    }
-
-    if (mode == VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_NV) {
-        if (src_as_state &&
-            (!src_as_state->built || !(src_as_state->build_info.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_NV))) {
-            skip |= LogError("VUID-vkCmdCopyAccelerationStructureNV-src-03411", commandBuffer, error_obj.location,
-                             "src must have been built with "
-                             "VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_NV if mode is "
-                             "VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_NV.");
-        }
-    }
-    if (!(mode == VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_NV || mode == VK_COPY_ACCELERATION_STRUCTURE_MODE_CLONE_KHR)) {
-        skip |= LogError("VUID-vkCmdCopyAccelerationStructureNV-mode-03410", commandBuffer, error_obj.location,
-                         "mode must be VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR"
-                         "or VK_COPY_ACCELERATION_STRUCTURE_MODE_CLONE_KHR.");
-    }
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateDestroyAccelerationStructureNV(VkDevice device, VkAccelerationStructureNV accelerationStructure,
-                                                               const VkAllocationCallbacks* pAllocator,
-                                                               const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (auto as_state = Get<vvl::AccelerationStructureNV>(accelerationStructure)) {
-        skip |= ValidateObjectNotInUse(as_state.get(), error_obj.location,
-                                       "VUID-vkDestroyAccelerationStructureNV-accelerationStructure-03752");
-    }
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateCmdWriteAccelerationStructuresPropertiesNV(
-    VkCommandBuffer commandBuffer, uint32_t accelerationStructureCount, const VkAccelerationStructureNV* pAccelerationStructures,
-    VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery, const ErrorObject& error_obj) const {
-    bool skip = false;
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-    auto query_pool_state = Get<vvl::QueryPool>(queryPool);
-    ASSERT_AND_RETURN_SKIP(query_pool_state);
-    const auto& query_pool_ci = query_pool_state->create_info;
-    if (query_pool_ci.queryType != queryType) {
-        skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesNV-queryPool-03755", commandBuffer,
-                         error_obj.location.dot(Field::queryType),
-                         "was created with %s which is differnent from the type queryPool was created with %s.",
-                         string_VkQueryType(queryType), string_VkQueryType(query_pool_ci.queryType));
-    }
-    for (uint32_t i = 0; i < accelerationStructureCount; ++i) {
-        if (queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_NV) {
-            auto as_state = Get<vvl::AccelerationStructureNV>(pAccelerationStructures[i]);
-            ASSERT_AND_CONTINUE(as_state);
-
-            if (!(as_state->build_info.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR)) {
-                skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesNV-pAccelerationStructures-06215", commandBuffer,
-                                 error_obj.location.dot(Field::pAccelerationStructures, i),
-                                 "was built with %s, but queryType is VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR.",
-                                 string_VkBuildAccelerationStructureFlagsKHR(as_state->build_info.flags).c_str());
-            }
-        }
-    }
-    return skip;
-}
-
-bool CoreChecks::ValidateGeometryTrianglesNV(const VkGeometryTrianglesNV& triangles, const Location& loc) const {
-    bool skip = false;
-
-    auto vb_state = Get<vvl::Buffer>(triangles.vertexData);
-    if (vb_state && vb_state->GetSize() <= triangles.vertexOffset) {
-        skip |= LogError("VUID-VkGeometryTrianglesNV-vertexOffset-02428", device, loc, "is invalid.");
-    }
-
-    auto ib_state = Get<vvl::Buffer>(triangles.indexData);
-    if (ib_state && ib_state->GetSize() <= triangles.indexOffset) {
-        skip |= LogError("VUID-VkGeometryTrianglesNV-indexOffset-02431", device, loc, "is invalid.");
-    }
-
-    auto td_state = Get<vvl::Buffer>(triangles.transformData);
-    if (td_state && td_state->GetSize() <= triangles.transformOffset) {
-        skip |= LogError("VUID-VkGeometryTrianglesNV-transformOffset-02437", device, loc, "is invalid.");
-    }
-
-    return skip;
-}
-
-bool CoreChecks::ValidateGeometryAABBNV(const VkGeometryAABBNV& aabbs, const Location& loc) const {
-    bool skip = false;
-
-    auto aabb_state = Get<vvl::Buffer>(aabbs.aabbData);
-    if (aabb_state && aabb_state->GetSize() > 0 && aabb_state->GetSize() <= aabbs.offset) {
-        skip |= LogError("VUID-VkGeometryAABBNV-offset-02439", device, loc, "is invalid.");
-    }
-
-    return skip;
-}
-
-bool CoreChecks::ValidateGeometryNV(const VkGeometryNV& geometry, const Location& loc) const {
-    bool skip = false;
-    if (geometry.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_NV) {
-        skip |= ValidateGeometryTrianglesNV(geometry.geometry.triangles, loc);
-    } else if (geometry.geometryType == VK_GEOMETRY_TYPE_AABBS_NV) {
-        skip |= ValidateGeometryAABBNV(geometry.geometry.aabbs, loc);
-    }
-    return skip;
-}
-
 bool CoreChecks::PreCallValidateCmdBuildPartitionedAccelerationStructuresNV(
     VkCommandBuffer commandBuffer, const VkBuildPartitionedAccelerationStructureInfoNV* pBuildInfo,
     const ErrorObject& error_obj) const {
@@ -430,23 +69,15 @@ bool CoreChecks::PreCallValidateCmdBuildPartitionedAccelerationStructuresNV(
     }
 
     {
-        BufferAddressValidation<2> buffer_address_validator = {
+        BufferAddressValidation<1> buffer_address_validator = {
             {{{"VUID-vkCmdBuildPartitionedAccelerationStructuresNV-pBuildInfo-10550",
                [](const vvl::Buffer& buffer_state) { return (buffer_state.usage & VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT) == 0; },
-               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT"; }, kUsageErrorMsgBuffer},
-              {"VUID-vkCmdBuildPartitionedAccelerationStructuresNV-pBuildInfo-10541",
-               [&build_size_info](const vvl::Buffer& buffer_state) {
-                   return buffer_state.requirements.size < build_size_info.buildScratchSize;
-               },
-               [&build_size_info]() {
-                   return "The buildScratchSize (" + std::to_string(build_size_info.buildScratchSize) +
-                          ") does not fit in any buffer";
-               },
-               kEmptyErrorMsgBuffer}}}};
+               []() { return "The following buffers are missing VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT"; }, ErrorMsgBuffer::Usage}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(
             *this, error_obj.location.dot(Field::pBuildInfo).dot(Field::scratchData), LogObjectList(commandBuffer),
-            pBuildInfo->scratchData, build_size_info.buildScratchSize);
+            pBuildInfo->scratchData, build_size_info.buildScratchSize,
+            "VUID-vkCmdBuildPartitionedAccelerationStructuresNV-pBuildInfo-10541");
     }
 
     {
@@ -459,7 +90,7 @@ bool CoreChecks::PreCallValidateCmdBuildPartitionedAccelerationStructuresNV(
                    return "The following buffers are missing "
                           "VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR";
                },
-               kUsageErrorMsgBuffer}}}};
+               ErrorMsgBuffer::Usage}}}};
 
         skip |=
             buffer_address_validator.ValidateDeviceAddress(*this, error_obj.location.dot(Field::pBuildInfo).dot(Field::srcInfos),
@@ -476,7 +107,7 @@ bool CoreChecks::PreCallValidateCmdBuildPartitionedAccelerationStructuresNV(
                    return "The following buffers are missing "
                           "VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR";
                },
-               kUsageErrorMsgBuffer}}}};
+               ErrorMsgBuffer::Usage}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(*this,
                                                                error_obj.location.dot(Field::pBuildInfo).dot(Field::srcInfosCount),
@@ -490,7 +121,7 @@ bool CoreChecks::PreCallValidateCmdBuildPartitionedAccelerationStructuresNV(
                    return (buffer_state.usage & VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) == 0;
                },
                []() { return "The following buffers are missing VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR"; },
-               kUsageErrorMsgBuffer}}}};
+               ErrorMsgBuffer::Usage}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(
             *this, error_obj.location.dot(Field::pBuildInfo).dot(Field::srcAccelerationStructureData), LogObjectList(commandBuffer),
@@ -520,26 +151,18 @@ bool CoreChecks::PreCallValidateCmdBuildPartitionedAccelerationStructuresNV(
     }
 
     {
-        BufferAddressValidation<2> buffer_address_validator = {
+        BufferAddressValidation<1> buffer_address_validator = {
             {{{"VUID-vkCmdBuildPartitionedAccelerationStructuresNV-pBuildInfo-10552",
                [](const vvl::Buffer& buffer_state) {
                    return (buffer_state.usage & VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) == 0;
                },
                []() { return "The following buffers are missing VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR"; },
-               kUsageErrorMsgBuffer},
-              {"VUID-vkCmdBuildPartitionedAccelerationStructuresNV-pBuildInfo-10543",
-               [&build_size_info](const vvl::Buffer& buffer_state) {
-                   return buffer_state.requirements.size < build_size_info.accelerationStructureSize;
-               },
-               [&build_size_info]() {
-                   return "The accelerationStructureSize (" + std::to_string(build_size_info.accelerationStructureSize) +
-                          ") does not fit in any buffer";
-               },
-               kEmptyErrorMsgBuffer}}}};
+               ErrorMsgBuffer::Usage}}}};
 
         skip |= buffer_address_validator.ValidateDeviceAddress(
             *this, error_obj.location.dot(Field::pBuildInfo).dot(Field::dstAccelerationStructureData), LogObjectList(commandBuffer),
-            pBuildInfo->dstAccelerationStructureData, build_size_info.accelerationStructureSize);
+            pBuildInfo->dstAccelerationStructureData, build_size_info.accelerationStructureSize,
+            "VUID-vkCmdBuildPartitionedAccelerationStructuresNV-pBuildInfo-10543");
     }
 
     if (pBuildInfo->dstAccelerationStructureData && pBuildInfo->scratchData) {
@@ -607,8 +230,8 @@ bool CoreChecks::PreCallValidateGetPartitionedAccelerationStructuresBuildSizesNV
         skip |= LogError("VUID-VkPartitionedAccelerationStructureInstancesInputNV-partitionCount-10535", device,
                          error_obj.location.dot(Field::pInfo).dot(Field::partitionCount),
                          "(%" PRIu32 ") and maxInstanceInGlobalPartitionCount (%" PRIu32
-                         ") sum must be less than or equal to "
-                         "maxPartitionCount (%" PRIu32 ") ",
+                         ") must sum to less than or equal to "
+                         "maxPartitionCount (%" PRIu32 ").",
                          pInfo->partitionCount, pInfo->maxInstanceInGlobalPartitionCount,
                          phys_dev_ext_props.partitioned_acceleration_structure_props.maxPartitionCount);
     }
@@ -626,38 +249,22 @@ bool CoreChecks::ValidateBuildPartitionedAccelerationStructureInfoNV(
                              build_info_loc.dot(Field::scratchData), "(0x%" PRIx64 ") must not be NULL", build_info.scratchData);
         }
     } else {
-        BufferAddressValidation<1> buffer_address_validator = {
-            {{{"VUID-VkBuildPartitionedAccelerationStructureInfoNV-scratchData-10559",
-               [&build_scratch_size](const vvl::Buffer& buffer_state) {
-                   return buffer_state.requirements.size < build_scratch_size;
-               },
-               [&build_scratch_size]() {
-                   return "The buildScratchSize (" + std::to_string(build_scratch_size) + ") does not fit in any buffer";
-               },
-               kEmptyErrorMsgBuffer}}}};
-
-        skip |= buffer_address_validator.ValidateDeviceAddress(*this, build_info_loc.dot(Field::scratchData), LogObjectList(device),
-                                                               build_info.scratchData, build_scratch_size);
+        BufferAddressValidation<0> buffer_address_validator;
+        skip |= buffer_address_validator.ValidateDeviceAddress(
+            *this, build_info_loc.dot(Field::scratchData), LogObjectList(device), build_info.scratchData, build_scratch_size,
+            "VUID-VkBuildPartitionedAccelerationStructureInfoNV-scratchData-10559");
     }
     if (build_info.dstAccelerationStructureData != 0) {
-        BufferAddressValidation<1> buffer_address_validator = {
-            {{{"VUID-VkBuildPartitionedAccelerationStructureInfoNV-dstAccelerationStructureData-10562",
-               [&build_acceleration_structure_size](const vvl::Buffer& buffer_state) {
-                   return buffer_state.requirements.size < build_acceleration_structure_size;
-               },
-               [&build_acceleration_structure_size]() {
-                   return "The accelerationStructureSize (" + std::to_string(build_acceleration_structure_size) +
-                          ") does not fit in any buffer";
-               },
-               kEmptyErrorMsgBuffer}}}};
-        skip |= buffer_address_validator.ValidateDeviceAddress(*this, build_info_loc.dot(Field::dstAccelerationStructureData),
-                                                               LogObjectList(device), build_info.dstAccelerationStructureData,
-                                                               build_acceleration_structure_size);
+        BufferAddressValidation<0> buffer_address_validator;
+        skip |= buffer_address_validator.ValidateDeviceAddress(
+            *this, build_info_loc.dot(Field::dstAccelerationStructureData), LogObjectList(device),
+            build_info.dstAccelerationStructureData, build_acceleration_structure_size,
+            "VUID-VkBuildPartitionedAccelerationStructureInfoNV-dstAccelerationStructureData-10562");
     }
 
     if (!IsPointerAligned(build_info.srcInfosCount, 4)) {
         skip |= LogError("VUID-VkBuildPartitionedAccelerationStructureInfoNV-srcInfosCount-10563", device,
-                         build_info_loc.dot(Field::srcInfosCount), "(0x%" PRIx64 ") must be aligned to 256 bytes",
+                         build_info_loc.dot(Field::srcInfosCount), "(0x%" PRIx64 ") must be aligned to 4 bytes",
                          build_info.srcInfosCount);
     }
     return skip;
@@ -702,12 +309,12 @@ bool CoreChecks::PreCallValidateCmdBuildClusterAccelerationStructureIndirectNV(
                  return "The buildScratchSize (" + std::to_string(accelerationStructure_size.buildScratchSize) +
                         ") does not fit in any buffer";
              },
-             kEmptyErrorMsgBuffer},
+             ErrorMsgBuffer::Empty},
             {"VUID-vkCmdBuildClusterAccelerationStructureIndirectNV-pCommandInfos-12304",
              [](const vvl::Buffer& buffer_state) {
                  return (static_cast<uint32_t>(buffer_state.usage) & VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT) == 0;
              },
-             []() { return "The following buffers are missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"; }, kUsageErrorMsgBuffer},
+             []() { return "The following buffers are missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"; }, ErrorMsgBuffer::Usage},
         }}};
         skip |= scratch_buffer_validator.ValidateDeviceAddress(*this, command_infos_loc.dot(Field::scratchData), objlist,
                                                                pCommandInfos->scratchData);
@@ -732,7 +339,7 @@ bool CoreChecks::PreCallValidateCmdBuildClusterAccelerationStructureIndirectNV(
              []() {
                  return "The following buffers are missing VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR";
              },
-             kUsageErrorMsgBuffer},
+             ErrorMsgBuffer::Usage},
         }}};
 
         skip |= src_infos_array_validator.ValidateDeviceAddress(
@@ -750,7 +357,7 @@ bool CoreChecks::PreCallValidateCmdBuildClusterAccelerationStructureIndirectNV(
              []() {
                  return "The following buffers are missing VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR";
              },
-             kUsageErrorMsgBuffer},
+             ErrorMsgBuffer::Usage},
         }}};
 
         skip |= src_infos_count_validator.ValidateDeviceAddress(*this, command_infos_loc.dot(Field::srcInfosCount), objlist,
@@ -763,7 +370,7 @@ bool CoreChecks::PreCallValidateCmdBuildClusterAccelerationStructureIndirectNV(
              [](const vvl::Buffer& buffer_state) {
                  return (static_cast<uint32_t>(buffer_state.usage) & VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT) == 0;
              },
-             []() { return "The following buffers are missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"; }, kUsageErrorMsgBuffer},
+             []() { return "The following buffers are missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"; }, ErrorMsgBuffer::Usage},
         }}};
 
         skip |= dst_addresses_array_validator.ValidateDeviceAddress(
@@ -778,7 +385,7 @@ bool CoreChecks::PreCallValidateCmdBuildClusterAccelerationStructureIndirectNV(
                  return (static_cast<uint32_t>(buffer_state.usage) & VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) == 0;
              },
              []() { return "The following buffers are missing VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR"; },
-             kUsageErrorMsgBuffer},
+             ErrorMsgBuffer::Usage},
         }}};
 
         skip |= dst_implicit_data_validator.ValidateDeviceAddress(*this, command_infos_loc.dot(Field::dstImplicitData), objlist,
@@ -945,22 +552,11 @@ bool CoreChecks::ValidateClusterAccelerationStructureCommandsInfoNV(
         } else {
             if (!invalid_triangle_input &&
                 command_infos.input.opType != VK_CLUSTER_ACCELERATION_STRUCTURE_OP_TYPE_MOVE_OBJECTS_NV) {
-                BufferAddressValidation<1> dst_implicit_size_validator = {{{
-                    {"VUID-VkClusterAccelerationStructureCommandsInfoNV-opMode-12310",
-                     [&accelerationStructure_size](const vvl::Buffer& buffer_state) {
-                         return buffer_state.GetSize() < accelerationStructure_size.accelerationStructureSize;
-                     },
-                     [&accelerationStructure_size]() {
-                         return "The accelerationStructureSize (" +
-                                std::to_string(accelerationStructure_size.accelerationStructureSize) +
-                                ") does not fit in any buffer";
-                     },
-                     kEmptyErrorMsgBuffer},
-                }}};
-
-                skip |= dst_implicit_size_validator.ValidateDeviceAddress(*this, command_infos_loc.dot(Field::dstImplicitData),
-                                                                          objlist, command_infos.dstImplicitData,
-                                                                          accelerationStructure_size.accelerationStructureSize);
+                BufferAddressValidation<0> dst_implicit_size_validator;
+                skip |= dst_implicit_size_validator.ValidateDeviceAddress(
+                    *this, command_infos_loc.dot(Field::dstImplicitData), objlist, command_infos.dstImplicitData,
+                    accelerationStructure_size.accelerationStructureSize,
+                    "VUID-VkClusterAccelerationStructureCommandsInfoNV-opMode-12310");
             }
         }
     }
@@ -1024,9 +620,10 @@ bool CoreChecks::ValidateClusterAccelerationStructureCommandsInfoNV(
     }
 
     if (command_infos.srcInfosArray.stride < stride_min && command_infos.srcInfosArray.stride != 0) {
-        skip |= LogError("VUID-VkClusterAccelerationStructureCommandsInfoNV-srcInfosArray-10476", objlist,
+        skip |= LogError("VUID-VkClusterAccelerationStructureCommandsInfoNV-srcInfosArray-12530", objlist,
                          command_infos_loc.dot(Field::srcInfosArray).dot(Field::stride),
-                         "(%" PRIu64 ") must be greater than size of %s (%" PRIu32 ")", command_infos.srcInfosArray.stride,
+                         "(%" PRIu64 ") must be greater than or equal to the size of %s (%" PRIu32 ")",
+                         command_infos.srcInfosArray.stride,
                          string_VkClusterAccelerationStructureOpTypeNV(command_infos.input.opType), stride_min);
     }
 

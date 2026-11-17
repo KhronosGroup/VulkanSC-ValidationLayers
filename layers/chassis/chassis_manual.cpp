@@ -21,6 +21,7 @@
 #include "chassis.h"
 
 #include <cstring>
+#include <sstream>
 
 #include "chassis/dispatch_object.h"
 #include "generated/dispatch_vector.h"
@@ -40,8 +41,7 @@ namespace vulkan_layer_chassis {
 
 // Check enabled instance extensions against supported instance extension whitelist
 static void InstanceExtensionWhitelist(vvl::DispatchInstance* layer_data, const VkInstanceCreateInfo* pCreateInfo,
-                                       VkInstance instance) {
-    Location loc(vvl::Func::vkCreateInstance);
+                                       VkInstance instance, const Location& loc) {
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
         vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
         if (extension == vvl::Extension::Empty) {
@@ -83,56 +83,75 @@ static void DeviceExtensionWhitelist(vvl::DispatchDevice* layer_data, const VkDe
     }
 }
 
-void OutputLayerStatusInfo(vvl::DispatchInstance* context) {
-    std::string list_of_enables;
-    std::string list_of_disables;
-    for (uint32_t i = 0; i < kMaxEnableFlags; i++) {
-        if (context->settings.enabled[i]) {
-            if (list_of_enables.size()) list_of_enables.append(", ");
-            list_of_enables.append(GetEnableFlagNameHelper()[i]);
-        }
-    }
-    if (list_of_enables.empty()) {
-        list_of_enables.append("None");
-    }
-    for (uint32_t i = 0; i < kMaxDisableFlags; i++) {
-        if (context->settings.disabled[i]) {
-            if (list_of_disables.size()) list_of_disables.append(", ");
-            list_of_disables.append(GetDisableFlagNameHelper()[i]);
-        }
-    }
-    if (list_of_disables.empty()) {
-        list_of_disables.append("None");
+// Output layer status information message
+// TODO - We should just dump all settings to a file (see https://github.com/KhronosGroup/Vulkan-Utility-Libraries/issues/188)
+void OutputLayerStatusInfo(vvl::DispatchInstance* context, const Location& loc) {
+    // Will save a lot of time if every test doesn't have to build this string up to not be printed
+    if (!context->debug_report->HasSeverityLevel(VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
+        return;
     }
 
-    Location loc(vvl::Func::vkCreateInstance);
-    // Output layer status information message
-    // TODO - We should just dump all settings to a file (see https://github.com/KhronosGroup/Vulkan-Utility-Libraries/issues/188)
-    context->LogInfo("WARNING-CreateInstance-status-message", context->instance, loc,
-                     "Khronos Validation Layer Active:\n    Current Enables: %s.\n    Current Disables: %s.\n",
-                     list_of_enables.c_str(), list_of_disables.c_str());
+    std::ostringstream ss;
+    const auto& settings = context->settings;
+    ss << "Current Validation Enabled:\n";
 
-    // Create warning message if user is running debug layers.
-#ifndef NDEBUG
-    context->LogPerformanceWarning("WARNING-CreateInstance-debug-warning", context->instance, loc,
-                                   "Using debug builds of the validation layers *will* adversely affect performance.");
-#endif
-    if (!context->settings.global_settings.fine_grained_locking) {
-        context->LogPerformanceWarning(
-            "WARNING-CreateInstance-locking-warning", context->instance, loc,
-            "Fine-grained locking is disabled, this will adversely affect performance of multithreaded applications.");
+    // Match the order in vkconfig
+    // The goal here is to not print ALL the settings, just which parts of validation are turned on
+    if (!settings.disabled[core_checks]) {
+        ss << "  - Core Checks\n";
     }
+    if (settings.enabled[sync_validation]) {
+        ss << "  - Synchronization\n";
+    }
+    if (!settings.disabled[stateless_checks]) {
+        ss << "  - Stateless Parameter\n";
+    }
+    if (!settings.disabled[object_tracking]) {
+        ss << "  - Object lifetime\n";
+    }
+    if (!settings.disabled[thread_safety]) {
+        ss << "  - Thread Safety\n";
+    }
+    if (!settings.disabled[handle_wrapping]) {
+        ss << "  - Handle Wrapping\n";
+    }
+    if (settings.enabled[legacy_detection]) {
+        ss << "  - Legacy Detection\n";
+    }
+    if (settings.enabled[best_practices]) {
+        ss << "  - Best Practices\n";
+    }
+    if (settings.enabled[gpu_validation]) {
+        ss << "  - GPU-AV\n";
+    }
+    if (settings.enabled[gpu_dump]) {
+        ss << "  - GPU Dump\n";
+    }
+    if (settings.enabled[debug_printf_validation]) {
+        ss << "  - Debug Printf\n";
+    }
+
+    context->LogInfo("CURRENT-VALIDATION-ENABLED", context->instance, loc, "%s", ss.str().c_str());
 }
 const vvl::unordered_map<std::string, function_data>& GetNameToFuncPtrMap();
 
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetDeviceProcAddr(VkDevice device, const char* funcName) {
     auto layer_data = vvl::GetDispatchDevice(device);
-    if (!ApiParentExtensionEnabled(funcName, &layer_data->extensions)) {
+    // Both maps are keyed by std::string, build it once instead of once per lookup
+    const std::string name(funcName);
+    if (!ApiParentExtensionEnabled(name, &layer_data->extensions)) {
         return nullptr;
     }
-    const auto& item = GetNameToFuncPtrMap().find(funcName);
+    const auto& item = GetNameToFuncPtrMap().find(name);
     if (item != GetNameToFuncPtrMap().end()) {
         if (item->second.function_type != kFuncTypeDev) {
+            // TEMPORARY workaround: NVIDIA driver 615.78.08 returns vkGetPhysicalDeviceInternalHandleNV from
+            // vk_icdGetInstanceProcAddr but not from vk_icdGetPhysicalDeviceProcAddr. Loaders older than 1.4.368 then treat it
+            // as an unknown device command and query it here during vkCreateDevice, which is not an application error.
+            // Remove once fixed drivers or updated loaders are available.
+            if (name == "vkGetPhysicalDeviceInternalHandleNV") {
+                return nullptr;
+            }
             Location loc(vvl::Func::vkGetDeviceProcAddr);
             // Was discussed in https://gitlab.khronos.org/vulkan/vulkan/-/merge_requests/6583
             // This has "valid" behavior to return null, but still worth warning users for this unqiue function
@@ -191,7 +210,11 @@ void ApplicationAtExit() {
 
 VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                               VkInstance* pInstance) {
-    atexit(ApplicationAtExit);
+    // Only register once for the entire process.
+    // If called every instance, any app (likley test suite) that keeps calling vkCreateInstance many times in a single process is
+    // just adding this to the C library's exit table and never gets removed until the process ends
+    static const bool at_exit_registered = (atexit(ApplicationAtExit), true);
+    (void)at_exit_registered;
 
     VVL_ZoneScoped;
     VkLayerInstanceCreateInfo* chain_info = GetChainInfo(pCreateInfo, VK_LAYER_LINK_INFO);
@@ -240,8 +263,15 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
 
     layer_init_instance_dispatch_table(*pInstance, &instance_dispatch->instance_dispatch_table, fpGetInstanceProcAddr);
 
-    OutputLayerStatusInfo(instance_dispatch.get());
-    InstanceExtensionWhitelist(instance_dispatch.get(), pCreateInfo, *pInstance);
+    Location loc(vvl::Func::vkCreateInstance);
+    // Create warning message if user is running debug layers.
+#ifndef NDEBUG
+    instance_dispatch->LogPerformanceWarning("WARNING-CreateInstance-debug-warning", instance_dispatch->instance, loc,
+                                             "Using debug builds of the validation layers *will* adversely affect performance.");
+#endif
+
+    OutputLayerStatusInfo(instance_dispatch.get(), loc);
+    InstanceExtensionWhitelist(instance_dispatch.get(), pCreateInfo, *pInstance, loc);
     instance_dispatch->FindSupportedExtensions();
 
     // save a raw pointer since the unique_ptr will be invalidate by the move() below
@@ -368,6 +398,29 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
         }
         vo->PreCallRecordCreateDevice(gpu, pCreateInfo, pAllocator, pDevice, record_obj, &modified_create_info);
     }
+
+#if defined(VVL_WORKAROUND_QUALCOMM)
+    // The Adreno driver reads the trailing padding of the VkPhysicalDeviceVulkan1XFeatures structs and returns
+    // VK_ERROR_FEATURE_NOT_PRESENT if it is not zero. The safe struct copies above never write that padding, so it holds
+    // whatever the allocator last had there. (VkPhysicalDeviceVulkan11Features has no padding)
+    // This is fixed in driver version 512.840.0 but CI is only at 512.762.1 and will be awhile until that fix lands
+    const auto zero_trailing_padding = [](void* feature_struct, size_t struct_size, size_t end_of_last_member) {
+        std::memset(static_cast<uint8_t*>(feature_struct) + end_of_last_member, 0, struct_size - end_of_last_member);
+    };
+    void* modified_pnext = const_cast<void*>(modified_create_info.pNext);
+    if (auto* features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(modified_pnext)) {
+        zero_trailing_padding(features, sizeof(*features),
+                              offsetof(VkPhysicalDeviceVulkan12Features, subgroupBroadcastDynamicId) + sizeof(VkBool32));
+    }
+    if (auto* features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(modified_pnext)) {
+        zero_trailing_padding(features, sizeof(*features),
+                              offsetof(VkPhysicalDeviceVulkan13Features, maintenance4) + sizeof(VkBool32));
+    }
+    if (auto* features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan14Features>(modified_pnext)) {
+        zero_trailing_padding(features, sizeof(*features),
+                              offsetof(VkPhysicalDeviceVulkan14Features, pushDescriptor) + sizeof(VkBool32));
+    }
+#endif
 
     VkResult result = fpCreateDevice(gpu, reinterpret_cast<VkDeviceCreateInfo*>(&modified_create_info), pAllocator, pDevice);
 
@@ -629,51 +682,6 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, VkPipelin
             vo->PostCallRecordCreateComputePipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
                                                      record_obj, pipeline_states, chassis_state);
         }
-    }
-    return result;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL CreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                           const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
-                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
-    auto device_dispatch = vvl::GetDispatchDevice(device);
-    bool skip = false;
-    ErrorObject error_obj(vvl::Func::vkCreateRayTracingPipelinesNV, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
-
-    PipelineStates pipeline_states;
-
-    for (const auto& vo : device_dispatch->object_dispatch) {
-        if (!vo) {
-            continue;
-        }
-        auto lock = vo->ReadLock();
-        skip |= vo->PreCallValidateCreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator,
-                                                               pPipelines, error_obj, pipeline_states);
-        if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
-    }
-
-    RecordObject record_obj(vvl::Func::vkCreateRayTracingPipelinesNV);
-    for (auto& vo : device_dispatch->object_dispatch) {
-        if (!vo) {
-            continue;
-        }
-        auto lock = vo->WriteLock();
-        vo->PreCallRecordCreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
-                                                     record_obj, pipeline_states);
-    }
-
-    VkResult result;
-    result =
-        device_dispatch->CreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
-    record_obj.result = result;
-
-    for (auto& vo : device_dispatch->object_dispatch) {
-        if (!vo) {
-            continue;
-        }
-        auto lock = vo->WriteLock();
-        vo->PostCallRecordCreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
-                                                      record_obj, pipeline_states);
     }
     return result;
 }
@@ -1137,8 +1145,63 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreat
                 continue;
             }
             auto lock = vo->WriteLock();
-            // If we don't pass into PostCallRecord, CoreCheck may give false positives when using GPU-AV
-            vo->PostCallRecordCreateBuffer(device, chassis_state.create_info_copy, pAllocator, pBuffer, record_obj);
+            vo->PostCallRecordCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, record_obj);
+        }
+    }
+    return result;
+}
+
+// This API needs the ability to modify a down-chain parameter
+VKAPI_ATTR VkResult VKAPI_CALL AllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
+                                              const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory) {
+    VVL_ZoneScoped;
+
+    auto device_dispatch = vvl::GetDispatchDevice(device);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkAllocateMemory, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+
+    {
+        VVL_ZoneScopedN("PreCallValidate_AllocateMemory");
+        for (const auto& vo : device_dispatch->intercept_vectors[InterceptIdPreCallValidateAllocateMemory]) {
+            if (!vo) {
+                continue;
+            }
+            auto lock = vo->ReadLock();
+            skip |= vo->PreCallValidateAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, error_obj);
+            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+    }
+
+    chassis::AllocateMemory chassis_state{};
+    chassis_state.allocate_info_copy = pAllocateInfo;
+
+    RecordObject record_obj(vvl::Func::vkAllocateMemory);
+    {
+        VVL_ZoneScopedN("PreCallRecord_AllocateMemory");
+        for (auto& vo : device_dispatch->object_dispatch) {
+            if (!vo) {
+                continue;
+            }
+            auto lock = vo->WriteLock();
+            vo->PreCallRecordAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, record_obj, chassis_state);
+        }
+    }
+
+    VkResult result;
+    {
+        VVL_ZoneScopedN("Dispatch_AllocateMemory");
+        result = device_dispatch->AllocateMemory(device, chassis_state.allocate_info_copy, pAllocator, pMemory);
+    }
+    record_obj.result = result;
+
+    {
+        VVL_ZoneScopedN("PostCallRecord_AllocateMemory");
+        for (auto& vo : device_dispatch->intercept_vectors[InterceptIdPostCallRecordAllocateMemory]) {
+            if (!vo) {
+                continue;
+            }
+            auto lock = vo->WriteLock();
+            vo->PostCallRecordAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, record_obj);
         }
     }
     return result;
@@ -1267,6 +1330,12 @@ VKAPI_ATTR VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer commandBuffer,
 
 // Handle tooling queries manually as this is a request for layer information
 static const VkPhysicalDeviceToolPropertiesEXT khronos_layer_tool_props = {
+    // https://gitlab.khronos.org/vulkan/vulkan/-/issues/4924
+    // We currently override the sType/pNext here but due to
+    //    VUID-VkPhysicalDeviceToolProperties-sType-sType
+    // and
+    //   VUID-VkPhysicalDeviceToolProperties-pNext-pNext
+    // we assume it is safe to just override as nothing extend these (and its simpler logic for us)
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TOOL_PROPERTIES_EXT,
     nullptr,
     "Khronos Validation Layer",
@@ -1469,4 +1538,5 @@ VKAPI_ATTR VkResult VKAPI_CALL GetValidationCacheDataEXT(VkDevice device, VkVali
     }
     return VK_SUCCESS;
 }
+
 }  // namespace vulkan_layer_chassis

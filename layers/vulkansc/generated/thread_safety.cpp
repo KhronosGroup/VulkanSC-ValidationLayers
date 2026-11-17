@@ -1094,21 +1094,6 @@ void Device::PostCallRecordDestroySampler(VkDevice device, VkSampler sampler, co
     // Host access to sampler must be externally synchronized
 }
 
-void Device::PreCallRecordDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout,
-                                                     const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
-    StartReadObjectParentInstance(device, record_obj.location);
-    StartWriteObject(descriptorSetLayout, record_obj.location);
-    // Host access to descriptorSetLayout must be externally synchronized
-}
-
-void Device::PostCallRecordDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout,
-                                                      const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
-    FinishReadObjectParentInstance(device, record_obj.location);
-    FinishWriteObject(descriptorSetLayout, record_obj.location);
-    DestroyObject(descriptorSetLayout);
-    // Host access to descriptorSetLayout must be externally synchronized
-}
-
 void Device::PreCallRecordCreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo,
                                                const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool,
                                                const RecordObject& record_obj) {
@@ -2982,12 +2967,6 @@ void Device::PreCallRecordCreateSharedSwapchainsKHR(VkDevice device, uint32_t sw
                                                     const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchains,
                                                     const RecordObject& record_obj) {
     StartReadObjectParentInstance(device, record_obj.location);
-
-    if (pSwapchains) {
-        for (uint32_t index = 0; index < swapchainCount; index++) {
-            StartReadObject(pSwapchains[index], record_obj.location);
-        }
-    }
 }
 
 void Device::PostCallRecordCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
@@ -4498,20 +4477,6 @@ void Device::PreCallRecordGetImageSubresourceLayout2KHR(VkDevice device, VkImage
 void Device::PostCallRecordGetImageSubresourceLayout2KHR(VkDevice device, VkImage image, const VkImageSubresource2* pSubresource,
                                                          VkSubresourceLayout2* pLayout, const RecordObject& record_obj) {
     PostCallRecordGetImageSubresourceLayout2(device, image, pSubresource, pLayout, record_obj);
-}
-
-void Device::PreCallRecordWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain,
-                                             const VkPresentWait2InfoKHR* pPresentWait2Info, const RecordObject& record_obj) {
-    StartReadObjectParentInstance(device, record_obj.location);
-    StartWriteObject(swapchain, record_obj.location);
-    // Host access to swapchain must be externally synchronized
-}
-
-void Device::PostCallRecordWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain,
-                                              const VkPresentWait2InfoKHR* pPresentWait2Info, const RecordObject& record_obj) {
-    FinishReadObjectParentInstance(device, record_obj.location);
-    FinishWriteObject(swapchain, record_obj.location);
-    // Host access to swapchain must be externally synchronized
 }
 
 void Device::PreCallRecordDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKHR pipelineBinary,
@@ -7188,6 +7153,74 @@ void Device::PostCallRecordCmdEndPerTileExecutionQCOM(VkCommandBuffer commandBuf
     FinishReadObject(commandBuffer, record_obj.location);
 }
 
+void Device::PreCallRecordSetLatencySleepModeLegacyNV(VkDevice device, VkBool32 lowLatencyMode, VkBool32 lowLatencyBoost,
+                                                      uint32_t minimumIntervalUs, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PostCallRecordSetLatencySleepModeLegacyNV(VkDevice device, VkBool32 lowLatencyMode, VkBool32 lowLatencyBoost,
+                                                       uint32_t minimumIntervalUs, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                               const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+    StartReadObject(signalSemaphore, record_obj.location);
+}
+
+void Device::PostCallRecordLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                                const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+    FinishReadObject(signalSemaphore, record_obj.location);
+}
+
+void Device::PreCallRecordSetLatencyMarkerLegacyNV(VkDevice device, uint64_t frameID, uint32_t marker,
+                                                   const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PostCallRecordSetLatencyMarkerLegacyNV(VkDevice device, uint64_t frameID, uint32_t marker,
+                                                    const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordGetLatencyTimingsLegacyNV(VkDevice device, void* pTimings, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PostCallRecordGetLatencyTimingsLegacyNV(VkDevice device, void* pTimings, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordQueueNotifyOutOfBandLegacyNV(VkQueue queue, uint32_t queueType, const RecordObject& record_obj) {
+    if (!vvl::Contains(internally_synchronized_queues, queue)) {
+        StartWriteObject(queue, record_obj.location);
+    }
+}
+
+void Device::PostCallRecordQueueNotifyOutOfBandLegacyNV(VkQueue queue, uint32_t queueType, const RecordObject& record_obj) {
+    if (!vvl::Contains(internally_synchronized_queues, queue)) {
+        FinishWriteObject(queue, record_obj.location);
+    }
+}
+
+void Device::PreCallRecordGetSleepStatusLegacyNV(VkDevice device, VkBool32* pLowLatencyMode, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PostCallRecordGetSleepStatusLegacyNV(VkDevice device, VkBool32* pLowLatencyMode, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordShutdownLatencyDeviceLegacyNV(VkDevice device, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PostCallRecordShutdownLatencyDeviceLegacyNV(VkDevice device, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
 #ifdef VK_USE_PLATFORM_METAL_EXT
 void Device::PreCallRecordExportMetalObjectsEXT(VkDevice device, VkExportMetalObjectsInfoEXT* pMetalObjectsInfo,
                                                 const RecordObject& record_obj) {
@@ -8975,18 +9008,6 @@ void Device::PostCallRecordLatencySleepNV(VkDevice device, VkSwapchainKHR swapch
     FinishReadObject(swapchain, record_obj.location);
 }
 
-void Device::PreCallRecordSetLatencyMarkerNV(VkDevice device, VkSwapchainKHR swapchain,
-                                             const VkSetLatencyMarkerInfoNV* pLatencyMarkerInfo, const RecordObject& record_obj) {
-    StartReadObjectParentInstance(device, record_obj.location);
-    StartReadObject(swapchain, record_obj.location);
-}
-
-void Device::PostCallRecordSetLatencyMarkerNV(VkDevice device, VkSwapchainKHR swapchain,
-                                              const VkSetLatencyMarkerInfoNV* pLatencyMarkerInfo, const RecordObject& record_obj) {
-    FinishReadObjectParentInstance(device, record_obj.location);
-    FinishReadObject(swapchain, record_obj.location);
-}
-
 void Device::PreCallRecordGetLatencyTimingsNV(VkDevice device, VkSwapchainKHR swapchain,
                                               VkGetLatencyMarkerInfoNV* pLatencyMarkerInfo, const RecordObject& record_obj) {
     StartReadObjectParentInstance(device, record_obj.location);
@@ -9647,6 +9668,36 @@ void Instance::PostCallRecordCreateUbmSurfaceSEC(VkInstance instance, const VkUb
 }
 
 #endif  // VK_USE_PLATFORM_UBM_SEC
+void Device::PreCallRecordGetDeviceInternalHandleNV(VkDevice device, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PostCallRecordGetDeviceInternalHandleNV(VkDevice device, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordGetQueueInternalHandleNV(VkQueue queue, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {
+    if (!vvl::Contains(internally_synchronized_queues, queue)) {
+        StartWriteObject(queue, record_obj.location);
+    }
+}
+
+void Device::PostCallRecordGetQueueInternalHandleNV(VkQueue queue, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {
+    if (!vvl::Contains(internally_synchronized_queues, queue)) {
+        FinishWriteObject(queue, record_obj.location);
+    }
+}
+
+void Device::PreCallRecordGetCommandBufferInternalHandleNV(VkCommandBuffer commandBuffer, VkInternalHandleNV* pHandle,
+                                                           const RecordObject& record_obj) {
+    StartReadObject(commandBuffer, record_obj.location);
+}
+
+void Device::PostCallRecordGetCommandBufferInternalHandleNV(VkCommandBuffer commandBuffer, VkInternalHandleNV* pHandle,
+                                                            const RecordObject& record_obj) {
+    FinishReadObject(commandBuffer, record_obj.location);
+}
+
 void Device::PreCallRecordCmdSetPrimitiveRestartIndexEXT(VkCommandBuffer commandBuffer, uint32_t primitiveRestartIndex,
                                                          const RecordObject& record_obj) {
     StartWriteObject(commandBuffer, record_obj.location);

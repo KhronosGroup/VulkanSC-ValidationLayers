@@ -4873,6 +4873,48 @@ virtual void PreCallRecordCmdEndPerTileExecutionQCOM(VkCommandBuffer commandBuff
                                                      const RecordObject& record_obj) {}
 virtual void PostCallRecordCmdEndPerTileExecutionQCOM(VkCommandBuffer commandBuffer, const VkPerTileEndInfoQCOM* pPerTileEndInfo,
                                                       const RecordObject& record_obj) {}
+virtual bool PreCallValidateSetLatencySleepModeLegacyNV(VkDevice device, VkBool32 lowLatencyMode, VkBool32 lowLatencyBoost,
+                                                        uint32_t minimumIntervalUs, const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordSetLatencySleepModeLegacyNV(VkDevice device, VkBool32 lowLatencyMode, VkBool32 lowLatencyBoost,
+                                                      uint32_t minimumIntervalUs, const RecordObject& record_obj) {}
+virtual void PostCallRecordSetLatencySleepModeLegacyNV(VkDevice device, VkBool32 lowLatencyMode, VkBool32 lowLatencyBoost,
+                                                       uint32_t minimumIntervalUs, const RecordObject& record_obj) {}
+virtual bool PreCallValidateLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                                 const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                               const RecordObject& record_obj) {}
+virtual void PostCallRecordLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                                const RecordObject& record_obj) {}
+virtual bool PreCallValidateSetLatencyMarkerLegacyNV(VkDevice device, uint64_t frameID, uint32_t marker,
+                                                     const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordSetLatencyMarkerLegacyNV(VkDevice device, uint64_t frameID, uint32_t marker,
+                                                   const RecordObject& record_obj) {}
+virtual void PostCallRecordSetLatencyMarkerLegacyNV(VkDevice device, uint64_t frameID, uint32_t marker,
+                                                    const RecordObject& record_obj) {}
+virtual bool PreCallValidateGetLatencyTimingsLegacyNV(VkDevice device, void* pTimings, const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordGetLatencyTimingsLegacyNV(VkDevice device, void* pTimings, const RecordObject& record_obj) {}
+virtual void PostCallRecordGetLatencyTimingsLegacyNV(VkDevice device, void* pTimings, const RecordObject& record_obj) {}
+virtual bool PreCallValidateQueueNotifyOutOfBandLegacyNV(VkQueue queue, uint32_t queueType, const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordQueueNotifyOutOfBandLegacyNV(VkQueue queue, uint32_t queueType, const RecordObject& record_obj) {}
+virtual void PostCallRecordQueueNotifyOutOfBandLegacyNV(VkQueue queue, uint32_t queueType, const RecordObject& record_obj) {}
+virtual bool PreCallValidateGetSleepStatusLegacyNV(VkDevice device, VkBool32* pLowLatencyMode, const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordGetSleepStatusLegacyNV(VkDevice device, VkBool32* pLowLatencyMode, const RecordObject& record_obj) {}
+virtual void PostCallRecordGetSleepStatusLegacyNV(VkDevice device, VkBool32* pLowLatencyMode, const RecordObject& record_obj) {}
+virtual bool PreCallValidateShutdownLatencyDeviceLegacyNV(VkDevice device, const ErrorObject& error_obj) const { return false; }
+virtual void PreCallRecordShutdownLatencyDeviceLegacyNV(VkDevice device, const RecordObject& record_obj) {}
+virtual void PostCallRecordShutdownLatencyDeviceLegacyNV(VkDevice device, const RecordObject& record_obj) {}
 #ifdef VK_USE_PLATFORM_METAL_EXT
 virtual bool PreCallValidateExportMetalObjectsEXT(VkDevice device, VkExportMetalObjectsInfoEXT* pMetalObjectsInfo,
                                                   const ErrorObject& error_obj) const {
@@ -6602,6 +6644,27 @@ virtual void PreCallRecordCmdSetComputeOccupancyPriorityNV(VkCommandBuffer comma
                                                            const RecordObject& record_obj) {}
 virtual void PostCallRecordCmdSetComputeOccupancyPriorityNV(VkCommandBuffer commandBuffer,
                                                             const VkComputeOccupancyPriorityParametersNV* pParameters,
+                                                            const RecordObject& record_obj) {}
+virtual bool PreCallValidateGetDeviceInternalHandleNV(VkDevice device, VkInternalHandleNV* pHandle,
+                                                      const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordGetDeviceInternalHandleNV(VkDevice device, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {}
+virtual void PostCallRecordGetDeviceInternalHandleNV(VkDevice device, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {
+}
+virtual bool PreCallValidateGetQueueInternalHandleNV(VkQueue queue, VkInternalHandleNV* pHandle,
+                                                     const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordGetQueueInternalHandleNV(VkQueue queue, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {}
+virtual void PostCallRecordGetQueueInternalHandleNV(VkQueue queue, VkInternalHandleNV* pHandle, const RecordObject& record_obj) {}
+virtual bool PreCallValidateGetCommandBufferInternalHandleNV(VkCommandBuffer commandBuffer, VkInternalHandleNV* pHandle,
+                                                             const ErrorObject& error_obj) const {
+    return false;
+}
+virtual void PreCallRecordGetCommandBufferInternalHandleNV(VkCommandBuffer commandBuffer, VkInternalHandleNV* pHandle,
+                                                           const RecordObject& record_obj) {}
+virtual void PostCallRecordGetCommandBufferInternalHandleNV(VkCommandBuffer commandBuffer, VkInternalHandleNV* pHandle,
                                                             const RecordObject& record_obj) {}
 virtual bool PreCallValidateCmdSetPrimitiveRestartIndexEXT(VkCommandBuffer commandBuffer, uint32_t primitiveRestartIndex,
                                                            const ErrorObject& error_obj) const {

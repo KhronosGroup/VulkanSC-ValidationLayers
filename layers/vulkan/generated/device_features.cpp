@@ -874,6 +874,12 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo* pCreateInfo, DeviceFeatu
                 features->maintenance10 |= enabled->maintenance10 == VK_TRUE;
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_KHR: {
+                const VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesKHR* enabled =
+                    reinterpret_cast<const VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesKHR*>(pNext);
+                features->pipelineLibraryGroupHandles |= enabled->pipelineLibraryGroupHandles == VK_TRUE;
+                break;
+            }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_11_FEATURES_KHR: {
                 const VkPhysicalDeviceMaintenance11FeaturesKHR* enabled =
                     reinterpret_cast<const VkPhysicalDeviceMaintenance11FeaturesKHR*>(pNext);
@@ -884,6 +890,12 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo* pCreateInfo, DeviceFeatu
                 const VkPhysicalDeviceExtendedFlagsFeaturesKHR* enabled =
                     reinterpret_cast<const VkPhysicalDeviceExtendedFlagsFeaturesKHR*>(pNext);
                 features->extendedFlags |= enabled->extendedFlags == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_12_FEATURES_KHR: {
+                const VkPhysicalDeviceMaintenance12FeaturesKHR* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceMaintenance12FeaturesKHR*>(pNext);
+                features->maintenance12 |= enabled->maintenance12 == VK_TRUE;
                 break;
             }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT: {
@@ -1773,12 +1785,6 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo* pCreateInfo, DeviceFeatu
                 features->shaderCoreBuiltins |= enabled->shaderCoreBuiltins == VK_TRUE;
                 break;
             }
-            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT: {
-                const VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT* enabled =
-                    reinterpret_cast<const VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT*>(pNext);
-                features->pipelineLibraryGroupHandles |= enabled->pipelineLibraryGroupHandles == VK_TRUE;
-                break;
-            }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT: {
                 const VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT* enabled =
                     reinterpret_cast<const VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT*>(pNext);
@@ -1947,13 +1953,13 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo* pCreateInfo, DeviceFeatu
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV: {
                 const VkPhysicalDeviceCooperativeMatrix2FeaturesNV* enabled =
                     reinterpret_cast<const VkPhysicalDeviceCooperativeMatrix2FeaturesNV*>(pNext);
-                features->cooperativeMatrixWorkgroupScope |= enabled->cooperativeMatrixWorkgroupScope == VK_TRUE;
-                features->cooperativeMatrixFlexibleDimensions |= enabled->cooperativeMatrixFlexibleDimensions == VK_TRUE;
-                features->cooperativeMatrixReductions |= enabled->cooperativeMatrixReductions == VK_TRUE;
-                features->cooperativeMatrixConversions |= enabled->cooperativeMatrixConversions == VK_TRUE;
-                features->cooperativeMatrixPerElementOperations |= enabled->cooperativeMatrixPerElementOperations == VK_TRUE;
-                features->cooperativeMatrixTensorAddressing |= enabled->cooperativeMatrixTensorAddressing == VK_TRUE;
-                features->cooperativeMatrixBlockLoads |= enabled->cooperativeMatrixBlockLoads == VK_TRUE;
+                features->cooperativeMatrixWorkgroupScopeNV |= enabled->cooperativeMatrixWorkgroupScope == VK_TRUE;
+                features->cooperativeMatrixFlexibleDimensionsNV |= enabled->cooperativeMatrixFlexibleDimensions == VK_TRUE;
+                features->cooperativeMatrixReductionsNV |= enabled->cooperativeMatrixReductions == VK_TRUE;
+                features->cooperativeMatrixConversionsNV |= enabled->cooperativeMatrixConversions == VK_TRUE;
+                features->cooperativeMatrixPerElementOperationsNV |= enabled->cooperativeMatrixPerElementOperations == VK_TRUE;
+                features->cooperativeMatrixTensorAddressingNV |= enabled->cooperativeMatrixTensorAddressing == VK_TRUE;
+                features->cooperativeMatrixBlockLoadsNV |= enabled->cooperativeMatrixBlockLoads == VK_TRUE;
                 break;
             }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_OPACITY_MICROMAP_FEATURES_ARM: {
@@ -2058,10 +2064,26 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo* pCreateInfo, DeviceFeatu
                 features->computeOccupancyPriority |= enabled->computeOccupancyPriority == VK_TRUE;
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_MAINTENANCE_1_FEATURES_EXT: {
+                const VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT*>(pNext);
+                features->cooperativeMatrixProperties2 |= enabled->cooperativeMatrixProperties2 == VK_TRUE;
+                features->cooperativeMatrixReductions |= enabled->cooperativeMatrixReductions == VK_TRUE;
+                features->cooperativeMatrixConversions |= enabled->cooperativeMatrixConversions == VK_TRUE;
+                features->cooperativeMatrixPerElementOperations |= enabled->cooperativeMatrixPerElementOperations == VK_TRUE;
+                features->cooperativeMatrixGetCoordinate |= enabled->cooperativeMatrixGetCoordinate == VK_TRUE;
+                break;
+            }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_PARTITIONED_FEATURES_EXT: {
                 const VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT* enabled =
                     reinterpret_cast<const VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT*>(pNext);
                 features->shaderSubgroupPartitioned |= enabled->shaderSubgroupPartitioned == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_LAYOUTS_FEATURES_ARM: {
+                const VkPhysicalDeviceCooperativeMatrixLayoutsFeaturesARM* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceCooperativeMatrixLayoutsFeaturesARM*>(pNext);
+                features->cooperativeMatrixArmLayouts |= enabled->cooperativeMatrixArmLayouts == VK_TRUE;
                 break;
             }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OCP_MICROSCALING_TYPES_FEATURES_EXT: {
@@ -2103,10 +2125,40 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo* pCreateInfo, DeviceFeatu
                 features->primitiveRestartIndex |= enabled->primitiveRestartIndex == VK_TRUE;
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ADDRESS_BINDING_UNRESTRICTED_FEATURES_EXT: {
+                const VkPhysicalDeviceVertexAddressBindingUnrestrictedFeaturesEXT* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceVertexAddressBindingUnrestrictedFeaturesEXT*>(pNext);
+                features->vertexAddressBindingUnrestricted |= enabled->vertexAddressBindingUnrestricted == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_TILING_CONTROL_FEATURES_EXT: {
+                const VkPhysicalDeviceImageTilingControlFeaturesEXT* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceImageTilingControlFeaturesEXT*>(pNext);
+                features->imageTilingControl |= enabled->imageTilingControl == VK_TRUE;
+                break;
+            }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_DECODE_VECTOR_FEATURES_NV: {
                 const VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV* enabled =
                     reinterpret_cast<const VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV*>(pNext);
                 features->cooperativeMatrixDecodeVector |= enabled->cooperativeMatrixDecodeVector == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_BASE_HANDLE_FEATURES_NV: {
+                const VkPhysicalDevicePrivateDataBaseHandleFeaturesNV* enabled =
+                    reinterpret_cast<const VkPhysicalDevicePrivateDataBaseHandleFeaturesNV*>(pNext);
+                features->privateDataBaseHandle |= enabled->privateDataBaseHandle == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_ALLOCATION_ALIGNMENT_FEATURES_VALVE: {
+                const VkPhysicalDeviceBufferDeviceAddressAllocationAlignmentFeaturesVALVE* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceBufferDeviceAddressAllocationAlignmentFeaturesVALVE*>(pNext);
+                features->bufferDeviceAddressAllocationAlignment |= enabled->bufferDeviceAddressAllocationAlignment == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HDR_SMPTE_ST_209450_FEATURES_GOOGLE: {
+                const VkPhysicalDeviceHdrSmpteSt209450FeaturesGOOGLE* enabled =
+                    reinterpret_cast<const VkPhysicalDeviceHdrSmpteSt209450FeaturesGOOGLE*>(pNext);
+                features->hdrSmpteSt209450 |= enabled->hdrSmpteSt209450 == VK_TRUE;
                 break;
             }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR: {

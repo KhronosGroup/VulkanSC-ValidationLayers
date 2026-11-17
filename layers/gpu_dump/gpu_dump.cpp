@@ -16,6 +16,7 @@
 
 #include "gpu_dump.h"
 #include <cstdint>
+#include <ostream>
 #include "chassis/layer_object_id.h"
 #include "generated/dispatch_functions.h"
 #include "generated/vk_extension_helper.h"
@@ -25,64 +26,94 @@
 
 namespace gpudump {
 
+std::ostream& operator<<(std::ostream& os, const Hex& hex) {
+    const std::ios_base::fmtflags flags = os.flags();
+    os << "0x" << std::hex << hex.value;
+    os.flags(flags);
+    return os;
+}
+
 GpuDump::GpuDump(vvl::DispatchDevice* dev, gpudump::Instance* instance_vo)
     : vvl::DeviceProxy(dev, instance_vo, LayerObjectTypeGpuDump) {}
 
 GpuDump::~GpuDump() {}
 
-std::vector<uint8_t> GpuDump::CopyDataFromMemory(VkDeviceAddress memory_addresss, VkDeviceSize copy_size) {
+std::vector<uint8_t> GpuDump::CopyDataFromMemory(VkDeviceAddress memory_address, VkDeviceSize copy_size) {
     std::vector<uint8_t> result;
-    vvl::span<vvl::Buffer* const> buffer_list = device_state->GetBuffersByAddress(memory_addresss);
+    if (copy_size == 0) {
+        return result;
+    }
+    vvl::span<vvl::Buffer* const> buffer_list = device_state->GetBuffersByAddress(memory_address);
     if (buffer_list.empty()) {
         return result;
     }
 
-    auto buffer_state = *buffer_list.begin();
-    const vvl::DeviceMemory& memory_state = *buffer_state->MemoryState();
+    const vvl::Buffer& buffer_state = **buffer_list.begin();
+    // Sparse buffers don't have a single memory binding
+    const vvl::MemoryBinding* binding = buffer_state.Binding();
+    if (!binding || !binding->memory_state || binding->memory_state->Destroyed()) {
+        return result;
+    }
+    const vvl::DeviceMemory& memory_state = *binding->memory_state;
 
     // Prevent copying OOB of a buffer
-    if ((memory_addresss + copy_size) > buffer_state->DeviceAddressRange().end) {
+    if ((memory_address + copy_size) > buffer_state.DeviceAddressRange().end) {
         return result;
     }
 
-    VkDeviceSize offset = memory_addresss - buffer_state->DeviceAddressRange().begin;
-    if (memory_state.mappable) {
-        uint8_t* data_ptr = static_cast<uint8_t*>(memory_state.p_driver_data);
-
-        if (!memory_state.p_driver_data) {
-            // Just use WHOLE_SIZE to avoid issues with partial mappings
-            // Example:
-            //  The |memory_address| is 0x1001 and |copy_size| is 4, the driver (or at least TestICD) will return back something
-            //  aligned to a value like 64, so if the buffer is only 64 bytes, you will now be accessing data over it
-            DispatchMapMemory(device, memory_state.VkHandle(), offset, VK_WHOLE_SIZE, 0, (void**)&data_ptr);
-
-            if (memory_state.cache_non_coherent) {
-                const VkDeviceSize atom_size = phys_dev_props.limits.nonCoherentAtomSize;
-                uint64_t aligned_offset = offset & ~(atom_size - 1);
-                if (aligned_offset < offset) {
-                    aligned_offset = offset;
-                }
-
-                VkMappedMemoryRange memory_range = vku::InitStructHelper();
-                memory_range.memory = memory_state.VkHandle();
-                memory_range.offset = aligned_offset;
-                memory_range.size = VK_WHOLE_SIZE;
-                DispatchInvalidateMappedMemoryRanges(device, 1, &memory_range);
-            }
-        }
-
-        data_ptr += offset;
-        result.resize(static_cast<uint32_t>(copy_size));
-        memcpy(result.data(), data_ptr, static_cast<uint32_t>(copy_size));
-
-        if (!memory_state.p_driver_data) {
-            DispatchUnmapMemory(device, memory_state.VkHandle());
-        }
-    } else {
+    if (!memory_state.mappable) {
         // TODO - Handle non-host visible memory
         // When we add, we need to guard against if trying to read non-aligned data
         //   (which should have a warning already)
+        return result;
     }
+
+    // The buffer might not be bound at the start of the VkDeviceMemory
+    const VkDeviceSize memory_offset = binding->memory_offset + (memory_address - buffer_state.DeviceAddressRange().begin);
+
+    if (memory_state.p_driver_data) {
+        // The application has the memory mapped already, only read if its mapping covers the data
+        const vvl::MemRange& mapped_range = memory_state.mapped_range;
+        const VkDeviceSize mapped_end = (mapped_range.size == VK_WHOLE_SIZE) ? memory_state.allocate_info.allocationSize
+                                                                             : mapped_range.offset + mapped_range.size;
+        if (memory_offset < mapped_range.offset || (memory_offset + copy_size) > mapped_end) {
+            return result;
+        }
+        const uint8_t* data_ptr = static_cast<const uint8_t*>(memory_state.p_driver_data) + (memory_offset - mapped_range.offset);
+        result.resize(static_cast<size_t>(copy_size));
+        memcpy(result.data(), data_ptr, static_cast<size_t>(copy_size));
+        return result;
+    }
+
+    // Map from an offset aligned to nonCoherentAtomSize so it can also be used for vkInvalidateMappedMemoryRanges.
+    // Just use WHOLE_SIZE to avoid issues with partial mappings
+    // Example:
+    //  The |memory_address| is 0x1001 and |copy_size| is 4, the driver will return back something
+    //  aligned to a value like 64, so if the buffer is only 64 bytes, you will now be accessing data over it
+    VkDeviceSize map_offset = memory_offset;
+    if (memory_state.cache_non_coherent) {
+        const VkDeviceSize atom_size = phys_dev_props.limits.nonCoherentAtomSize;
+        map_offset = (memory_offset / atom_size) * atom_size;
+    }
+
+    void* mapped_data = nullptr;
+    if (DispatchMapMemory(device, memory_state.VkHandle(), map_offset, VK_WHOLE_SIZE, 0, &mapped_data) != VK_SUCCESS) {
+        return result;
+    }
+
+    if (memory_state.cache_non_coherent) {
+        VkMappedMemoryRange memory_range = vku::InitStructHelper();
+        memory_range.memory = memory_state.VkHandle();
+        memory_range.offset = map_offset;
+        memory_range.size = VK_WHOLE_SIZE;
+        DispatchInvalidateMappedMemoryRanges(device, 1, &memory_range);
+    }
+
+    const uint8_t* data_ptr = static_cast<const uint8_t*>(mapped_data) + (memory_offset - map_offset);
+    result.resize(static_cast<size_t>(copy_size));
+    memcpy(result.data(), data_ptr, static_cast<size_t>(copy_size));
+
+    DispatchUnmapMemory(device, memory_state.VkHandle());
 
     return result;
 }
@@ -109,7 +140,7 @@ bool GpuDump::ListBuffers(std::ostringstream& ss, VkDeviceAddress address, uint3
     }
 
     if (buffer_states.empty()) {
-        ss << "- [WARNING] No VkBuffer found at 0x" << std::hex << address;
+        ss << "- [WARNING] No VkBuffer found at " << Hex(address);
     }
 
     if (!new_line_start) {
@@ -142,7 +173,7 @@ bool GpuDump::ListAccelerationStructures(std::ostringstream& ss, VkDeviceAddress
     }
 
     if (as_states.empty()) {
-        ss << "- [WARNING] No VkAccelerationStructureKHR found at 0x" << std::hex << address;
+        ss << "- [WARNING] No VkAccelerationStructureKHR found at " << Hex(address);
     }
 
     if (!new_line_start) {
@@ -150,33 +181,6 @@ bool GpuDump::ListAccelerationStructures(std::ostringstream& ss, VkDeviceAddress
     }
 
     return as_states.empty();
-}
-
-void GpuDump::FinishDeviceSetup(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) {
-    if (gpu_dump_settings.descriptors && global_settings.descriptor_hashing) {
-        if (IsExtEnabled(extensions.vk_ext_descriptor_heap)) {
-            heap_all_descriptor_sizes = device_state->cached_descriptor_size.GetAllSizes(true);
-            for (VkDeviceSize size : heap_all_descriptor_sizes) {
-                if (size > heap_max_descriptor_size) {
-                    heap_max_descriptor_size = size;
-                }
-            }
-        }
-        if (IsExtEnabled(extensions.vk_ext_descriptor_buffer)) {
-            buffer_all_descriptor_sizes = device_state->cached_descriptor_size.GetAllSizes(false);
-            for (VkDeviceSize size : buffer_all_descriptor_sizes) {
-                if (size > buffer_max_descriptor_size) {
-                    buffer_max_descriptor_size = size;
-                }
-            }
-        }
-
-        // |force_on_robustness| marks the "modified" feature so need to check for both
-        if (enabled_features.nullDescriptor || gpuav_settings.force_on_robustness) {
-            null_descriptor_allowed = true;
-        }
-        null_descriptor_dword = GetNullDescriptorDWord(phys_dev_props);
-    }
 }
 
 }  // namespace gpudump

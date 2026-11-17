@@ -16,12 +16,9 @@
 */
 
 #include <algorithm>
-#include <array>
 #include "test_icd.h"
 #include "test_icd_helper.h"
 #include <vulkan/utility/vk_format_utils.h>
-#include <vulkan/vulkan_core.h>
-#include <cstddef>
 #include <vulkan/utility/vk_struct_helper.hpp>
 
 namespace icd {
@@ -563,7 +560,7 @@ static VKAPI_ATTR void VKAPI_CALL DestroyDevice(VkDevice device, const VkAllocat
         }
         command_pool_buffer_map.erase(cp);
     }
-    command_pool_map[device].clear();
+    command_pool_map.erase(device);
 
 #ifdef VULKANSC
     // Vulkan SC does not support vkFreeMemory therefore all mapped memory is implicitly unmapped during device destruction
@@ -798,13 +795,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBuff
                                                    const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer) {
     unique_lock_t lock(global_lock);
     *pBuffer = (VkBuffer)global_unique_handle++;
-    // Some address for RTX need to be aligned to 256
-    if (pCreateInfo->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT ||
-        pCreateInfo->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR) {
-        const uint64_t rtx_alignment = current_available_address % 256;
-        if (rtx_alignment != 0) {
-            current_available_address += (256 - rtx_alignment);
-        }
+    // Many addresses (RTX, descriptor heaps, ...) need to be aligned to 256. The usage can't be used to know which (it can be zero
+    // when using VkBufferUsageFlags2CreateInfo), and the tests would then depend on which buffers earlier tests happened to create.
+    const uint64_t buffer_alignment = current_available_address % 256;
+    if (buffer_alignment != 0) {
+        current_available_address += (256 - buffer_alignment);
     }
     buffer_map[device][*pBuffer] = {pCreateInfo->size, current_available_address};
     current_available_address += pCreateInfo->size;
@@ -925,16 +920,62 @@ static VKAPI_ATTR void VKAPI_CALL GetTensorMemoryRequirementsARM(VkDevice device
     memReq.memoryTypeBits = 0xFFFF & ~(0x1 << 3);
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL CreateDataGraphPipelineSessionARM(VkDevice device,
+                                                                        const VkDataGraphPipelineSessionCreateInfoARM* pCreateInfo,
+                                                                        const VkAllocationCallbacks* pAllocator,
+                                                                        VkDataGraphPipelineSessionARM* pSession) {
+    unique_lock_t lock(global_lock);
+
+    *pSession = (VkDataGraphPipelineSessionARM)global_unique_handle++;
+
+    if (nullptr != pCreateInfo) {
+        if (vku::FindStructInPNextChain<VkDataGraphPipelineSessionNeuralStatisticsCreateInfoARM>(pCreateInfo->pNext)) {
+            ne_stats_sessions.emplace(*pSession);
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR void VKAPI_CALL DestroyDataGraphPipelineSessionARM(VkDevice device, VkDataGraphPipelineSessionARM session,
+                                                                     const VkAllocationCallbacks* pAllocator) {
+    unique_lock_t lock(global_lock);
+    ne_stats_sessions.erase(session);
+}
+
 static VKAPI_ATTR VkResult VKAPI_CALL GetDataGraphPipelineSessionBindPointRequirementsARM(
     VkDevice device, const VkDataGraphPipelineSessionBindPointRequirementsInfoARM* pInfo, uint32_t* pBindPointRequirementCount,
     VkDataGraphPipelineSessionBindPointRequirementARM* pBindPointRequirements) {
-    if (nullptr == pBindPointRequirements) {
-        *pBindPointRequirementCount = 1;
-    } else {
-        pBindPointRequirements->bindPoint = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TRANSIENT_ARM;
-        pBindPointRequirements->bindPointType = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM;
-        pBindPointRequirements->numObjects = 1;
+    unique_lock_t lock(global_lock);
+
+    const bool uses_ne_stats = ne_stats_sessions.find(pInfo->session) != ne_stats_sessions.end();
+
+    const uint32_t num_bind_points = 1 + (uses_ne_stats ? 1 : 0);
+
+    if (!pBindPointRequirements) {
+        *pBindPointRequirementCount = num_bind_points;
+
+        return VK_SUCCESS;
     }
+
+    if (0 == *pBindPointRequirementCount) {
+        return VK_INCOMPLETE;
+    }
+    pBindPointRequirements[0].bindPoint = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TRANSIENT_ARM;
+    pBindPointRequirements[0].bindPointType = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM;
+    pBindPointRequirements[0].numObjects = 1;
+
+    if (uses_ne_stats) {
+        if (1 == *pBindPointRequirementCount) {
+            return VK_INCOMPLETE;
+        }
+        pBindPointRequirements[1].bindPoint = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_NEURAL_ACCELERATOR_STATISTICS_ARM;
+        pBindPointRequirements[1].bindPointType = VK_DATA_GRAPH_PIPELINE_SESSION_BIND_POINT_TYPE_MEMORY_ARM;
+        pBindPointRequirements[1].numObjects = 1;
+    }
+
+    *pBindPointRequirementCount = num_bind_points;
+
     return VK_SUCCESS;
 }
 
@@ -1561,22 +1602,58 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceExternalTensorPropertiesARM(
 #endif  // VULKANSC
 
 #ifndef VULKANSC  // Vulkan SC does not support VK_ARM_data_graph
+// Operations supported by the default ARM engine
+// TODO: add more operations for other engines here
+static constexpr VkPhysicalDeviceDataGraphOperationSupportARM tosa_operation{
+    VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_SPIRV_EXTENDED_INSTRUCTION_SET_ARM, "TOSA.001000.1", 0};
+static constexpr VkPhysicalDeviceDataGraphOperationSupportARM optical_flow_operation{
+    VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_OPTICAL_FLOW_ARM, "OpticalFlow", 1};
+static constexpr VkPhysicalDeviceDataGraphOperationSupportARM neural_model_operation{
+    VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_NEURAL_MODEL_QCOM, "Generic QNN", 0};
+static constexpr VkPhysicalDeviceDataGraphOperationSupportARM compute_model_operation{
+    VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_NEURAL_MODEL_QCOM, "Generic QNN GPU (compute)", 0};
+
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphPropertiesARM(
     VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, uint32_t* pQueueFamilyDataGraphPropertyCount,
     VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties) {
     // TODO: Need a way for test to decide to support or not support various engines
+    // NOTE: q4 and q5 are the data graph only queue families from max_profile
+    if (queueFamilyIndex == 4 || queueFamilyIndex == 5) {
+        if (pQueueFamilyDataGraphProperties) {
+            if (queueFamilyIndex == 4) {
+                pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_NEURAL_QCOM,
+                                                             VK_TRUE};
+                pQueueFamilyDataGraphProperties[0].operation = neural_model_operation;
+            } else {
+                pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_COMPUTE_QCOM,
+                                                             VK_TRUE};
+                pQueueFamilyDataGraphProperties[0].operation = compute_model_operation;
+            }
+        }
+        *pQueueFamilyDataGraphPropertyCount = 1;
+        return VK_SUCCESS;
+    }
 
+    // NOTE: queue 0 supports both properties, q1 only tosa, q2 only opt flow, q > 2 neither
     if (pQueueFamilyDataGraphProperties == nullptr) {
-        *pQueueFamilyDataGraphPropertyCount = 2;
+        *pQueueFamilyDataGraphPropertyCount = (queueFamilyIndex == 0) ? 2 : (queueFamilyIndex > 2) ? 0 : 1;
     } else {
-        pQueueFamilyDataGraphProperties[0].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
-        pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
-        pQueueFamilyDataGraphProperties[0].operation = {
-            VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_SPIRV_EXTENDED_INSTRUCTION_SET_ARM, "TOSA.001000.1", 0};
-        pQueueFamilyDataGraphProperties[1].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
-        pQueueFamilyDataGraphProperties[1].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
-        pQueueFamilyDataGraphProperties[1].operation = {VK_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_TYPE_OPTICAL_FLOW_ARM,
-                                                        "OpticalFlow", 1};
+        if (queueFamilyIndex == 0) {
+            pQueueFamilyDataGraphProperties[0].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
+            pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
+            pQueueFamilyDataGraphProperties[0].operation = tosa_operation;
+            pQueueFamilyDataGraphProperties[1].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
+            pQueueFamilyDataGraphProperties[1].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
+            pQueueFamilyDataGraphProperties[1].operation = optical_flow_operation;
+        } else if (queueFamilyIndex == 1) {
+            pQueueFamilyDataGraphProperties[0].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
+            pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
+            pQueueFamilyDataGraphProperties[0].operation = tosa_operation;
+        } else if (queueFamilyIndex == 2) {
+            pQueueFamilyDataGraphProperties[0].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_PROPERTIES_ARM;
+            pQueueFamilyDataGraphProperties[0].engine = {VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM, false};
+            pQueueFamilyDataGraphProperties[0].operation = optical_flow_operation;
+        }
     }
     return VK_SUCCESS;
 }
@@ -1584,21 +1661,56 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphPrope
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphEngineOperationPropertiesARM(
     VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
     const VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties, VkBaseOutStructure* pProperties) {
-    if (pProperties->sType == VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_OPTICAL_FLOW_PROPERTIES_ARM) {
-        auto* properties = reinterpret_cast<VkQueueFamilyDataGraphOpticalFlowPropertiesARM*>(pProperties);
-        properties->supportedOutputGridSizes =
-            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM |
-            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_4X4_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_8X8_BIT_ARM;
-        properties->supportedHintGridSizes =
-            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM |
-            VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_4X4_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_8X8_BIT_ARM;
-        properties->hintSupported = VK_TRUE;
-        properties->costSupported = VK_TRUE;
-        properties->minWidth = 10;
-        properties->minHeight = 10;
-        properties->maxWidth = 10000;
-        properties->maxHeight = 10000;
+
+    if (pQueueFamilyDataGraphProperties->engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM &&
+        pQueueFamilyDataGraphProperties->engine.isForeign == false) {
+        if (pQueueFamilyDataGraphProperties->operation.operationType == optical_flow_operation.operationType &&
+            strcmp(pQueueFamilyDataGraphProperties->operation.name, optical_flow_operation.name) == 0 &&
+            pProperties->sType == VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_OPTICAL_FLOW_PROPERTIES_ARM) {
+            auto* pOpticalFlowProperties = reinterpret_cast<VkQueueFamilyDataGraphOpticalFlowPropertiesARM*>(pProperties);
+            if (queueFamilyIndex == 0) {
+                // queue 0 supports everything
+                pOpticalFlowProperties->supportedOutputGridSizes =
+                    VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM |
+                    VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_4X4_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_8X8_BIT_ARM;
+                pOpticalFlowProperties->supportedHintGridSizes =
+                    VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM |
+                    VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_4X4_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_8X8_BIT_ARM;
+                pOpticalFlowProperties->hintSupported = VK_TRUE;
+                pOpticalFlowProperties->costSupported = VK_TRUE;
+            } else {
+                // leave something out on other queues for negative tests
+                pOpticalFlowProperties->supportedOutputGridSizes =
+                    VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM;
+                pOpticalFlowProperties->supportedHintGridSizes =
+                    VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_1X1_BIT_ARM | VK_DATA_GRAPH_OPTICAL_FLOW_GRID_SIZE_2X2_BIT_ARM;
+                pOpticalFlowProperties->hintSupported = VK_FALSE;
+                pOpticalFlowProperties->costSupported = VK_FALSE;
+            }
+            pOpticalFlowProperties->minWidth = 10;
+            pOpticalFlowProperties->minHeight = 10;
+            pOpticalFlowProperties->maxWidth = 10000;
+            pOpticalFlowProperties->maxHeight = 10000;
+        } else if (pQueueFamilyDataGraphProperties->operation.operationType == tosa_operation.operationType &&
+                   strcmp(pQueueFamilyDataGraphProperties->operation.name, tosa_operation.name) == 0 &&
+                   pProperties->sType == VK_STRUCTURE_TYPE_QUEUE_FAMILY_DATA_GRAPH_TOSA_PROPERTIES_ARM) {
+            auto *pTOSAProperties = reinterpret_cast<VkQueueFamilyDataGraphTOSAPropertiesARM *>(pProperties);
+            static constexpr VkDataGraphTOSANameQualityARM graphTOSANameQualityProfiles[] = {
+                { "PRO-INT", VK_DATA_GRAPH_TOSA_QUALITY_CONFORMANT_ARM },
+                { "PRO-FP", VK_DATA_GRAPH_TOSA_QUALITY_CONFORMANT_ARM },
+            };
+            pTOSAProperties->profileCount = static_cast<uint32_t>(std::size(graphTOSANameQualityProfiles));
+            pTOSAProperties->pProfiles = graphTOSANameQualityProfiles;
+            pTOSAProperties->extensionCount = 0;
+            pTOSAProperties->pExtensions = nullptr;
+            pTOSAProperties->level = VK_DATA_GRAPH_TOSA_LEVEL_8K_ARM;
+        }
+    } else if (pQueueFamilyDataGraphProperties->engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_COMPUTE_QCOM) {
+        // TODO: add properties for this processing engine
+    } else if (pQueueFamilyDataGraphProperties->engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_NEURAL_QCOM) {
+        // TODO: add properties for this processing engine
     }
+
     return VK_SUCCESS;
 }
 
@@ -1607,42 +1719,54 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceQueueFamilyDataGraphOptic
     const VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties,
     const VkDataGraphOpticalFlowImageFormatInfoARM* pOpticalFlowImageFormatInfo, uint32_t* pFormatCount,
     VkDataGraphOpticalFlowImageFormatPropertiesARM* pImageFormatProperties) {
-    switch (pOpticalFlowImageFormatInfo->usage) {
-        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_INPUT_BIT_ARM: {
-            static constexpr std::array<VkFormat, 6> input_formats = {
-                VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8_UNORM,
-                VK_FORMAT_B8G8R8_UNORM,   VK_FORMAT_R8_UNORM,       VK_FORMAT_B10G11R11_UFLOAT_PACK32,
-            };
-            if (pImageFormatProperties != nullptr) {
-                for (uint32_t i = 0; i < *pFormatCount; ++i) {
-                    pImageFormatProperties[i].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
-                    pImageFormatProperties[i].format = input_formats[i];
+
+    if (pQueueFamilyDataGraphProperties->engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_DEFAULT_ARM &&
+        pQueueFamilyDataGraphProperties->engine.isForeign == false) {
+
+        switch (pOpticalFlowImageFormatInfo->usage) {
+            case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_INPUT_BIT_ARM: {
+                static constexpr std::array<VkFormat, 6> input_formats = {
+                    VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8_UNORM,
+                    VK_FORMAT_B8G8R8_UNORM,   VK_FORMAT_R8_UNORM,       VK_FORMAT_B10G11R11_UFLOAT_PACK32,
+                };
+                if (pImageFormatProperties != nullptr) {
+                    for (uint32_t i = 0; i < *pFormatCount; ++i) {
+                        pImageFormatProperties[i].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
+                        pImageFormatProperties[i].format = input_formats[i];
+                    }
+                } else {
+                    *pFormatCount = static_cast<uint32_t>(input_formats.size());
                 }
-            } else {
-                *pFormatCount = static_cast<uint32_t>(input_formats.size());
+                break;
             }
-            break;
+            case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_OUTPUT_BIT_ARM:
+            case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_HINT_BIT_ARM:
+                if (pImageFormatProperties != nullptr) {
+                    pImageFormatProperties[0].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
+                    pImageFormatProperties[0].format = VK_FORMAT_R16G16_SFLOAT;
+                } else {
+                    *pFormatCount = 1;
+                }
+                break;
+            case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_COST_BIT_ARM:
+                if (pImageFormatProperties != nullptr) {
+                    pImageFormatProperties[0].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
+                    pImageFormatProperties[0].format = VK_FORMAT_R16_UINT;
+                } else {
+                    *pFormatCount = 1;
+                }
+                break;
+            default:
+                break;
         }
-        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_OUTPUT_BIT_ARM:
-        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_HINT_BIT_ARM:
-            if (pImageFormatProperties != nullptr) {
-                pImageFormatProperties[0].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
-                pImageFormatProperties[0].format = VK_FORMAT_R16G16_SFLOAT;
-            } else {
-                *pFormatCount = 1;
-            }
-            break;
-        case VK_DATA_GRAPH_OPTICAL_FLOW_IMAGE_USAGE_COST_BIT_ARM:
-            if (pImageFormatProperties != nullptr) {
-                pImageFormatProperties[0].sType = VK_STRUCTURE_TYPE_DATA_GRAPH_OPTICAL_FLOW_IMAGE_FORMAT_PROPERTIES_ARM;
-                pImageFormatProperties[0].format = VK_FORMAT_R16_UINT;
-            } else {
-                *pFormatCount = 1;
-            }
-            break;
-        default:
-            break;
+    } else if (pQueueFamilyDataGraphProperties->engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_COMPUTE_QCOM) {
+        // TODO: add formats sopported by this processing engine. Currently none
+        *pFormatCount = 0;
+    } else if (pQueueFamilyDataGraphProperties->engine.type == VK_PHYSICAL_DEVICE_DATA_GRAPH_PROCESSING_ENGINE_TYPE_NEURAL_QCOM) {
+        // TODO: add formats sopported by this processing engine. Currently none
+        *pFormatCount = 0;
     }
+
     return VK_SUCCESS;
 }
 #endif  // VULKANSC
@@ -1656,6 +1780,45 @@ GetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const V
         external_image_prop->externalMemoryProperties.externalMemoryFeatures =
             VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT;
         external_image_prop->externalMemoryProperties.compatibleHandleTypes = external_image_format->handleType;
+    }
+
+    auto* filter_cubic_prop =
+        vku::FindStructInPNextChain<VkFilterCubicImageViewImageFormatPropertiesEXT>(pImageFormatProperties->pNext);
+    if (filter_cubic_prop) {
+        bool view_type_supported = false;
+        if (const auto* image_view_info =
+                vku::FindStructInPNextChain<VkPhysicalDeviceImageViewImageFormatInfoEXT>(pImageFormatInfo->pNext)) {
+            switch (image_view_info->imageViewType) {
+                case VK_IMAGE_VIEW_TYPE_2D:
+                case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+                case VK_IMAGE_VIEW_TYPE_CUBE:
+                case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+                    view_type_supported = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        bool format_supported = false;
+        switch (pImageFormatInfo->format) {
+            case VK_FORMAT_R32G32B32A32_SFLOAT:
+            case VK_FORMAT_R32G32_SFLOAT:
+            case VK_FORMAT_R32_SFLOAT:
+            case VK_FORMAT_R16G16B16A16_UNORM:
+            case VK_FORMAT_R16G16B16A16_SNORM:
+            case VK_FORMAT_R16G16_UNORM:
+            case VK_FORMAT_R16G16_SNORM:
+            case VK_FORMAT_R16_UNORM:
+            case VK_FORMAT_R16_SNORM:
+                format_supported = false;
+                break;
+            default:
+                format_supported = true;
+                break;
+        }
+        filter_cubic_prop->filterCubic = (format_supported && view_type_supported) ? VK_TRUE : VK_FALSE;
+        filter_cubic_prop->filterCubicMinmax = filter_cubic_prop->filterCubic;
     }
 
     GetPhysicalDeviceImageFormatProperties(physicalDevice, pImageFormatInfo->format, pImageFormatInfo->type,
@@ -1685,7 +1848,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties2(VkPhys
 #else
         if (*pQueueFamilyPropertyCount >= 2) {
             auto props = &pQueueFamilyProperties[1].queueFamilyProperties;
-            props->queueFlags = VK_QUEUE_TRANSFER_BIT | VK_QUEUE_PROTECTED_BIT | VK_QUEUE_VIDEO_DECODE_BIT_KHR;
+            props->queueFlags = VK_QUEUE_TRANSFER_BIT | VK_QUEUE_PROTECTED_BIT | VK_QUEUE_VIDEO_DECODE_BIT_KHR | VK_QUEUE_DATA_GRAPH_BIT_ARM;
             props->queueCount = 1;
             props->timestampValidBits = 16;
             props->minImageTransferGranularity = {1, 1, 1};
@@ -1704,7 +1867,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceQueueFamilyProperties2(VkPhys
         }
         if (*pQueueFamilyPropertyCount >= 3) {
             auto props = &pQueueFamilyProperties[2].queueFamilyProperties;
-            props->queueFlags = VK_QUEUE_TRANSFER_BIT | VK_QUEUE_PROTECTED_BIT | VK_QUEUE_VIDEO_ENCODE_BIT_KHR;
+            props->queueFlags = VK_QUEUE_TRANSFER_BIT | VK_QUEUE_PROTECTED_BIT | VK_QUEUE_VIDEO_ENCODE_BIT_KHR | VK_QUEUE_DATA_GRAPH_BIT_ARM;
             props->queueCount = 1;
             props->timestampValidBits = 16;
             props->minImageTransferGranularity = {1, 1, 1};
@@ -1780,7 +1943,9 @@ static VKAPI_ATTR VkResult VKAPI_CALL EnumeratePhysicalDeviceGroups(
 #ifndef VULKANSC  // Vulkan SC does not supportVK_KHR_device_fault
 static VKAPI_ATTR VkResult VKAPI_CALL GetDeviceFaultReportsKHR(VkDevice device, uint64_t timeout, uint32_t* pFaultCounts,
                                                                VkDeviceFaultInfoKHR* pFaultInfo) {
-    return timeout == 0 ? VK_SUCCESS : VK_TIMEOUT;
+    // No faults ever occur, VK_TIMEOUT is returned even if timeout is zero
+    *pFaultCounts = 0;
+    return VK_TIMEOUT;
 }
 #endif  // VULKANSC
 
@@ -2023,6 +2188,77 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixFlexible
     return VK_SUCCESS;
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixProperties2EXT(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceCooperativeMatrixInfo2EXT* pCooperativeMatrixInfo,
+    uint32_t* pPropertyCount, VkCooperativeMatrixProperties2EXT* pProperties) {
+    const bool saturating = (pCooperativeMatrixInfo->flags & VK_COOPERATIVE_MATRIX_SATURATING_ACCUMULATION_BIT_EXT) != 0;
+    // Give each selector a distinct, realistic tile so tests can detect a query made with the wrong selector.
+    struct TileDimensions {
+        uint32_t m;
+        uint32_t n;
+        uint32_t k;
+    } selector_granularity{};
+    if (pCooperativeMatrixInfo->scope == VK_SCOPE_SUBGROUP_KHR) {
+        switch (pCooperativeMatrixInfo->subgroupSize) {
+            case 0:
+                selector_granularity = {16, 16, 32};
+                break;
+            case 16:
+                selector_granularity = {16, 32, 16};
+                break;
+            case 32:
+                selector_granularity = {32, 16, 16};
+                break;
+            case 64:
+                selector_granularity = {32, 32, 32};
+                break;
+            default:
+                break;
+        }
+    } else if (pCooperativeMatrixInfo->scope == VK_SCOPE_WORKGROUP_KHR && pCooperativeMatrixInfo->invocations == 64 &&
+               pCooperativeMatrixInfo->subgroupSize == 0) {
+        selector_granularity = {32, 16, 32};
+    }
+
+    const bool has_selector_property = selector_granularity.m != 0;
+    constexpr uint32_t required_property_count = 3;
+    const uint32_t available_count = saturating ? 0 : required_property_count + (has_selector_property ? 1 : 0);
+    if (!pProperties) {
+        *pPropertyCount = available_count;
+        return VK_SUCCESS;
+    }
+
+    const uint32_t write_count = std::min(*pPropertyCount, available_count);
+    const auto set_property = [](VkCooperativeMatrixProperties2EXT& property, uint32_t m, uint32_t n, uint32_t k,
+                                 VkComponentTypeKHR ab_type, VkComponentTypeKHR accumulator_type) {
+        property.MGranularity = m;
+        property.NGranularity = n;
+        property.KGranularity = k;
+        property.AType = ab_type;
+        property.BType = ab_type;
+        property.CType = accumulator_type;
+        property.ResultType = accumulator_type;
+    };
+    if (write_count >= 1) {
+        // A realistic FP16 16x16x16 matrix-multiply tile.
+        set_property(pProperties[0], 16, 16, 16, VK_COMPONENT_TYPE_FLOAT16_KHR, VK_COMPONENT_TYPE_FLOAT16_KHR);
+    }
+    if (write_count >= 2) {
+        // Non-saturating required queries must cover FP16, UINT8, and SINT8 input combinations.
+        set_property(pProperties[1], 16, 16, 16, VK_COMPONENT_TYPE_UINT8_KHR, VK_COMPONENT_TYPE_UINT32_KHR);
+    }
+    if (write_count >= 3) {
+        set_property(pProperties[2], 16, 16, 16, VK_COMPONENT_TYPE_SINT8_KHR, VK_COMPONENT_TYPE_SINT32_KHR);
+    }
+    if (write_count >= 4) {
+        // A selector-dependent property used to verify the query parameters chosen by runtime validation.
+        set_property(pProperties[3], selector_granularity.m, selector_granularity.n, selector_granularity.k,
+                     VK_COMPONENT_TYPE_FLOAT16_KHR, VK_COMPONENT_TYPE_FLOAT16_KHR);
+    }
+    *pPropertyCount = write_count;
+    return write_count < available_count ? VK_INCOMPLETE : VK_SUCCESS;
+}
+
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeVectorPropertiesNV(VkPhysicalDevice physicalDevice,
                                                                                      uint32_t* pPropertyCount,
                                                                                      VkCooperativeVectorPropertiesNV* pProperties) {
@@ -2094,6 +2330,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetAndroidHardwareBufferPropertiesANDROID(
         // Likley using this format
         format_prop->format = VK_FORMAT_R8G8B8A8_UNORM;
         format_prop->externalFormat = 37;
+    }
+    auto* format_prop2 = vku::FindStructInPNextChain<VkAndroidHardwareBufferFormatProperties2ANDROID>(pProperties->pNext);
+    if (format_prop2) {
+        format_prop2->format = VK_FORMAT_R8G8B8A8_UNORM;
+        format_prop2->externalFormat = 37;
     }
 
     auto* format_resolve_prop =

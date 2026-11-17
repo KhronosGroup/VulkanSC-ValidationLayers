@@ -14,14 +14,17 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
-// stype-check off
 
 #include <vulkan/vulkan_core.h>
 #include <algorithm>
 #include "layer_validation_tests.h"
 #include "pipeline_helper.h"
+#include "shader_templates.h"
 #include "utils/hash_util.h"
 #include "generated/vk_validation_error_messages.h"
+
+// These tests are likely going to need to test the sType actually
+// stype-check off
 
 class NegativeOther : public VkLayerTest {};
 
@@ -97,6 +100,7 @@ TEST_F(NegativeOther, VuidHashStability) {
     ASSERT_TRUE(hash_util::VuidHash("GPU-DUMP") == 0xe5c5edc1);
     ASSERT_TRUE(hash_util::VuidHash("WARNING-Setting-Limit-Adjusted") == 0x86fe6721);
     ASSERT_TRUE(hash_util::VuidHash("VALIDATION-SETTINGS") == 0x7f1922d7);
+    ASSERT_TRUE(hash_util::VuidHash("CURRENT-VALIDATION-ENABLED") == 0xfd7b2292);
 }
 
 TEST_F(NegativeOther, RequiredParameter) {
@@ -153,7 +157,7 @@ TEST_F(NegativeOther, RequiredParameter) {
     vk::AllocateMemory(device(), NULL, NULL, &memory);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdSetStencilReference-faceMask-requiredbitmask");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdSetStencilReference-faceMask-parameter");
     // Specify 0 for a required VkFlags parameter
     // Expected to trigger an error with StatelessValidation::ValidateFlags
     vk::CmdSetStencilReference(m_command_buffer, 0, 0);
@@ -189,7 +193,7 @@ TEST_F(NegativeOther, RequiredParameter) {
 }
 
 #ifdef ANNOTATED_SPEC_LINK
-// This test case are replaced with Vulkan SC specific ones
+// These test cases are replaced with Vulkan SC specific ones
 TEST_F(NegativeOther, DISABLED_SpecLinksImplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
@@ -203,7 +207,7 @@ TEST_F(NegativeOther, DISABLED_SpecLinksImplicit) {
     m_errorMonitor->VerifyFound();
 }
 
-// This test case are replaced with Vulkan SC specific ones
+// These test cases are replaced with Vulkan SC specific ones
 TEST_F(NegativeOther, DISABLED_SpecLinksExplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
@@ -221,12 +225,12 @@ TEST_F(NegativeOther, DISABLED_SpecLinksExplicit) {
 
 #else   // ANNOTATED_SPEC_LINK
 
-// This test case are replaced with Vulkan SC specific ones
+// These test cases are replaced with Vulkan SC specific ones
 TEST_F(NegativeOther, DISABLED_SpecLinksImplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
-    // keep VUID seperate otherwise vk_validation_stats.py will get confused
+    // keep VUID separate otherwise vk_validation_stats.py will get confused
     std::string spec_version = "https://docs.vulkan.org/spec/latest/chapters/features.html#" +
                                std::string("VUID-vkGetPhysicalDeviceFeatures-pFeatures-parameter");
 
@@ -235,12 +239,12 @@ TEST_F(NegativeOther, DISABLED_SpecLinksImplicit) {
     m_errorMonitor->VerifyFound();
 }
 
-// This test case are replaced with Vulkan SC specific ones
+// These test cases are replaced with Vulkan SC specific ones
 TEST_F(NegativeOther, DISABLED_SpecLinksExplicit) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     RETURN_IF_SKIP(Init());
 
-    // keep VUID seperate otherwise vk_validation_stats.py will get confused
+    // keep VUID separate otherwise vk_validation_stats.py will get confused
     std::string spec_version =
         "https://docs.vulkan.org/spec/latest/chapters/resources.html#" + std::string("VUID-VkBufferCreateInfo-size-00912");
 
@@ -543,9 +547,9 @@ TEST_F(NegativeOther, DISABLED_InvalidAllocationCallbacks) {
     struct Alloc {
         static VKAPI_ATTR void* VKAPI_CALL alloc(void*, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
         static VKAPI_ATTR void* VKAPI_CALL realloc(void*, void*, size_t, size_t, VkSystemAllocationScope) { return nullptr; };
-        static VKAPI_ATTR void VKAPI_CALL free(void*, void*){};
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL free(void*, void*) {};
+        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
+        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
     };
 
     {
@@ -887,7 +891,7 @@ TEST_F(NegativeOther, GetPhysicalDeviceImageFormatPropertiesFlags) {
     }
 
     VkImageFormatProperties dummy_props;
-    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceImageFormatProperties-usage-requiredbitmask");
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceImageFormatProperties-usage-parameter");
     vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D,
                                                VK_IMAGE_TILING_OPTIMAL, 0, 0, &dummy_props);
     m_errorMonitor->VerifyFound();
@@ -1150,7 +1154,7 @@ TEST_F(NegativeOther, DescriptorBufferNoExtension) {
     m_errorMonitor->VerifyFound();
 }
 
-// This test case are replaced with Vulkan SC specific ones
+// These test cases are replaced with Vulkan SC specific ones
 TEST_F(NegativeOther, DISABLED_MissingCreateInfo) {
     RETURN_IF_SKIP(Init());
 
@@ -1316,10 +1320,8 @@ TEST_F(NegativeOther, DISABLED_DisplayApplicationName) {
 
 TEST_F(NegativeOther, GetDeviceFaultInfoEXT) {
     AddRequiredExtensions(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceFaultFeaturesEXT ext_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(ext_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::deviceFaultEXT);
+    RETURN_IF_SKIP(Init());
     VkDeviceFaultCountsEXT fault_count = vku::InitStructHelper();
     VkDeviceFaultInfoEXT fault_info = vku::InitStructHelper();
     m_errorMonitor->SetDesiredError("VUID-vkGetDeviceFaultInfoEXT-device-07336");
@@ -1362,9 +1364,7 @@ TEST_F(NegativeOther, PhysicalDeviceLayeredApiVulkanPropertiesKHR) {
     m_errorMonitor->VerifyFound();
 }
 
-// stype-check off
-// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/9185
-TEST_F(NegativeOther, DISABLED_PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
+TEST_F(NegativeOther, PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance7);
@@ -1385,7 +1385,28 @@ TEST_F(NegativeOther, DISABLED_PhysicalDeviceLayeredApiVulkanPropertiesPNext) {
     vk::GetPhysicalDeviceProperties2(Gpu(), &phys_dev_props_2);
     m_errorMonitor->VerifyFound();
 }
-// stype-check on
+
+TEST_F(NegativeOther, PhysicalDeviceLayeredApiVulkanPropertiesDuplicatePNext) {
+    TEST_DESCRIPTION("Same struct twice in a VkPhysicalDeviceLayeredApiPropertiesKHR pNext chain");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance7);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceLayeredApiVulkanPropertiesKHR api_vulkan_props_2 = vku::InitStructHelper();
+    VkPhysicalDeviceLayeredApiVulkanPropertiesKHR api_vulkan_props = vku::InitStructHelper(&api_vulkan_props_2);
+    VkPhysicalDeviceLayeredApiPropertiesKHR api_props = vku::InitStructHelper(&api_vulkan_props);
+
+    VkPhysicalDeviceLayeredApiPropertiesListKHR api_prop_lists = vku::InitStructHelper();
+    api_prop_lists.layeredApiCount = 1;
+    api_prop_lists.pLayeredApis = &api_props;
+
+    VkPhysicalDeviceProperties2 phys_dev_props_2 = vku::InitStructHelper(&api_prop_lists);
+
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceLayeredApiPropertiesKHR-sType-unique");
+    vk::GetPhysicalDeviceProperties2(Gpu(), &phys_dev_props_2);
+    m_errorMonitor->VerifyFound();
+}
 
 TEST_F(NegativeOther, UnrecognizedEnumExtension) {
     RETURN_IF_SKIP(Init());
@@ -1439,7 +1460,7 @@ TEST_F(NegativeOther, MissingExtensionPipelineCreateFlags2) {
 }
 
 TEST_F(NegativeOther, OverridePipelineCreateFlags2) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
+    SetTargetApiVersion(VK_API_VERSION_1_4);
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
@@ -1453,7 +1474,29 @@ TEST_F(NegativeOther, OverridePipelineCreateFlags2) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeOther, UnkonwnStructType) {
+TEST_F(NegativeOther, AppendingPipelineCreateFlags2) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::descriptorHeap);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+
+    VkPipelineCreateFlags2CreateInfo flags2 = vku::InitStructHelper();
+    flags2.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+
+    CreateComputePipelineHelper pipe(*this, &flags2);
+    pipe.cp_ci_.flags = VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+    VkShaderObj cs_module = VkShaderObj(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.stage = cs_module.GetStageCreateInfo();
+    pipe.cp_ci_.layout = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredWarning("WARNING-VkPipelineCreateFlags2-flags-appending");
+    pipe.CreateComputePipeline(false);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeOther, UnknownStructType) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     VkBaseOutStructure bogus_struct{};
@@ -1537,4 +1580,101 @@ TEST_F(NegativeOther, FeatureNotPresentNoCoreFeatures) {
     if (device != VK_NULL_HANDLE) {
         vk::DestroyDevice(device, nullptr);
     }
+}
+
+TEST_F(NegativeOther, FeatureWithNoSType) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12964");
+    RETURN_IF_SKIP(InitFramework());
+    if (!DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_16BIT_STORAGE_EXTENSION_NAME)) {
+        GTEST_SKIP() << "VK_KHR_16bit_storage is supported";
+    }
+
+    VkPhysicalDevice16BitStorageFeatures enabled_features = vku::InitStructHelper();
+    enabled_features.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    enabled_features.storageBuffer16BitAccess = VK_TRUE;
+
+    float priority = 1.0f;
+    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
+    queue_info.queueFamilyIndex = 0;
+    queue_info.queueCount = 1;
+    queue_info.pQueuePriorities = &priority;
+
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper(&enabled_features);
+    dev_info.flags = 0;
+    dev_info.queueCreateInfoCount = 1;
+    dev_info.pQueueCreateInfos = &queue_info;
+    dev_info.enabledLayerCount = 0;
+    dev_info.ppEnabledLayerNames = nullptr;
+    dev_info.enabledExtensionCount = 0;
+    dev_info.ppEnabledExtensionNames = nullptr;
+    dev_info.pEnabledFeatures = nullptr;
+
+    VkDevice device = VK_NULL_HANDLE;
+    m_errorMonitor->SetDesiredError(
+        "You likely forgot to set the sType in the struct as VK_STRUCTURE_TYPE_APPLICATION_INFO is the value zero");
+    vk::CreateDevice(Gpu(), &dev_info, nullptr, &device);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeOther, CircularPNextChainSelf) {
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    RETURN_IF_SKIP(Init());
+
+    VkBufferUsageFlags2CreateInfo cycle = vku::InitStructHelper();
+    cycle.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    cycle.pNext = &cycle;
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.pNext = &cycle;
+    buffer_ci.size = 32;
+    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VkBuffer buffer = VK_NULL_HANDLE;
+    // VUID-VkBufferCreateInfo-sType-unique
+    m_errorMonitor->SetDesiredError("circular loop detected in pNext chaining");
+    vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeOther, CircularPNextChainTwoNodes) {
+    SetTargetApiVersion(VK_API_VERSION_1_4);
+    RETURN_IF_SKIP(Init());
+
+    VkBufferUsageFlags2CreateInfo node_a = vku::InitStructHelper();
+    node_a.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VkExternalMemoryBufferCreateInfo node_b = vku::InitStructHelper();
+    node_a.pNext = &node_b;
+    node_b.pNext = &node_a;
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.pNext = &node_a;
+    buffer_ci.size = 32;
+    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VkBuffer buffer = VK_NULL_HANDLE;
+    // VUID-VkBufferCreateInfo-sType-unique
+    m_errorMonitor->SetDesiredError("circular loop detected in pNext chaining");
+    vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeOther, CircularPNextChainGarbage) {
+    RETURN_IF_SKIP(Init());
+
+    VkBaseInStructure cycle = {};
+    // stype-check off
+    cycle.sType = static_cast<VkStructureType>(0x7FFF0000);
+    cycle.pNext = &cycle;
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.pNext = &cycle;
+    buffer_ci.size = 32;
+    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VkBuffer buffer = VK_NULL_HANDLE;
+    // VUID-VkBufferCreateInfo-pNext-pNext and VUID-VkBufferCreateInfo-sType-unique
+    m_errorMonitor->SetDesiredError("circular loop detected in pNext chaining", 2);
+    vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
+    m_errorMonitor->VerifyFound();
 }

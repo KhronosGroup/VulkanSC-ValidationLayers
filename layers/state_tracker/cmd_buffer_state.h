@@ -46,15 +46,16 @@ class DeviceState;
 class Pipeline;
 class Framebuffer;
 class Queue;
+struct QueueSubmission;
 class RenderPass;
 class VideoSession;
 class VideoSessionParameters;
 }  // namespace vvl
 
 enum class CbState {
-    New,                // Newly created CB w/o any cmds
+    New,                // Newly created CB w/o any cmds (Initial state)
     Recording,          // BeginCB has been called on this CB
-    Recorded,           // EndCB has been called on this CB
+    Recorded,           // EndCB has been called on this CB (Executable state)
     InvalidComplete,    // had a complete recording, but was since invalidated
     InvalidIncomplete,  // fouled before recording was completed
 };
@@ -190,16 +191,24 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
         CBDynamicFlags cb;        // for lifetime of CommandBuffer (invalidated if static pipeline is bound)
         CBDynamicFlags pipeline;  // for lifetime since last bound pipeline
 
-        CBDynamicFlags history;  // for lifetime of CommandBuffer, regardless if invalidated, used for better error messages
-
         // There is currently only a single non-graphics dynamic state, for now manage manually to save memory
         bool rtx_stack_size_cb;        // for lifetime of CommandBuffer
         bool rtx_stack_size_pipeline;  // for lifetime since last bound pipeline
     } dynamic_state_status;
 
-    // used to mark which pipeline invalidated dynamic state so error message knows
-    // Note that index zero is not used due to the enum size being bitset friendly
-    VkPipeline invalidated_state_pipe[CB_DYNAMIC_STATE_STATUS_NUM];
+    // Dynamic State is tricky and can be "invalidated" for various reasons.
+    // The user will likely be confused why they are getting an error message, but called vkCmdSet*
+    // somewhere, so we need to prove/help show them what happened.
+    struct DynamicStateInvalidation {
+        // Track pipeline that didn't have dynamic state
+        VkPipeline pipeline = VK_NULL_HANDLE;
+        // The command that made it invalid (empty means never been invalidated)
+        Func command = Func::Empty;
+    };
+    std::array<DynamicStateInvalidation, CB_DYNAMIC_STATE_STATUS_NUM> dynamic_state_invalidation;
+    bool WasDynamicStateInvalidated(CBDynamicState dynamic_state) const {
+        return dynamic_state_invalidation[dynamic_state].command != Func::Empty;
+    }
     std::string DescribeInvalidatedState(CBDynamicState dynamic_state) const;
 
     // Return true if the corresponding vkCmdSet* call has occurred in the command buffer.
@@ -387,7 +396,6 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     // Currently storing "lastBound" objects on per-CB basis
     //  long-term may want to create caches of "lastBound" states and could have
     //  each individual CMD_NODE referencing its own "lastBound" state
-    // Store last bound state for Gfx & Compute pipeline bind points
     std::array<LastBound, vvl::BindPointCount> lastBound;
     const LastBound &GetLastBoundGraphics() const { return lastBound[vvl::BindPointGraphics]; }
     const LastBound &GetLastBoundCompute() const { return lastBound[vvl::BindPointCompute]; }
@@ -422,12 +430,17 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     enum class SuspendState { Empty, Suspended, Resumed };
     SuspendState last_suspend_state;
 
-    // Used by submit time validation to check for invalild commands when render pass instance is suspended.
+    // Used by submit time validation to check for invalid commands when render pass instance is suspended.
     vvl::Func first_action_or_sync_command;
+
+    // Used to report which command set an image's first layout
+    vvl::Func current_command;
 
     // Rendering info from the first/last vkCmdBeginRendering.
     std::optional<vku::safe_VkRenderingInfo> first_rendering_info;
     std::unique_ptr<LocationCapture> first_rendering_info_loc;
+    // The optional means "vkCmdBeginRendering was called at least once (so far)"
+    // The struct content is only used for Suspend/Resume
     std::optional<vku::safe_VkRenderingInfo> last_rendering_info;
 
     // This is null if we are outside a renderPass/rendering
@@ -453,7 +466,7 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     // only when not using dynamic rendering
     vku::safe_VkRenderPassSampleLocationsBeginInfoEXT sample_locations_begin_info;
     std::vector<SubpassInfo> active_subpasses;
-    const char *DescribeActiveColorAttachment() const;
+    std::string DescribeActiveColorAttachment() const;
 
     VkSubpassContents active_subpass_contents;
     uint32_t GetActiveSubpass() const { return active_subpass_; }
@@ -493,7 +506,6 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
         }
     } rendering_attachments;
 
-    std::vector<VkEvent> events;
     vvl::unordered_set<QueryObject> active_queries;
     vvl::unordered_set<QueryObject> started_queries;
     vvl::unordered_set<QueryObject> updated_queries;
@@ -590,6 +602,8 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
 
     void SetDescriptorMode(vvl::DescriptorMode new_mode, vvl::Func function);
     void InvalidateDescriptorMode(vvl::DescriptorMode invalidate_mode, vvl::DescriptorMode new_mode, vvl::Func function);
+    vvl::DescriptorMode GetLastUsedDescriptorMode() const { return last_used_descriptor_mode; }
+    vvl::DescriptorMode last_used_descriptor_mode = vvl::DescriptorMode::DescriptorModeUnknown;
 
     mutable std::shared_mutex lock;
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock); }
@@ -683,7 +697,7 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
                                        const uint32_t *p_dynamic_offsets, const Location &loc);
 
     void UpdateLastBoundDescriptorBuffers(LastBound& last_bound, std::shared_ptr<const vvl::PipelineLayout> pipeline_layout,
-                                          uint32_t first_set, uint32_t set_count, const uint32_t* buffer_indicies,
+                                          uint32_t first_set, uint32_t set_count, const uint32_t* buffer_indices,
                                           const VkDeviceSize* buffer_offsets);
     void UpdateLastBoundDescriptorBuffersEmbedded(LastBound& last_bound, std::shared_ptr<const vvl::PipelineLayout> pipeline_layout,
                                                   uint32_t set);
@@ -757,15 +771,17 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
 
     void RecordSetEvent(VkEvent event, VkPipelineStageFlags stageMask, const Location& loc);
     void RecordSetEvent2(VkEvent event, const VkDependencyInfo& dependency_info, const Location& loc);
-    void RecordResetEvent(VkEvent event, VkPipelineStageFlags2KHR stageMask, const Location &loc);
+    void RecordResetEvent(VkEvent event, VkPipelineStageFlags2 stageMask, const Location &loc);
     void RecordWaitEvents(vvl::span<const VkEvent> events, VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask,
                           const Location& loc);
     void RecordWaitEvent2(VkEvent event, const VkDependencyInfo& dependency_info, const Location& dep_info_loc);
-    void RecordPushConstants(const vvl::PipelineLayout& pipeline_layout_state, VkShaderStageFlags stage_flags, uint32_t offset,
-                             uint32_t size, const void *values);
+    void RecordPushConstants(std::shared_ptr<const vvl::PipelineLayout> pipeline_layout, VkShaderStageFlags stage_flags,
+                             uint32_t offset, uint32_t size, const void* values);
     void RecordPushData(const VkPushDataInfoEXT& push_data_info, const Location& loc);
     bool VerifyPushData(uint32_t offset, uint32_t size) const;
 
+    void RecordBindDescriptorBuffer(vvl::DeviceState& device_state, uint32_t buffer_count,
+                                    const VkDescriptorBufferBindingInfoEXT* binding_infos, const Location& loc);
     void RecordBindResourceHeap(vvl::DeviceState& device_state, const VkBindHeapInfoEXT& bind_info, const Location& loc);
     void RecordBindSamplerHeap(vvl::DeviceState& device_state, const VkBindHeapInfoEXT& bind_info, const Location& loc);
 
@@ -797,7 +813,7 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     void TrackImageFirstLayout(const vvl::Image &image_state, const VkImageSubresourceRange &subresource_range,
                                int32_t depth_offset, uint32_t depth_extent, VkImageLayout layout);
 
-    void SubmitTimeValidate(Queue &queue_state, uint32_t perf_submit_pass, const Location &loc);
+    void SubmitTimeValidate(Queue &queue, const QueueSubmission &submission, uint32_t cb_index);
 
     // Helpers to offset into |active_attachments|
     // [all color, all color resolve, depth, depth resolve, stencil, stencil resolve, FragmentDensityMap]
@@ -823,6 +839,8 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
 
     const std::vector<LabelCommand> &GetLabelCommands() const { return label_commands_; }
 
+    uint32_t GetLastLabelCommandIndex() const;
+
     // Applies label commands to the label_stack: for "begin label" command it pushes
     // a label on the stack, and for the "end label" command it removes the top label.
     static void ReplayLabelCommands(const vvl::span<const LabelCommand> &label_commands, std::vector<std::string> &label_stack);
@@ -830,14 +848,17 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
     static std::string GetDebugRegionName(const std::vector<LabelCommand>& label_commands, uint32_t label_command_index,
                                           const std::vector<std::string>& initial_label_stack = {});
 
+    // This command buffer might contain a push descriptor set, which is not tracked in the object maps.
+    // So the only way to cleanup SubStates on the descriptor set is through here.
+    void RemoveOwnedSubState(LayerObjectTypeId id);
   private:
     void ResetCBState();
 
     // Keep track of how many CmdBeginDebugUtilsLabelEXT calls have been made without a matching CmdEndDebugUtilsLabelEXT.
     // Negative value for a secondary command buffer indicates invalid state.
-    // Negative value for a primary command buffer is allowed. Validation is done at submit time accross all command buffers.
+    // Negative value for a primary command buffer is allowed. Validation is done at submit time across all command buffers.
     int32_t label_stack_depth_ = 0;
-    // Used during sumbit time validation.
+    // Used during submit time validation.
     std::vector<LabelCommand> label_commands_;
 
     uint32_t active_subpass_;
@@ -848,9 +869,11 @@ class CommandBuffer : public RefcountedStateObject, public SubStateManager<Comma
   protected:
     void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
     void UpdateAttachmentsView(const VkRenderPassBeginInfo *pRenderPassBegin);
+    vvl::ImageView* GetAttachmentViewState(VkImageView image_view);
     void RecordVideoInlineQueries(const VkVideoInlineQueryInfoKHR &query_info);
     void RecordVideoEncodeQuantizationMap(const VkVideoEncodeQuantizationMapInfoKHR &quant_map_info);
-    void UnbindResources();
+    void UnbindResources(Func command);
+    void RecordInvalidateDynamicState(const CBDynamicFlags& invalidated, Func command, VkPipeline pipeline);
 };
 
 class CommandBufferSubState {
@@ -948,6 +971,7 @@ class CommandBufferSubState {
     virtual void ClearPushConstants() {}
     virtual void ClearPushData() {}
 
+    // VK_EXT_descriptor_heap
     virtual void RecordBindResourceHeap() {}
     virtual void RecordBindSamplerHeap() {}
 
@@ -986,7 +1010,7 @@ class CommandBufferSubState {
 
     virtual void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {}
 
-    virtual void Submit(Queue &queue_state, uint32_t perf_submit_pass, const Location &loc) {}
+    virtual void Submit(Queue& queue_state, const QueueSubmission& submission, uint32_t cb_index) {}
 
     VulkanTypedHandle Handle() const;
     VkCommandBuffer VkHandle() const;

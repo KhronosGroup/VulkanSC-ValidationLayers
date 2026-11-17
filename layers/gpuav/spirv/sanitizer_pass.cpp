@@ -195,8 +195,7 @@ BoolResultXY SanitizerPass::FminmaxCheck(BasicBlock& block, InstructionIt* inst_
 // For BDA pointers, converts the pointer to its low 32 bits. Returns 0 if not a BDA pointer.
 uint32_t SanitizerPass::GetCoopMatPointerAddress(const Type* pointer_type, uint32_t pointer_id, BasicBlock& block,
                                                  InstructionIt* inst_it) {
-    if (pointer_type && pointer_type->spv_type_ == SpvType::kPointer &&
-        pointer_type->inst_.StorageClass() == spv::StorageClassPhysicalStorageBuffer) {
+    if (pointer_type && pointer_type->IsBDA()) {
         module_.use_bda_ = true;
         const Type& uint32_type = type_manager_.GetTypeInt(32, false);
         const Type& uint64_type = type_manager_.GetTypeInt(64, false);
@@ -318,11 +317,11 @@ uint32_t SanitizerPass::CreateFunctionCall(BasicBlock& block, InstructionIt* ins
         const uint32_t element_index_id = GetCoopMatElementIndex(pointer_inst, block, inst_it);
 
         const uint32_t bool_type = type_manager_.GetTypeBool().Id();
-        const uint32_t component_size_id = type_manager_.CreateConstantUInt32(meta.component_size).Id();
+        const uint32_t element_size_id = type_manager_.CreateConstantUInt32(meta.element_size).Id();
         const uint32_t alignment_id = type_manager_.CreateConstantUInt32(meta.constant_value).Id();
         const uint32_t opcode_id = type_manager_.CreateConstantUInt32(meta.target_instruction->Opcode()).Id();
         block.CreateInstruction(spv::OpFunctionCall,
-                                {bool_type, function_result, function_def, stride_uint_id, component_size_id, alignment_id,
+                                {bool_type, function_result, function_def, stride_uint_id, element_size_id, alignment_id,
                                  pointer_address_id, element_index_id, inst_position_id, opcode_id},
                                 inst_it);
     } else {
@@ -360,11 +359,27 @@ bool SanitizerPass::IsConstantZero(const Constant& constant) const {
     return false;
 }
 
+// Mainly used because a tad faster than IsValueIn
+static bool IsDivideOrRemainder(uint32_t opcode) {
+    switch (opcode) {
+        case spv::OpUDiv:
+        case spv::OpSDiv:
+        case spv::OpUMod:
+        case spv::OpSMod:
+        case spv::OpSRem:
+        case spv::OpFMod:
+        case spv::OpFRem:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool SanitizerPass::RequiresInstrumentation(const Function& function, const Instruction& inst, InstructionMeta& meta) {
     const spv::Op opcode = (spv::Op)inst.Opcode();
     meta.target_instruction = &inst;
 
-    if (IsValueIn(opcode, {spv::OpUDiv, spv::OpSDiv, spv::OpUMod, spv::OpSMod, spv::OpSRem, spv::OpFMod, spv::OpFRem})) {
+    if (IsDivideOrRemainder(opcode)) {
         // Note - It is valid to divide by zero for a float (you get NaN), but invalid for an int.
         if (const Constant* constant = type_manager_.FindConstantById(inst.Word(4))) {
             // If its a constant, no reason to instrument, unless its a constant value of zero,
@@ -422,7 +437,7 @@ bool SanitizerPass::RequiresInstrumentation(const Function& function, const Inst
 
         meta.sub_code = glsl::kErrorSubCode_Sanitizer_CoopMatAlignment;
         meta.constant_value = required_alignment;
-        meta.component_size = cma.component_size;
+        meta.element_size = cma.element_size;
         meta.skip_safe_mode = true;
         return true;
     }

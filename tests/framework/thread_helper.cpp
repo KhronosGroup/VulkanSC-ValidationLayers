@@ -12,6 +12,8 @@
 
 #include "thread_helper.h"
 
+#include <chrono>
+
 bool ThreadTimeoutHelper::WaitForThreads(int timeout_in_seconds) {
     std::unique_lock lock(mutex_);
     return cv_.wait_for(lock, std::chrono::seconds{timeout_in_seconds}, [this] {
@@ -66,8 +68,6 @@ void UpdateDescriptor(ThreadTestData* data) {
     }
 }
 
-#endif  // GTEST_IS_THREADSAFE
-
 void ReleaseNullFence(ThreadTestData* data) {
     for (int i = 0; i < 40000; i++) {
         vk::DestroyFence(data->device, VK_NULL_HANDLE, NULL);
@@ -76,3 +76,5 @@ void ReleaseNullFence(ThreadTestData* data) {
         }
     }
 }
+
+#endif  // GTEST_IS_THREADSAFE

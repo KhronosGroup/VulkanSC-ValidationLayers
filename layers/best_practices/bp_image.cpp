@@ -47,11 +47,11 @@ bool BestPractices::PreCallValidateCreateImage(VkDevice device, const VkImageCre
         if (pCreateInfo->samples > VK_SAMPLE_COUNT_1_BIT && !(pCreateInfo->usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)) {
             skip |= LogPerformanceWarning(
                 "BestPractices-vkCreateImage-non-transient-ms-image", device, error_obj.location,
-                "%s %s Trying to create a multisampled image, but pCreateInfo->usage did not have "
+                "%s Trying to create a multisampled image, but pCreateInfo->usage did not have "
                 "VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT set. Multisampled images may be resolved on-chip, "
                 "and do not need to be backed by physical storage. "
                 "TRANSIENT_ATTACHMENT allows tiled GPUs to not back the multisampled image with physical memory.",
-                VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG));
+                VendorSpecificTag(kBPVendorArm | kBPVendorIMG).c_str());
         }
     }
 
@@ -155,7 +155,7 @@ void BestPractices::QueueValidateImage(QueueCallbacks& funcs, const Location& lo
     const uint32_t max_layers = image_state.GetArrayLayers() - base_array_layer;
     const uint32_t array_layers = std::min(subresource_range.layerCount, max_layers);
     const uint32_t max_levels = image_state.GetMipLevels() - subresource_range.baseMipLevel;
-    const uint32_t mip_levels = std::min(image_state.GetMipLevels(), max_levels);
+    const uint32_t mip_levels = std::min(subresource_range.levelCount, max_levels);
 
     for (uint32_t layer = 0; layer < array_layers; layer++) {
         for (uint32_t level = 0; level < mip_levels; level++) {
@@ -189,21 +189,21 @@ void BestPractices::ValidateImageInQueueArmImg(const Location& loc, vvl::Image& 
     if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_CLEARED && last_usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_STORED &&
         !image_state.IsSwapchainImage()) {
         LogPerformanceWarning("BestPractices-RenderPass-redundant-store", device, loc,
-                              "%s %s Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
+                              "%s Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
                               ") of image was cleared as part of LOAD_OP_CLEAR, but last time "
                               "image was used, it was written to with STORE_OP_STORE. "
                               "Storing to the image is probably redundant in this case, and wastes bandwidth on tile-based "
                               "architectures.",
-                              VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level);
+                              VendorSpecificTag(kBPVendorArm | kBPVendorIMG).c_str(), array_layer, mip_level);
     } else if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_CLEARED && last_usage == IMAGE_SUBRESOURCE_USAGE_BP::CLEARED) {
         LogPerformanceWarning(
             "BestPractices-RenderPass-redundant-clear", device, loc,
-            "%s %s Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
+            "%s Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
             ") of image was cleared as part of LOAD_OP_CLEAR, but last time "
             "image was used, it was written to with vkCmdClear*Image(). "
             "Clearing the image with vkCmdClear*Image() is probably redundant in this case, and wastes bandwidth on "
             "tile-based architectures.",
-            VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level);
+            VendorSpecificTag(kBPVendorArm | kBPVendorIMG).c_str(), array_layer, mip_level);
     } else if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_READ_TO_TILE &&
                (last_usage == IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE || last_usage == IMAGE_SUBRESOURCE_USAGE_BP::CLEARED ||
                 last_usage == IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE || last_usage == IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE)) {
@@ -249,11 +249,10 @@ void BestPractices::ValidateImageInQueueArmImg(const Location& loc, vvl::Image& 
         }
 
         LogPerformanceWarning(vuid, device, loc,
-                              "%s %s Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
+                              "%s Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
                               ") of image was loaded to tile as part of LOAD_OP_LOAD, but last "
                               "time image was used, it was written to with %s. %s",
-                              VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level, last_cmd,
-                              suggestion);
+                              VendorSpecificTag(kBPVendorArm | kBPVendorIMG).c_str(), array_layer, mip_level, last_cmd, suggestion);
     }
 }
 
@@ -266,7 +265,7 @@ void BestPractices::ValidateImageInQueue(const vvl::Queue& qs, const vvl::Comman
 
     // Concurrent sharing usage of image with exclusive sharing mode
     bool qfot_required = true;
-    if (enabled_features.maintenance9) {
+    if (enabled_features.maintenance9 && last_usage.queue_family_index != VK_QUEUE_FAMILY_IGNORED) {
         if (image_state.GetTiling() == VK_IMAGE_TILING_LINEAR) {
             qfot_required = false;
         } else if ((image_state.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
@@ -277,10 +276,10 @@ void BestPractices::ValidateImageInQueue(const vvl::Queue& qs, const vvl::Comman
             // https://registry.khronos.org/vulkan/specs/latest/man/html/VkSharingMode.html
             VkQueueFamilyOwnershipTransferPropertiesKHR qfot_props = vku::InitStructHelper();
             uint32_t qf_count = last_usage.queue_family_index + 1;
-            std::vector<VkQueueFamilyProperties2> qf_props(qf_count);
+            std::vector<VkQueueFamilyProperties2> qf_props(qf_count, vku::InitStruct<VkQueueFamilyProperties2>());
             qf_props.back().pNext = &qfot_props;
             DispatchGetPhysicalDeviceQueueFamilyProperties2(cbs.dev_data.physical_device, &qf_count, qf_props.data());
-            qfot_required = (qfot_props.optimalImageTransferToQueueFamilies & (1 << last_usage.queue_family_index)) == 0;
+            qfot_required = (qfot_props.optimalImageTransferToQueueFamilies & (1u << last_usage.queue_family_index)) == 0;
         }
     }
 

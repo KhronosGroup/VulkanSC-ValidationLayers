@@ -60,7 +60,13 @@ void DeviceGeneratedCommandsTest::SetPreProcessBuffer(VkGeneratedCommandsInfoEXT
         buffer_usage_flags.usage = VK_BUFFER_USAGE_2_PREPROCESS_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         VkBufferCreateInfo buffer_ci = vku::InitStructHelper(&buffer_usage_flags);
         buffer_ci.size = pre_process_size;
-        pre_process_buffer_->Init(*m_device, buffer_ci, 0, &allocate_flag_info);
+        pre_process_buffer_->InitNoMemory(*m_device, buffer_ci);
+        // The memory must also be one of the memory types allowed for preprocess memory
+        VkMemoryRequirements buffer_mem_reqs = pre_process_buffer_->MemoryRequirements();
+        buffer_mem_reqs.memoryTypeBits &= mem_reqs2.memoryRequirements.memoryTypeBits;
+        pre_process_memory_.Init(*m_device,
+                                 vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_mem_reqs, 0, &allocate_flag_info));
+        pre_process_buffer_->BindMemory(pre_process_memory_, 0);
         pre_process_address = pre_process_buffer_->Address();
     }
 
@@ -90,8 +96,8 @@ TEST_F(PositiveDeviceGeneratedCommands, CreateIndirectExecutionSetShaderObject) 
 
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     VkShaderCreateInfoEXT vert_create_info =
-        ShaderCreateInfoFlag(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
-    const vkt::Shader vertShader(*m_device, vert_create_info);
+        ShaderCreateInfoFlagEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
+    const vkt::ShaderEXT vertShader(*m_device, vert_create_info);
     const VkShaderEXT shaders[] = {vertShader};
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     VkIndirectExecutionSetShaderLayoutInfoEXT exe_set_layouts = vku::InitStructHelper();
@@ -267,6 +273,64 @@ TEST_F(PositiveDeviceGeneratedCommands, CmdExecuteGeneratedCommandsGraphics) {
     m_command_buffer.End();
 }
 
+TEST_F(PositiveDeviceGeneratedCommands, PreprocessUsesStateCommandBufferPipeline) {
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+    InitRenderTarget();
+
+    VkIndirectCommandsVertexBufferTokenEXT vertex_buffer_token = {0};
+    VkIndirectCommandsLayoutTokenEXT tokens[2];
+    tokens[0] = vku::InitStructHelper();
+    tokens[0].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_VERTEX_BUFFER_EXT;
+    tokens[0].data.pVertexBuffer = &vertex_buffer_token;
+    tokens[0].offset = 0;
+    tokens[1] = vku::InitStructHelper();
+    tokens[1].type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_EXT;
+    tokens[1].offset = 16;
+
+    vkt::PipelineLayout layout(*m_device);
+    VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
+    command_layout_ci.flags = VK_INDIRECT_COMMANDS_LAYOUT_USAGE_EXPLICIT_PREPROCESS_BIT_EXT;
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+    command_layout_ci.pipelineLayout = layout;
+    command_layout_ci.tokenCount = 2;
+    command_layout_ci.pTokens = tokens;
+    vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
+
+    CreatePipelineHelper dgc_pipe(*this);
+    dgc_pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
+    dgc_pipe.CreateGraphicsPipeline();
+
+    CreatePipelineHelper other_pipe(*this);
+    other_pipe.CreateGraphicsPipeline();
+
+    VkGeneratedCommandsPipelineInfoEXT pipeline_info = vku::InitStructHelper();
+    pipeline_info.pipeline = dgc_pipe;
+
+    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
+    VkGeneratedCommandsInfoEXT generated_commands_info = vku::InitStructHelper(&pipeline_info);
+    generated_commands_info.shaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+    generated_commands_info.indirectExecutionSet = VK_NULL_HANDLE;
+    generated_commands_info.indirectCommandsLayout = command_layout;
+    generated_commands_info.indirectAddressSize = 64;
+    generated_commands_info.indirectAddress = block_buffer.Address();
+    generated_commands_info.sequenceCountAddress = 0;
+    generated_commands_info.maxSequenceCount = 1;
+    generated_commands_info.maxDrawCount = 1;
+    SetPreProcessBuffer(generated_commands_info, &pipeline_info);
+
+    vkt::CommandBuffer state_cb(*m_device, m_command_pool);
+    state_cb.Begin();
+    vk::CmdBindPipeline(state_cb, VK_PIPELINE_BIND_POINT_GRAPHICS, dgc_pipe);
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, other_pipe);
+    vk::CmdPreprocessGeneratedCommandsEXT(m_command_buffer, &generated_commands_info, state_cb);
+    m_command_buffer.End();
+    state_cb.End();
+}
+
 TEST_F(PositiveDeviceGeneratedCommands, UpdateIndirectExecutionSetPipeline) {
     RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
     InitRenderTarget();
@@ -329,8 +393,8 @@ TEST_F(PositiveDeviceGeneratedCommands, UpdateIndirectExecutionSetShader) {
 
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     VkShaderCreateInfoEXT vert_create_info =
-        ShaderCreateInfoFlag(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
-    const vkt::Shader vertShader(*m_device, vert_create_info);
+        ShaderCreateInfoFlagEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
+    const vkt::ShaderEXT vertShader(*m_device, vert_create_info);
     const VkShaderEXT shaders[] = {vertShader};
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     VkIndirectExecutionSetShaderLayoutInfoEXT exe_set_layouts = vku::InitStructHelper();
@@ -360,8 +424,8 @@ TEST_F(PositiveDeviceGeneratedCommands, UpdateIndirectExecutionSetShaderDestroye
 
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     VkShaderCreateInfoEXT vert_create_info =
-        ShaderCreateInfoFlag(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
-    const vkt::Shader vertShader(*m_device, vert_create_info);
+        ShaderCreateInfoFlagEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
+    const vkt::ShaderEXT vertShader(*m_device, vert_create_info);
     const VkShaderEXT shaders[] = {vertShader};
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
 
@@ -478,8 +542,8 @@ TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectVertex) {
 
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     VkShaderCreateInfoEXT vert_create_info =
-        ShaderCreateInfoFlag(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
-    const vkt::Shader vertShader(*m_device, vert_create_info);
+        ShaderCreateInfoFlagEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
+    const vkt::ShaderEXT vertShader(*m_device, vert_create_info);
     const VkShaderEXT shaders[] = {vertShader};
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     VkIndirectExecutionSetShaderLayoutInfoEXT exe_set_layouts = vku::InitStructHelper();
@@ -511,7 +575,7 @@ TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectVertex) {
     m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT};
     vk::CmdBindShadersEXT(m_command_buffer, 1u, stages, shaders);
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
     m_command_buffer.EndRendering();
     m_command_buffer.End();
@@ -542,9 +606,9 @@ TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectMesh) {
     vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
 
     const auto spv = GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, kMeshMinimalGlsl, SPV_ENV_VULKAN_1_3);
-    VkShaderCreateInfoEXT mesh_create_info = ShaderCreateInfoFlag(
+    VkShaderCreateInfoEXT mesh_create_info = ShaderCreateInfoFlagEXT(
         spv, VK_SHADER_STAGE_MESH_BIT_EXT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT | VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT);
-    const vkt::Shader mesh_shader(*m_device, mesh_create_info);
+    const vkt::ShaderEXT mesh_shader(*m_device, mesh_create_info);
     const VkShaderEXT shaders[] = {mesh_shader};
 
     vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
@@ -575,9 +639,56 @@ TEST_F(PositiveDeviceGeneratedCommands, ExecuteShaderObjectMesh) {
     vk::CmdBindShadersEXT(m_command_buffer, 1u, &null_stages, &null_shader);
     null_stages = VK_SHADER_STAGE_TASK_BIT_EXT;
     vk::CmdBindShadersEXT(m_command_buffer, 1u, &null_stages, &null_shader);
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
     m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, ExecutePipelineMesh) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::meshShader);
+    AddRequiredFeature(vkt::Feature::taskShader);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+    InitRenderTarget();
+
+    VkIndirectCommandsLayoutTokenEXT token = vku::InitStructHelper();
+    token.type = VK_INDIRECT_COMMANDS_TOKEN_TYPE_DRAW_MESH_TASKS_EXT;
+    token.offset = 0;
+
+    VkIndirectCommandsLayoutCreateInfoEXT command_layout_ci = vku::InitStructHelper();
+    command_layout_ci.shaderStages = VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    command_layout_ci.pipelineLayout = VK_NULL_HANDLE;
+    command_layout_ci.tokenCount = 1;
+    command_layout_ci.pTokens = &token;
+    vkt::IndirectCommandsLayout command_layout(*m_device, command_layout_ci);
+
+    VkShaderObj ms(*m_device, kMeshMinimalGlsl, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_2);
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {ms.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    vkt::Buffer block_buffer(*m_device, 64, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, vkt::device_address);
+
+    VkGeneratedCommandsPipelineInfoEXT pipeline_info = vku::InitStructHelper();
+    pipeline_info.pipeline = pipe;
+    VkGeneratedCommandsInfoEXT generated_commands_info = vku::InitStructHelper(&pipeline_info);
+    generated_commands_info.shaderStages = VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    generated_commands_info.indirectExecutionSet = VK_NULL_HANDLE;
+    generated_commands_info.indirectCommandsLayout = command_layout;
+    generated_commands_info.indirectAddressSize = 64;
+    generated_commands_info.indirectAddress = block_buffer.Address();
+    generated_commands_info.sequenceCountAddress = 0;
+    generated_commands_info.maxSequenceCount = 1;
+    generated_commands_info.maxDrawCount = 1;
+    SetPreProcessBuffer(generated_commands_info, &pipeline_info);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdExecuteGeneratedCommandsEXT(m_command_buffer, false, &generated_commands_info);
+    m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
 
@@ -624,7 +735,7 @@ TEST_F(PositiveDeviceGeneratedCommands, IndirectExecutionSetNullLayout) {
     shader_ci.pSetLayouts = &descriptor_set_layout.handle();
     shader_ci.pushConstantRangeCount = 1u;
     shader_ci.pPushConstantRanges = &push_constant_range;
-    vkt::Shader shader(*m_device, shader_ci);
+    vkt::ShaderEXT shader(*m_device, shader_ci);
 
     VkIndirectExecutionSetShaderInfoEXT shader_info = vku::InitStructHelper();
     shader_info.shaderCount = 1u;
@@ -722,13 +833,13 @@ TEST_F(PositiveDeviceGeneratedCommands, ShaderObjectQuery) {
 
     const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
     VkShaderCreateInfoEXT vert_create_info =
-        ShaderCreateInfoFlag(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
-    const vkt::Shader vert_shader(*m_device, vert_create_info);
+        ShaderCreateInfoFlagEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
+    const vkt::ShaderEXT vert_shader(*m_device, vert_create_info);
 
     const auto frag_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
     VkShaderCreateInfoEXT frag_create_info =
-        ShaderCreateInfoFlag(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
-    const vkt::Shader frag_shader(*m_device, frag_create_info);
+        ShaderCreateInfoFlagEXT(frag_spv, VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT);
+    const vkt::ShaderEXT frag_shader(*m_device, frag_create_info);
 
     const VkShaderStageFlagBits stages[7] = {VK_SHADER_STAGE_VERTEX_BIT,
                                              VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -788,7 +899,7 @@ TEST_F(PositiveDeviceGeneratedCommands, ShaderObjectQuery) {
 
     vk::CmdBindShadersEXT(m_command_buffer, 7u, stages, shaders);
 
-    SetDefaultDynamicStatesAll(m_command_buffer);
+    SetDefaultDynamicStatesAllEXT(m_command_buffer);
     VkVertexInputBindingDescription2EXT binding_desc = vku::InitStructHelper();
     binding_desc.binding = 0;
     binding_desc.stride = 16;
@@ -809,4 +920,53 @@ TEST_F(PositiveDeviceGeneratedCommands, ShaderObjectQuery) {
 
     m_command_buffer.EndRendering();
     m_command_buffer.End();
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, IndirectExecutionSetNullSetLayout) {
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_11_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::maintenance11);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+    InitRenderTarget();
+
+    const auto vert_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    VkShaderCreateInfoEXT vert_create_info =
+        ShaderCreateInfoFlagEXT(vert_spv, VK_SHADER_STAGE_VERTEX_BIT,
+                                VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT | VK_SHADER_CREATE_INDEPENDENT_SETS_BIT_KHR);
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    VkDescriptorSetLayout shader_set_layouts[2] = {VK_NULL_HANDLE, descriptor_set.layout_.handle()};
+    vert_create_info.setLayoutCount = 2;
+    vert_create_info.pSetLayouts = shader_set_layouts;
+    const vkt::ShaderEXT vert_shader(*m_device, vert_create_info);
+    const VkShaderEXT shaders[] = {vert_shader};
+
+    VkIndirectExecutionSetShaderLayoutInfoEXT exe_set_layouts = vku::InitStructHelper();
+    exe_set_layouts.setLayoutCount = 2;
+    exe_set_layouts.pSetLayouts = shader_set_layouts;
+
+    VkIndirectExecutionSetShaderInfoEXT exe_set_shader_info = vku::InitStructHelper();
+    exe_set_shader_info.shaderCount = 1;
+    exe_set_shader_info.pInitialShaders = shaders;
+    exe_set_shader_info.pSetLayoutInfos = &exe_set_layouts;
+    exe_set_shader_info.maxShaderCount = 1;
+    exe_set_shader_info.pushConstantRangeCount = 0;
+    vkt::IndirectExecutionSet exe_set(*m_device, exe_set_shader_info);
+}
+
+TEST_F(PositiveDeviceGeneratedCommands, IndirectExecutionSetGPL) {
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    RETURN_IF_SKIP(InitBasicDeviceGeneratedCommands());
+    InitRenderTarget();
+
+    VkPipelineCreateFlags2CreateInfo create_flags = vku::InitStructHelper();
+    create_flags.flags = VK_PIPELINE_CREATE_2_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_2_INDIRECT_BINDABLE_BIT_EXT;
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo(&create_flags);
+    frag_out_lib.gp_ci_.layout = VK_NULL_HANDLE;
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    vkt::IndirectExecutionSet exe_set(*m_device, frag_out_lib, 1);
 }

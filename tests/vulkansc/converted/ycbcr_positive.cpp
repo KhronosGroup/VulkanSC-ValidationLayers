@@ -405,8 +405,8 @@ TEST_F(PositiveYcbcr, ImageLayoutUpdate) {
     img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_command_buffer.Barrier(img_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT);
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &ds, 0, nullptr);
@@ -969,4 +969,120 @@ TEST_F(PositiveYcbcr, DescriptorIndexNotYCbcr) {
     pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout;
     pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveYcbcr, DescriptorIndexOtherArraySameType) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM);
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo(&conversion_info));
+    VkSampler samplers[3] = {sampler, sampler, sampler};
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_COMPUTE_BIT, samplers},
+                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    const char* cs_source = R"glsl(
+        #version 460
+        layout(set = 0, binding = 0) uniform sampler2D ycbcr[3];
+        layout(set = 0, binding = 1) buffer SSBO { vec4 result; uint x; };
+        layout(set = 0, binding = 2) uniform sampler2D other[3];
+        void main() {
+            result = texture(ycbcr[2], vec2(0));   // YCbCr, constant index
+            result += texture(other[x], vec2(0));  // not YCbCr, dynamic index
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveYcbcr, YcbcrDegammaCombinedSampledImage) {
+    TEST_DESCRIPTION("Use Ycbcr degamma in Ycbcr conversion sampler.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    AddRequiredFeature(vkt::Feature::ycbcrDegamma);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    constexpr VkFormat format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+    const auto image_ci = vkt::Image::ImageCreateInfo2D(256, 256, 1, 1, format, VK_IMAGE_USAGE_SAMPLED_BIT);
+    if (!IsImageFormatSupported(Gpu(), image_ci,
+                                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+        GTEST_SKIP()
+            << "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM format doesn't support sampled-image and chroma-samples, skipping test.";
+    }
+
+    vkt::Image image{*m_device, image_ci, vkt::set_layout};
+
+    VkSamplerYcbcrConversionYcbcrDegammaCreateInfoQCOM ycbcr_degamma_ci = vku::InitStructHelper();
+    ycbcr_degamma_ci.enableYDegamma = VK_TRUE;
+    ycbcr_degamma_ci.enableCbCrDegamma = VK_TRUE;
+    VkSamplerYcbcrConversionCreateInfo ycbcr_conversion_ci = vkt::SamplerYcbcrConversion::DefaultConversionInfo(format);
+    ycbcr_conversion_ci.pNext = &ycbcr_degamma_ci;
+    vkt::SamplerYcbcrConversion conversion{*m_device, ycbcr_conversion_ci};
+    auto conversion_info = conversion.ConversionInfo();
+    vkt::Sampler sampler{*m_device, SafeSaneSamplerCreateInfo(&conversion_info)};
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
+
+    const char* fs_source = R"glsl(
+        #version 450
+
+        layout (set = 0, binding = 0) uniform sampler2D ycbcr;
+        layout(location = 0) out vec4 out_color;
+
+        void main() {
+            out_color = texture(ycbcr, vec2(0.0, 0.0));
+        }
+    )glsl";
+
+    VkShaderObj fs{*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_1};
+
+    CreatePipelineHelper graphics_pipe{*this};
+    graphics_pipe.shader_stages_ = {graphics_pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    graphics_pipe.dsl_bindings_ = {
+        {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()}};
+    graphics_pipe.CreateGraphicsPipeline();
+    graphics_pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, nullptr, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    graphics_pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipe.pipeline_layout_, 0, 1,
+                              &graphics_pipe.descriptor_set_->set_, 0, nullptr);
+    vk::CmdDraw(m_command_buffer, 1, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveYcbcr, YcbcrDegammaSinglePlanePackedFormat) {
+    TEST_DESCRIPTION("Use Ycbcr degamma with a single-plane packed 8-bit YCbCr format.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    AddRequiredFeature(vkt::Feature::ycbcrDegamma);
+    RETURN_IF_SKIP(Init());
+
+    constexpr VkFormat format = VK_FORMAT_G8B8G8R8_422_UNORM;
+    if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+        GTEST_SKIP() << "VK_FORMAT_G8B8G8R8_422_UNORM doesn't support sampled-image and chroma-samples, skipping test.";
+    }
+
+    VkSamplerYcbcrConversionYcbcrDegammaCreateInfoQCOM ycbcr_degamma_ci = vku::InitStructHelper();
+    ycbcr_degamma_ci.enableYDegamma = VK_TRUE;
+    ycbcr_degamma_ci.enableCbCrDegamma = VK_TRUE;
+    VkSamplerYcbcrConversionCreateInfo ycbcr_conversion_ci = vkt::SamplerYcbcrConversion::DefaultConversionInfo(format);
+    ycbcr_conversion_ci.pNext = &ycbcr_degamma_ci;
+    vkt::SamplerYcbcrConversion conversion{*m_device, ycbcr_conversion_ci};
 }

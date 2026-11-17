@@ -48,7 +48,7 @@ struct FeaturePointer {
     FeaturePointer(bool DeviceFeatures::* ptr) : IsEnabled([=](const DeviceFeatures& features) { return features.*ptr; }) {}
 };
 
-// Each instance of the struct will only have a singel field non-null
+// Each instance of the struct will only have a single field non-null
 struct RequiredSpirvInfo {
     uint32_t version;
     FeaturePointer feature;
@@ -209,7 +209,7 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityFragmentDensityEXT, {0, &DeviceFeatures::fragmentDensityMap, nullptr, ""}},
         {spv::CapabilityFragmentDensityEXT, {0, &DeviceFeatures::shadingRateImage, nullptr, ""}},
         {spv::CapabilityPhysicalStorageBufferAddresses, {0, &DeviceFeatures::bufferDeviceAddress, nullptr, ""}},
-        {spv::CapabilityPhysicalStorageBufferAddresses, {0, &DeviceFeatures::bufferDeviceAddress, nullptr, ""}},
+        {spv::CapabilityPhysicalStorageBufferAddresses, {0, &DeviceFeatures::bufferDeviceAddressEXT, nullptr, ""}},
         {spv::CapabilityCooperativeMatrixNV, {0, &DeviceFeatures::cooperativeMatrix, nullptr, ""}},
         {spv::CapabilityIntegerFunctions2INTEL, {0, &DeviceFeatures::shaderIntegerFunctions2, nullptr, ""}},
         {spv::CapabilityShaderSMBuiltinsNV, {0, &DeviceFeatures::shaderSMBuiltins, nullptr, ""}},
@@ -218,7 +218,6 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityFragmentShaderShadingRateInterlockEXT, {0, &DeviceFeatures::fragmentShaderShadingRateInterlock, nullptr, ""}},
         {spv::CapabilityFragmentShaderShadingRateInterlockEXT, {0, &DeviceFeatures::shadingRateImage, nullptr, ""}},
         {spv::CapabilityDemoteToHelperInvocation, {0, &DeviceFeatures::shaderDemoteToHelperInvocation, nullptr, ""}},
-        {spv::CapabilityDemoteToHelperInvocation, {0, &DeviceFeatures::shaderDemoteToHelperInvocation, nullptr, ""}},
         {spv::CapabilityFragmentShadingRateKHR, {0, &DeviceFeatures::pipelineFragmentShadingRate, nullptr, ""}},
         {spv::CapabilityFragmentShadingRateKHR, {0, &DeviceFeatures::primitiveFragmentShadingRate, nullptr, ""}},
         {spv::CapabilityFragmentShadingRateKHR, {0, &DeviceFeatures::attachmentFragmentShadingRate, nullptr, ""}},
@@ -226,12 +225,8 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR, {0, &DeviceFeatures::workgroupMemoryExplicitLayout8BitAccess, nullptr, ""}},
         {spv::CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR, {0, &DeviceFeatures::workgroupMemoryExplicitLayout16BitAccess, nullptr, ""}},
         {spv::CapabilityDotProductInputAll, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
-        {spv::CapabilityDotProductInputAll, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
-        {spv::CapabilityDotProductInput4x8Bit, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
         {spv::CapabilityDotProductInput4x8Bit, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
         {spv::CapabilityDotProductInput4x8BitPacked, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
-        {spv::CapabilityDotProductInput4x8BitPacked, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
-        {spv::CapabilityDotProduct, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
         {spv::CapabilityDotProduct, {0, &DeviceFeatures::shaderIntegerDotProduct, nullptr, ""}},
         {spv::CapabilityFragmentBarycentricKHR, {0, &DeviceFeatures::fragmentShaderBarycentric, nullptr, ""}},
         {spv::CapabilityFragmentBarycentricKHR, {0, &DeviceFeatures::fragmentShaderBarycentric, nullptr, ""}},
@@ -239,13 +234,10 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityTextureBoxFilterQCOM, {0, &DeviceFeatures::textureBoxFilter, nullptr, ""}},
         {spv::CapabilityTextureBlockMatchQCOM, {0, &DeviceFeatures::textureBlockMatch, nullptr, ""}},
         {spv::CapabilityTextureBlockMatch2QCOM, {0, &DeviceFeatures::textureBlockMatch2, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityImageGatherLinearQCOM, {0, &DeviceFeatures::imageGatherLinear, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityImageGatherExtendedModesQCOM, {0, &DeviceFeatures::imageGatherExtendedModes, nullptr, ""}},
+        {spv::CapabilityImageGatherLinearQCOM, {0, &DeviceFeatures::imageGatherLinear, nullptr, ""}},
+        {spv::CapabilityImageGatherExtendedModesQCOM, {0, &DeviceFeatures::imageGatherExtendedModes, nullptr, ""}},
         {spv::CapabilityMeshShadingEXT, {0, nullptr, &DeviceExtensions::vk_ext_mesh_shader, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityRayTracingOpacityMicromapEXT, {0, nullptr, &DeviceExtensions::vk_ext_opacity_micromap, ""}},
+        {spv::CapabilityRayTracingOpacityMicromapKHR, {0, nullptr, &DeviceExtensions::vk_ext_opacity_micromap, ""}},
         {spv::CapabilityRayTracingOpacityMicromapKHR, {0, &DeviceFeatures::micromap, nullptr, ""}},
         {spv::CapabilityRayTracingOpacityMicromapExecutionModeKHR, {0, &DeviceFeatures::micromap, nullptr, ""}},
         {spv::CapabilityCoreBuiltinsARM, {0, &DeviceFeatures::shaderCoreBuiltins, nullptr, ""}},
@@ -263,10 +255,7 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityShaderEnqueueAMDX, {0, &DeviceFeatures::shaderEnqueue, nullptr, ""}},
 #endif
         {spv::CapabilityGroupNonUniformRotateKHR, {0, &DeviceFeatures::shaderSubgroupRotate, nullptr, ""}},
-        {spv::CapabilityGroupNonUniformRotateKHR, {0, &DeviceFeatures::shaderSubgroupRotate, nullptr, ""}},
         {spv::CapabilityExpectAssumeKHR, {0, &DeviceFeatures::shaderExpectAssume, nullptr, ""}},
-        {spv::CapabilityExpectAssumeKHR, {0, &DeviceFeatures::shaderExpectAssume, nullptr, ""}},
-        {spv::CapabilityFloatControls2, {0, &DeviceFeatures::shaderFloatControls2, nullptr, ""}},
         {spv::CapabilityFloatControls2, {0, &DeviceFeatures::shaderFloatControls2, nullptr, ""}},
         {spv::CapabilityQuadControlKHR, {0, &DeviceFeatures::shaderQuadControl, nullptr, ""}},
         {spv::CapabilityBFloat16TypeKHR, {0, &DeviceFeatures::shaderBFloat16Type, nullptr, ""}},
@@ -274,12 +263,10 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityBFloat16CooperativeMatrixKHR, {0, &DeviceFeatures::shaderBFloat16CooperativeMatrix, nullptr, ""}},
         {spv::CapabilityRawAccessChainsNV, {0, &DeviceFeatures::shaderRawAccessChains, nullptr, ""}},
         {spv::CapabilityReplicatedCompositesEXT, {0, &DeviceFeatures::shaderReplicatedComposites, nullptr, ""}},
-        {spv::CapabilityTensorAddressingNV, {0, &DeviceFeatures::cooperativeMatrixTensorAddressing, nullptr, ""}},
-        {spv::CapabilityCooperativeMatrixReductionsNV, {0, &DeviceFeatures::cooperativeMatrixReductions, nullptr, ""}},
-        {spv::CapabilityCooperativeMatrixConversionsNV, {0, &DeviceFeatures::cooperativeMatrixConversions, nullptr, ""}},
-        {spv::CapabilityCooperativeMatrixPerElementOperationsNV, {0, &DeviceFeatures::cooperativeMatrixPerElementOperations, nullptr, ""}},
-        {spv::CapabilityCooperativeMatrixTensorAddressingNV, {0, &DeviceFeatures::cooperativeMatrixTensorAddressing, nullptr, ""}},
-        {spv::CapabilityCooperativeMatrixBlockLoadsNV, {0, &DeviceFeatures::cooperativeMatrixBlockLoads, nullptr, ""}},
+        {spv::CapabilityTensorAddressingNV, {0, &DeviceFeatures::cooperativeMatrixTensorAddressingNV, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixConversionsNV, {0, &DeviceFeatures::cooperativeMatrixConversionsNV, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixTensorAddressingNV, {0, &DeviceFeatures::cooperativeMatrixTensorAddressingNV, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixBlockLoadsNV, {0, &DeviceFeatures::cooperativeMatrixBlockLoadsNV, nullptr, ""}},
         {spv::CapabilityCooperativeMatrixDecodeVectorNV, {0, &DeviceFeatures::cooperativeMatrixDecodeVector, nullptr, ""}},
         {spv::CapabilityRayTracingSpheresGeometryNV, {0, &DeviceFeatures::spheres, nullptr, ""}},
         {spv::CapabilityRayTracingLinearSweptSpheresGeometryNV, {0, &DeviceFeatures::linearSweptSpheres, nullptr, ""}},
@@ -290,8 +277,7 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityShaderInvocationReorderEXT, {0, nullptr, &DeviceExtensions::vk_ext_ray_tracing_invocation_reorder, ""}},
         {spv::CapabilityTileShadingQCOM, {0, &DeviceFeatures::tileShading, nullptr, ""}},
         {spv::CapabilitySplitBarrierEXT, {0, &DeviceFeatures::shaderSplitBarrier, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityMultipleWaitQueuesQCOM, {0, &DeviceFeatures::shaderMultipleWaitQueues, nullptr, ""}},
+        {spv::CapabilityMultipleWaitQueuesQCOM, {0, &DeviceFeatures::shaderMultipleWaitQueues, nullptr, ""}},
         {spv::CapabilityTensorsARM, {0, &DeviceFeatures::shaderTensorAccess, nullptr, ""}},
         {spv::CapabilityStorageTensorArrayDynamicIndexingARM, {0, &DeviceFeatures::shaderStorageTensorArrayDynamicIndexing, nullptr, ""}},
         {spv::CapabilityStorageTensorArrayNonUniformIndexingARM, {0, &DeviceFeatures::shaderStorageTensorArrayNonUniformIndexing, nullptr, ""}},
@@ -311,18 +297,19 @@ const std::unordered_multimap<uint32_t, RequiredSpirvInfo>& GetSpirvCapabilites(
         {spv::CapabilityDotProductFloat8AccFloat32VALVE, {0, &DeviceFeatures::shaderMixedFloatDotProductFloat8AccFloat32, nullptr, ""}},
         {spv::CapabilityConstantDataKHR, {0, &DeviceFeatures::shaderConstantData, nullptr, ""}},
         {spv::CapabilityAbortKHR, {0, &DeviceFeatures::shaderAbort, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityFloat4EXT, {0, &DeviceFeatures::shaderFloat4, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityFloat6EXT, {0, &DeviceFeatures::shaderFloat6, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityFloat8UnsignedE8M0EXT, {0, &DeviceFeatures::shaderFloat8UnsignedE8M0, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityMXInt8EXT, {0, &DeviceFeatures::shaderMXInt8, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityBitcastExtractEXT, {0, &DeviceFeatures::shaderFloat4, nullptr, ""}},
-        // Not found in current SPIR-V Headers
-        // {spv::CapabilityBitcastExtractEXT, {0, &DeviceFeatures::shaderFloat6, nullptr, ""}},
+        {spv::CapabilityFloat4EXT, {0, &DeviceFeatures::shaderFloat4, nullptr, ""}},
+        {spv::CapabilityFloat6EXT, {0, &DeviceFeatures::shaderFloat6, nullptr, ""}},
+        {spv::CapabilityFloat8UnsignedE8M0EXT, {0, &DeviceFeatures::shaderFloat8UnsignedE8M0, nullptr, ""}},
+        {spv::CapabilityMXInt8EXT, {0, &DeviceFeatures::shaderMXInt8, nullptr, ""}},
+        {spv::CapabilityBitcastExtractEXT, {0, &DeviceFeatures::shaderFloat4, nullptr, ""}},
+        {spv::CapabilityBitcastExtractEXT, {0, &DeviceFeatures::shaderFloat6, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixReductionsEXT, {0, &DeviceFeatures::cooperativeMatrixReductions, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixReductionsEXT, {0, &DeviceFeatures::cooperativeMatrixReductionsNV, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixConversionsEXT, {0, &DeviceFeatures::cooperativeMatrixConversions, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixPerElementOperationsEXT, {0, &DeviceFeatures::cooperativeMatrixPerElementOperations, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixPerElementOperationsEXT, {0, &DeviceFeatures::cooperativeMatrixPerElementOperationsNV, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixGetCoordinateEXT, {0, &DeviceFeatures::cooperativeMatrixGetCoordinate, nullptr, ""}},
+        {spv::CapabilityCooperativeMatrixLayoutsARM, {0, &DeviceFeatures::cooperativeMatrixArmLayouts, nullptr, ""}},
     };
     // clang-format on
     return spirv_capabilities;
@@ -469,486 +456,11 @@ const std::unordered_multimap<std::string_view, RequiredSpirvInfo>& GetSpirvExte
         {"SPV_KHR_abort", {0, nullptr, &DeviceExtensions::vk_khr_shader_abort, ""}},
         {"SPV_KHR_constant_data", {0, nullptr, &DeviceExtensions::vk_khr_shader_constant_data, ""}},
         {"SPV_EXT_ocp_microscaling_types", {0, nullptr, &DeviceExtensions::vk_ext_shader_ocp_microscaling_types, ""}},
+        {"SPV_EXT_cooperative_matrix_maintenance1", {0, nullptr, &DeviceExtensions::vk_ext_cooperative_matrix_maintenance1, ""}},
+        {"SPV_ARM_cooperative_matrix_layouts", {0, nullptr, &DeviceExtensions::vk_arm_cooperative_matrix_layouts, ""}},
     };
     // clang-format on
     return spirv_extensions;
-}
-
-static inline const char* string_SpvCapability(uint32_t input_value) {
-    switch ((spv::Capability)input_value) {
-        case spv::CapabilityMatrix:
-            return "Matrix";
-        case spv::CapabilityShader:
-            return "Shader";
-        case spv::CapabilityGeometry:
-            return "Geometry";
-        case spv::CapabilityTessellation:
-            return "Tessellation";
-        case spv::CapabilityAddresses:
-            return "Addresses";
-        case spv::CapabilityLinkage:
-            return "Linkage";
-        case spv::CapabilityFloat16:
-            return "Float16";
-        case spv::CapabilityFloat64:
-            return "Float64";
-        case spv::CapabilityInt64:
-            return "Int64";
-        case spv::CapabilityInt64Atomics:
-            return "Int64Atomics";
-        case spv::CapabilityGroups:
-            return "Groups";
-        case spv::CapabilityAtomicStorage:
-            return "AtomicStorage";
-        case spv::CapabilityInt16:
-            return "Int16";
-        case spv::CapabilityTessellationPointSize:
-            return "TessellationPointSize";
-        case spv::CapabilityGeometryPointSize:
-            return "GeometryPointSize";
-        case spv::CapabilityImageGatherExtended:
-            return "ImageGatherExtended";
-        case spv::CapabilityStorageImageMultisample:
-            return "StorageImageMultisample";
-        case spv::CapabilityUniformBufferArrayDynamicIndexing:
-            return "UniformBufferArrayDynamicIndexing";
-        case spv::CapabilitySampledImageArrayDynamicIndexing:
-            return "SampledImageArrayDynamicIndexing";
-        case spv::CapabilityStorageBufferArrayDynamicIndexing:
-            return "StorageBufferArrayDynamicIndexing";
-        case spv::CapabilityStorageImageArrayDynamicIndexing:
-            return "StorageImageArrayDynamicIndexing";
-        case spv::CapabilityClipDistance:
-            return "ClipDistance";
-        case spv::CapabilityCullDistance:
-            return "CullDistance";
-        case spv::CapabilityImageCubeArray:
-            return "ImageCubeArray";
-        case spv::CapabilitySampleRateShading:
-            return "SampleRateShading";
-        case spv::CapabilityImageRect:
-            return "ImageRect";
-        case spv::CapabilitySampledRect:
-            return "SampledRect";
-        case spv::CapabilityGenericPointer:
-            return "GenericPointer";
-        case spv::CapabilityInt8:
-            return "Int8";
-        case spv::CapabilityInputAttachment:
-            return "InputAttachment";
-        case spv::CapabilitySparseResidency:
-            return "SparseResidency";
-        case spv::CapabilityMinLod:
-            return "MinLod";
-        case spv::CapabilitySampled1D:
-            return "Sampled1D";
-        case spv::CapabilityImage1D:
-            return "Image1D";
-        case spv::CapabilitySampledCubeArray:
-            return "SampledCubeArray";
-        case spv::CapabilitySampledBuffer:
-            return "SampledBuffer";
-        case spv::CapabilityImageBuffer:
-            return "ImageBuffer";
-        case spv::CapabilityImageMSArray:
-            return "ImageMSArray";
-        case spv::CapabilityStorageImageExtendedFormats:
-            return "StorageImageExtendedFormats";
-        case spv::CapabilityImageQuery:
-            return "ImageQuery";
-        case spv::CapabilityDerivativeControl:
-            return "DerivativeControl";
-        case spv::CapabilityInterpolationFunction:
-            return "InterpolationFunction";
-        case spv::CapabilityTransformFeedback:
-            return "TransformFeedback";
-        case spv::CapabilityGeometryStreams:
-            return "GeometryStreams";
-        case spv::CapabilityStorageImageReadWithoutFormat:
-            return "StorageImageReadWithoutFormat";
-        case spv::CapabilityStorageImageWriteWithoutFormat:
-            return "StorageImageWriteWithoutFormat";
-        case spv::CapabilityMultiViewport:
-            return "MultiViewport";
-        case spv::CapabilityGroupNonUniform:
-            return "GroupNonUniform";
-        case spv::CapabilityGroupNonUniformVote:
-            return "GroupNonUniformVote";
-        case spv::CapabilityGroupNonUniformArithmetic:
-            return "GroupNonUniformArithmetic";
-        case spv::CapabilityGroupNonUniformBallot:
-            return "GroupNonUniformBallot";
-        case spv::CapabilityGroupNonUniformShuffle:
-            return "GroupNonUniformShuffle";
-        case spv::CapabilityGroupNonUniformShuffleRelative:
-            return "GroupNonUniformShuffleRelative";
-        case spv::CapabilityGroupNonUniformClustered:
-            return "GroupNonUniformClustered";
-        case spv::CapabilityGroupNonUniformQuad:
-            return "GroupNonUniformQuad";
-        case spv::CapabilityShaderLayer:
-            return "ShaderLayer";
-        case spv::CapabilityShaderViewportIndex:
-            return "ShaderViewportIndex";
-        case spv::CapabilityUniformDecoration:
-            return "UniformDecoration";
-        case spv::CapabilityCoreBuiltinsARM:
-            return "CoreBuiltinsARM";
-        case spv::CapabilityTileImageColorReadAccessEXT:
-            return "TileImageColorReadAccessEXT";
-        case spv::CapabilityTileImageDepthReadAccessEXT:
-            return "TileImageDepthReadAccessEXT";
-        case spv::CapabilityTileImageStencilReadAccessEXT:
-            return "TileImageStencilReadAccessEXT";
-        case spv::CapabilityTensorsARM:
-            return "TensorsARM";
-        case spv::CapabilityStorageTensorArrayDynamicIndexingARM:
-            return "StorageTensorArrayDynamicIndexingARM";
-        case spv::CapabilityStorageTensorArrayNonUniformIndexingARM:
-            return "StorageTensorArrayNonUniformIndexingARM";
-        case spv::CapabilityGraphARM:
-            return "GraphARM";
-        case spv::CapabilityCooperativeMatrixLayoutsARM:
-            return "CooperativeMatrixLayoutsARM";
-        case spv::CapabilityFloat8EXT:
-            return "Float8EXT";
-        case spv::CapabilityFloat8CooperativeMatrixEXT:
-            return "Float8CooperativeMatrixEXT";
-        case spv::CapabilityFragmentShadingRateKHR:
-            return "FragmentShadingRateKHR";
-        case spv::CapabilitySubgroupBallotKHR:
-            return "SubgroupBallotKHR";
-        case spv::CapabilityDrawParameters:
-            return "DrawParameters";
-        case spv::CapabilityWorkgroupMemoryExplicitLayoutKHR:
-            return "WorkgroupMemoryExplicitLayoutKHR";
-        case spv::CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR:
-            return "WorkgroupMemoryExplicitLayout8BitAccessKHR";
-        case spv::CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR:
-            return "WorkgroupMemoryExplicitLayout16BitAccessKHR";
-        case spv::CapabilitySubgroupVoteKHR:
-            return "SubgroupVoteKHR";
-        case spv::CapabilityStorageBuffer16BitAccess:
-            return "StorageBuffer16BitAccess";
-        case spv::CapabilityUniformAndStorageBuffer16BitAccess:
-            return "UniformAndStorageBuffer16BitAccess";
-        case spv::CapabilityStoragePushConstant16:
-            return "StoragePushConstant16";
-        case spv::CapabilityStorageInputOutput16:
-            return "StorageInputOutput16";
-        case spv::CapabilityDeviceGroup:
-            return "DeviceGroup";
-        case spv::CapabilityMultiView:
-            return "MultiView";
-        case spv::CapabilityVariablePointersStorageBuffer:
-            return "VariablePointersStorageBuffer";
-        case spv::CapabilityVariablePointers:
-            return "VariablePointers";
-        case spv::CapabilityAtomicStorageOps:
-            return "AtomicStorageOps";
-        case spv::CapabilitySampleMaskPostDepthCoverage:
-            return "SampleMaskPostDepthCoverage";
-        case spv::CapabilityStorageBuffer8BitAccess:
-            return "StorageBuffer8BitAccess";
-        case spv::CapabilityUniformAndStorageBuffer8BitAccess:
-            return "UniformAndStorageBuffer8BitAccess";
-        case spv::CapabilityStoragePushConstant8:
-            return "StoragePushConstant8";
-        case spv::CapabilityDenormPreserve:
-            return "DenormPreserve";
-        case spv::CapabilityDenormFlushToZero:
-            return "DenormFlushToZero";
-        case spv::CapabilitySignedZeroInfNanPreserve:
-            return "SignedZeroInfNanPreserve";
-        case spv::CapabilityRoundingModeRTE:
-            return "RoundingModeRTE";
-        case spv::CapabilityRoundingModeRTZ:
-            return "RoundingModeRTZ";
-        case spv::CapabilityRayQueryProvisionalKHR:
-            return "RayQueryProvisionalKHR";
-        case spv::CapabilityRayQueryKHR:
-            return "RayQueryKHR";
-        case spv::CapabilityUntypedPointersKHR:
-            return "UntypedPointersKHR";
-        case spv::CapabilityRayTraversalPrimitiveCullingKHR:
-            return "RayTraversalPrimitiveCullingKHR";
-        case spv::CapabilityRayTracingKHR:
-            return "RayTracingKHR";
-        case spv::CapabilityTextureSampleWeightedQCOM:
-            return "TextureSampleWeightedQCOM";
-        case spv::CapabilityTextureBoxFilterQCOM:
-            return "TextureBoxFilterQCOM";
-        case spv::CapabilityTextureBlockMatchQCOM:
-            return "TextureBlockMatchQCOM";
-        case spv::CapabilityTileShadingQCOM:
-            return "TileShadingQCOM";
-        case spv::CapabilityCooperativeMatrixConversionQCOM:
-            return "CooperativeMatrixConversionQCOM";
-        case spv::CapabilityTextureBlockMatch2QCOM:
-            return "TextureBlockMatch2QCOM";
-        case spv::CapabilityFloat16ImageAMD:
-            return "Float16ImageAMD";
-        case spv::CapabilityImageGatherBiasLodAMD:
-            return "ImageGatherBiasLodAMD";
-        case spv::CapabilityFragmentMaskAMD:
-            return "FragmentMaskAMD";
-        case spv::CapabilityStencilExportEXT:
-            return "StencilExportEXT";
-        case spv::CapabilityImageReadWriteLodAMD:
-            return "ImageReadWriteLodAMD";
-        case spv::CapabilityInt64ImageEXT:
-            return "Int64ImageEXT";
-        case spv::CapabilityShaderClockKHR:
-            return "ShaderClockKHR";
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-        case spv::CapabilityShaderEnqueueAMDX:
-            return "ShaderEnqueueAMDX";
-#endif
-        case spv::CapabilityQuadControlKHR:
-            return "QuadControlKHR";
-        case spv::CapabilityInt4TypeINTEL:
-            return "Int4TypeINTEL";
-        case spv::CapabilityInt4CooperativeMatrixINTEL:
-            return "Int4CooperativeMatrixINTEL";
-        case spv::CapabilityBFloat16TypeKHR:
-            return "BFloat16TypeKHR";
-        case spv::CapabilityBFloat16DotProductKHR:
-            return "BFloat16DotProductKHR";
-        case spv::CapabilityBFloat16CooperativeMatrixKHR:
-            return "BFloat16CooperativeMatrixKHR";
-        case spv::CapabilityAbortKHR:
-            return "AbortKHR";
-        case spv::CapabilityDescriptorHeapEXT:
-            return "DescriptorHeapEXT";
-        case spv::CapabilityConstantDataKHR:
-            return "ConstantDataKHR";
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-        case spv::CapabilityPoisonFreezeKHR:
-            return "PoisonFreezeKHR";
-#endif
-        case spv::CapabilityWeakLinkageAMD:
-            return "WeakLinkageAMD";
-        case spv::CapabilitySampleMaskOverrideCoverageNV:
-            return "SampleMaskOverrideCoverageNV";
-        case spv::CapabilityGeometryShaderPassthroughNV:
-            return "GeometryShaderPassthroughNV";
-        case spv::CapabilityShaderViewportIndexLayerEXT:
-            return "ShaderViewportIndexLayerEXT";
-        case spv::CapabilityShaderViewportMaskNV:
-            return "ShaderViewportMaskNV";
-        case spv::CapabilityShaderStereoViewNV:
-            return "ShaderStereoViewNV";
-        case spv::CapabilityPerViewAttributesNV:
-            return "PerViewAttributesNV";
-        case spv::CapabilityFragmentFullyCoveredEXT:
-            return "FragmentFullyCoveredEXT";
-        case spv::CapabilityMeshShadingNV:
-            return "MeshShadingNV";
-        case spv::CapabilityImageFootprintNV:
-            return "ImageFootprintNV";
-        case spv::CapabilityMeshShadingEXT:
-            return "MeshShadingEXT";
-        case spv::CapabilityFragmentBarycentricKHR:
-            return "FragmentBarycentricKHR";
-        case spv::CapabilityComputeDerivativeGroupQuadsKHR:
-            return "ComputeDerivativeGroupQuadsKHR";
-        case spv::CapabilityFragmentDensityEXT:
-            return "FragmentDensityEXT";
-        case spv::CapabilityGroupNonUniformPartitionedEXT:
-            return "GroupNonUniformPartitionedEXT";
-        case spv::CapabilityShaderNonUniform:
-            return "ShaderNonUniform";
-        case spv::CapabilityRuntimeDescriptorArray:
-            return "RuntimeDescriptorArray";
-        case spv::CapabilityInputAttachmentArrayDynamicIndexing:
-            return "InputAttachmentArrayDynamicIndexing";
-        case spv::CapabilityUniformTexelBufferArrayDynamicIndexing:
-            return "UniformTexelBufferArrayDynamicIndexing";
-        case spv::CapabilityStorageTexelBufferArrayDynamicIndexing:
-            return "StorageTexelBufferArrayDynamicIndexing";
-        case spv::CapabilityUniformBufferArrayNonUniformIndexing:
-            return "UniformBufferArrayNonUniformIndexing";
-        case spv::CapabilitySampledImageArrayNonUniformIndexing:
-            return "SampledImageArrayNonUniformIndexing";
-        case spv::CapabilityStorageBufferArrayNonUniformIndexing:
-            return "StorageBufferArrayNonUniformIndexing";
-        case spv::CapabilityStorageImageArrayNonUniformIndexing:
-            return "StorageImageArrayNonUniformIndexing";
-        case spv::CapabilityInputAttachmentArrayNonUniformIndexing:
-            return "InputAttachmentArrayNonUniformIndexing";
-        case spv::CapabilityUniformTexelBufferArrayNonUniformIndexing:
-            return "UniformTexelBufferArrayNonUniformIndexing";
-        case spv::CapabilityStorageTexelBufferArrayNonUniformIndexing:
-            return "StorageTexelBufferArrayNonUniformIndexing";
-        case spv::CapabilityRayTracingPositionFetchKHR:
-            return "RayTracingPositionFetchKHR";
-        case spv::CapabilityRayTracingNV:
-            return "RayTracingNV";
-        case spv::CapabilityRayTracingMotionBlurNV:
-            return "RayTracingMotionBlurNV";
-        case spv::CapabilityVulkanMemoryModel:
-            return "VulkanMemoryModel";
-        case spv::CapabilityVulkanMemoryModelDeviceScope:
-            return "VulkanMemoryModelDeviceScope";
-        case spv::CapabilityPhysicalStorageBufferAddresses:
-            return "PhysicalStorageBufferAddresses";
-        case spv::CapabilityComputeDerivativeGroupLinearKHR:
-            return "ComputeDerivativeGroupLinearKHR";
-        case spv::CapabilityRayTracingProvisionalKHR:
-            return "RayTracingProvisionalKHR";
-        case spv::CapabilityCooperativeMatrixNV:
-            return "CooperativeMatrixNV";
-        case spv::CapabilityFragmentShaderSampleInterlockEXT:
-            return "FragmentShaderSampleInterlockEXT";
-        case spv::CapabilityFragmentShaderShadingRateInterlockEXT:
-            return "FragmentShaderShadingRateInterlockEXT";
-        case spv::CapabilityShaderSMBuiltinsNV:
-            return "ShaderSMBuiltinsNV";
-        case spv::CapabilityFragmentShaderPixelInterlockEXT:
-            return "FragmentShaderPixelInterlockEXT";
-        case spv::CapabilityDemoteToHelperInvocation:
-            return "DemoteToHelperInvocation";
-        case spv::CapabilityDisplacementMicromapNV:
-            return "DisplacementMicromapNV";
-        case spv::CapabilityRayTracingOpacityMicromapKHR:
-            return "RayTracingOpacityMicromapKHR";
-        case spv::CapabilityShaderInvocationReorderNV:
-            return "ShaderInvocationReorderNV";
-        case spv::CapabilityShaderInvocationReorderEXT:
-            return "ShaderInvocationReorderEXT";
-        case spv::CapabilityBindlessTextureNV:
-            return "BindlessTextureNV";
-        case spv::CapabilityRayQueryPositionFetchKHR:
-            return "RayQueryPositionFetchKHR";
-        case spv::CapabilityCooperativeVectorNV:
-            return "CooperativeVectorNV";
-        case spv::CapabilityAtomicFloat16VectorNV:
-            return "AtomicFloat16VectorNV";
-        case spv::CapabilityRayTracingDisplacementMicromapNV:
-            return "RayTracingDisplacementMicromapNV";
-        case spv::CapabilityRawAccessChainsNV:
-            return "RawAccessChainsNV";
-        case spv::CapabilityRayTracingSpheresGeometryNV:
-            return "RayTracingSpheresGeometryNV";
-        case spv::CapabilityRayTracingLinearSweptSpheresGeometryNV:
-            return "RayTracingLinearSweptSpheresGeometryNV";
-        case spv::CapabilityPushConstantBanksNV:
-            return "PushConstantBanksNV";
-        case spv::CapabilityLongVectorEXT:
-            return "LongVectorEXT";
-        case spv::CapabilityShader64BitIndexingEXT:
-            return "Shader64BitIndexingEXT";
-        case spv::CapabilityCooperativeMatrixReductionsNV:
-            return "CooperativeMatrixReductionsNV";
-        case spv::CapabilityCooperativeMatrixConversionsNV:
-            return "CooperativeMatrixConversionsNV";
-        case spv::CapabilityCooperativeMatrixPerElementOperationsNV:
-            return "CooperativeMatrixPerElementOperationsNV";
-        case spv::CapabilityCooperativeMatrixTensorAddressingNV:
-            return "CooperativeMatrixTensorAddressingNV";
-        case spv::CapabilityCooperativeMatrixBlockLoadsNV:
-            return "CooperativeMatrixBlockLoadsNV";
-        case spv::CapabilityCooperativeVectorTrainingNV:
-            return "CooperativeVectorTrainingNV";
-        case spv::CapabilityRayTracingClusterAccelerationStructureNV:
-            return "RayTracingClusterAccelerationStructureNV";
-        case spv::CapabilityTensorAddressingNV:
-            return "TensorAddressingNV";
-        case spv::CapabilityCooperativeMatrixDecodeVectorNV:
-            return "CooperativeMatrixDecodeVectorNV";
-        case spv::CapabilityIntegerFunctions2INTEL:
-            return "IntegerFunctions2INTEL";
-        case spv::CapabilityFunctionPointersINTEL:
-            return "FunctionPointersINTEL";
-        case spv::CapabilityAtomicFloat32MinMaxEXT:
-            return "AtomicFloat32MinMaxEXT";
-        case spv::CapabilityAtomicFloat64MinMaxEXT:
-            return "AtomicFloat64MinMaxEXT";
-        case spv::CapabilityAtomicFloat16MinMaxEXT:
-            return "AtomicFloat16MinMaxEXT";
-        case spv::CapabilityExpectAssumeKHR:
-            return "ExpectAssumeKHR";
-        case spv::CapabilityDotProductInputAll:
-            return "DotProductInputAll";
-        case spv::CapabilityDotProductInput4x8Bit:
-            return "DotProductInput4x8Bit";
-        case spv::CapabilityDotProductInput4x8BitPacked:
-            return "DotProductInput4x8BitPacked";
-        case spv::CapabilityDotProduct:
-            return "DotProduct";
-        case spv::CapabilityRayCullMaskKHR:
-            return "RayCullMaskKHR";
-        case spv::CapabilityCooperativeMatrixKHR:
-            return "CooperativeMatrixKHR";
-        case spv::CapabilityReplicatedCompositesEXT:
-            return "ReplicatedCompositesEXT";
-        case spv::CapabilityBitInstructions:
-            return "BitInstructions";
-        case spv::CapabilityGroupNonUniformRotateKHR:
-            return "GroupNonUniformRotateKHR";
-        case spv::CapabilityFloatControls2:
-            return "FloatControls2";
-        case spv::CapabilityFMAKHR:
-            return "FMAKHR";
-        case spv::CapabilityRayTracingOpacityMicromapExecutionModeKHR:
-            return "RayTracingOpacityMicromapExecutionModeKHR";
-        case spv::CapabilityAtomicFloat32AddEXT:
-            return "AtomicFloat32AddEXT";
-        case spv::CapabilityAtomicFloat64AddEXT:
-            return "AtomicFloat64AddEXT";
-        case spv::CapabilityOptNoneEXT:
-            return "OptNoneEXT";
-        case spv::CapabilityAtomicFloat16AddEXT:
-            return "AtomicFloat16AddEXT";
-        case spv::CapabilitySplitBarrierEXT:
-            return "SplitBarrierEXT";
-        case spv::CapabilityArithmeticFenceEXT:
-            return "ArithmeticFenceEXT";
-        case spv::CapabilitySubgroupBufferPrefetchINTEL:
-            return "SubgroupBufferPrefetchINTEL";
-        case spv::CapabilitySubgroup2DBlockIOINTEL:
-            return "Subgroup2DBlockIOINTEL";
-        case spv::CapabilitySubgroup2DBlockTransformINTEL:
-            return "Subgroup2DBlockTransformINTEL";
-        case spv::CapabilitySubgroup2DBlockTransposeINTEL:
-            return "Subgroup2DBlockTransposeINTEL";
-        case spv::CapabilitySubgroupMatrixMultiplyAccumulateINTEL:
-            return "SubgroupMatrixMultiplyAccumulateINTEL";
-        case spv::CapabilityTernaryBitwiseFunctionINTEL:
-            return "TernaryBitwiseFunctionINTEL";
-        case spv::CapabilityUntypedVariableLengthArrayINTEL:
-            return "UntypedVariableLengthArrayINTEL";
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-        case spv::CapabilitySpecConditionalINTEL:
-            return "SpecConditionalINTEL";
-#endif
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-        case spv::CapabilityFunctionVariantsINTEL:
-            return "FunctionVariantsINTEL";
-#endif
-        case spv::CapabilityPredicatedIOINTEL:
-            return "PredicatedIOINTEL";
-        case spv::CapabilityRoundedDivideSqrtINTEL:
-            return "RoundedDivideSqrtINTEL";
-        case spv::CapabilityGroupUniformArithmeticKHR:
-            return "GroupUniformArithmeticKHR";
-        case spv::CapabilityTensorFloat32RoundingINTEL:
-            return "TensorFloat32RoundingINTEL";
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-        case spv::CapabilityBindlessImagesINTEL:
-            return "BindlessImagesINTEL";
-#endif
-        case spv::CapabilityDotProductFloat16AccFloat32VALVE:
-            return "DotProductFloat16AccFloat32VALVE";
-        case spv::CapabilityDotProductFloat16AccFloat16VALVE:
-            return "DotProductFloat16AccFloat16VALVE";
-        case spv::CapabilityDotProductBFloat16AccVALVE:
-            return "DotProductBFloat16AccVALVE";
-        case spv::CapabilityDotProductFloat8AccFloat32VALVE:
-            return "DotProductFloat8AccFloat32VALVE";
-        default:
-            return "Unhandled OpCapability";
-    };
 }
 
 // Will return the Vulkan format for a given SPIR-V image format value
@@ -1258,22 +770,24 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityFragmentShaderSampleInterlockEXT, "VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT::fragmentShaderSampleInterlock"},
     {spv::CapabilityFragmentShaderPixelInterlockEXT, "VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT::fragmentShaderPixelInterlock"},
     {spv::CapabilityFragmentShaderShadingRateInterlockEXT, "VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT::fragmentShaderShadingRateInterlock OR VkPhysicalDeviceShadingRateImageFeaturesNV::shadingRateImage"},
-    {spv::CapabilityDemoteToHelperInvocation, "VkPhysicalDeviceVulkan13Features::shaderDemoteToHelperInvocation OR VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT::shaderDemoteToHelperInvocation"},
+    {spv::CapabilityDemoteToHelperInvocation, "VkPhysicalDeviceVulkan13Features::shaderDemoteToHelperInvocation"},
     {spv::CapabilityFragmentShadingRateKHR, "VkPhysicalDeviceFragmentShadingRateFeaturesKHR::pipelineFragmentShadingRate OR VkPhysicalDeviceFragmentShadingRateFeaturesKHR::primitiveFragmentShadingRate OR VkPhysicalDeviceFragmentShadingRateFeaturesKHR::attachmentFragmentShadingRate"},
     {spv::CapabilityWorkgroupMemoryExplicitLayoutKHR, "VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR::workgroupMemoryExplicitLayout"},
     {spv::CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR, "VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR::workgroupMemoryExplicitLayout8BitAccess"},
     {spv::CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR, "VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR::workgroupMemoryExplicitLayout16BitAccess"},
-    {spv::CapabilityDotProductInputAll, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct OR VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR::shaderIntegerDotProduct"},
-    {spv::CapabilityDotProductInput4x8Bit, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct OR VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR::shaderIntegerDotProduct"},
-    {spv::CapabilityDotProductInput4x8BitPacked, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct OR VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR::shaderIntegerDotProduct"},
-    {spv::CapabilityDotProduct, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct OR VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR::shaderIntegerDotProduct"},
+    {spv::CapabilityDotProductInputAll, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct"},
+    {spv::CapabilityDotProductInput4x8Bit, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct"},
+    {spv::CapabilityDotProductInput4x8BitPacked, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct"},
+    {spv::CapabilityDotProduct, "VkPhysicalDeviceVulkan13Features::shaderIntegerDotProduct"},
     {spv::CapabilityFragmentBarycentricKHR, "VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR::fragmentShaderBarycentric OR VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV::fragmentShaderBarycentric"},
     {spv::CapabilityTextureSampleWeightedQCOM, "VkPhysicalDeviceImageProcessingFeaturesQCOM::textureSampleWeighted"},
     {spv::CapabilityTextureBoxFilterQCOM, "VkPhysicalDeviceImageProcessingFeaturesQCOM::textureBoxFilter"},
     {spv::CapabilityTextureBlockMatchQCOM, "VkPhysicalDeviceImageProcessingFeaturesQCOM::textureBlockMatch"},
     {spv::CapabilityTextureBlockMatch2QCOM, "VkPhysicalDeviceImageProcessing2FeaturesQCOM::textureBlockMatch2"},
+    {spv::CapabilityImageGatherLinearQCOM, "VkPhysicalDeviceImageProcessing3FeaturesQCOM::imageGatherLinear"},
+    {spv::CapabilityImageGatherExtendedModesQCOM, "VkPhysicalDeviceImageProcessing3FeaturesQCOM::imageGatherExtendedModes"},
     {spv::CapabilityMeshShadingEXT, "VK_EXT_mesh_shader"},
-    {spv::CapabilityRayTracingOpacityMicromapKHR, "VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap"},
+    {spv::CapabilityRayTracingOpacityMicromapKHR, "VK_EXT_opacity_micromap OR VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap"},
     {spv::CapabilityRayTracingOpacityMicromapExecutionModeKHR, "VkPhysicalDeviceOpacityMicromapFeaturesKHR::micromap"},
     {spv::CapabilityCoreBuiltinsARM, "VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM::shaderCoreBuiltins"},
     {spv::CapabilityShaderInvocationReorderNV, "VK_NV_ray_tracing_invocation_reorder"},
@@ -1287,9 +801,9 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
 #ifdef VK_ENABLE_BETA_EXTENSIONS
     {spv::CapabilityShaderEnqueueAMDX, "VkPhysicalDeviceShaderEnqueueFeaturesAMDX::shaderEnqueue"},
 #endif  // VK_ENABLE_BETA_EXTENSIONS
-    {spv::CapabilityGroupNonUniformRotateKHR, "VkPhysicalDeviceVulkan14Features::shaderSubgroupRotate OR VkPhysicalDeviceShaderSubgroupRotateFeatures::shaderSubgroupRotate"},
-    {spv::CapabilityExpectAssumeKHR, "VkPhysicalDeviceVulkan14Features::shaderExpectAssume OR VkPhysicalDeviceShaderExpectAssumeFeatures::shaderExpectAssume"},
-    {spv::CapabilityFloatControls2, "VkPhysicalDeviceVulkan14Features::shaderFloatControls2 OR VkPhysicalDeviceShaderFloatControls2Features::shaderFloatControls2"},
+    {spv::CapabilityGroupNonUniformRotateKHR, "VkPhysicalDeviceVulkan14Features::shaderSubgroupRotate"},
+    {spv::CapabilityExpectAssumeKHR, "VkPhysicalDeviceVulkan14Features::shaderExpectAssume"},
+    {spv::CapabilityFloatControls2, "VkPhysicalDeviceVulkan14Features::shaderFloatControls2"},
     {spv::CapabilityQuadControlKHR, "VkPhysicalDeviceShaderQuadControlFeaturesKHR::shaderQuadControl"},
     {spv::CapabilityBFloat16TypeKHR, "VkPhysicalDeviceShaderBfloat16FeaturesKHR::shaderBFloat16Type"},
     {spv::CapabilityBFloat16DotProductKHR, "VkPhysicalDeviceShaderBfloat16FeaturesKHR::shaderBFloat16DotProduct"},
@@ -1297,9 +811,7 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityRawAccessChainsNV, "VkPhysicalDeviceRawAccessChainsFeaturesNV::shaderRawAccessChains"},
     {spv::CapabilityReplicatedCompositesEXT, "VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT::shaderReplicatedComposites"},
     {spv::CapabilityTensorAddressingNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixTensorAddressing"},
-    {spv::CapabilityCooperativeMatrixReductionsNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixReductions"},
     {spv::CapabilityCooperativeMatrixConversionsNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixConversions"},
-    {spv::CapabilityCooperativeMatrixPerElementOperationsNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixPerElementOperations"},
     {spv::CapabilityCooperativeMatrixTensorAddressingNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixTensorAddressing"},
     {spv::CapabilityCooperativeMatrixBlockLoadsNV, "VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixBlockLoads"},
     {spv::CapabilityCooperativeMatrixDecodeVectorNV, "VkPhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV::cooperativeMatrixDecodeVector"},
@@ -1312,6 +824,7 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityShaderInvocationReorderEXT, "VK_EXT_ray_tracing_invocation_reorder"},
     {spv::CapabilityTileShadingQCOM, "VkPhysicalDeviceTileShadingFeaturesQCOM::tileShading"},
     {spv::CapabilitySplitBarrierEXT, "VkPhysicalDeviceShaderSplitBarrierFeaturesEXT::shaderSplitBarrier"},
+    {spv::CapabilityMultipleWaitQueuesQCOM, "VkPhysicalDeviceShaderMultipleWaitQueuesFeaturesQCOM::shaderMultipleWaitQueues"},
     {spv::CapabilityTensorsARM, "VkPhysicalDeviceTensorFeaturesARM::shaderTensorAccess"},
     {spv::CapabilityStorageTensorArrayDynamicIndexingARM, "VkPhysicalDeviceTensorFeaturesARM::shaderStorageTensorArrayDynamicIndexing"},
     {spv::CapabilityStorageTensorArrayNonUniformIndexingARM, "VkPhysicalDeviceTensorFeaturesARM::shaderStorageTensorArrayNonUniformIndexing"},
@@ -1329,6 +842,16 @@ static inline const char* SpvCapabilityRequirements(uint32_t capability) {
     {spv::CapabilityDotProductFloat8AccFloat32VALVE, "VkPhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE::shaderMixedFloatDotProductFloat8AccFloat32"},
     {spv::CapabilityConstantDataKHR, "VkPhysicalDeviceShaderConstantDataFeaturesKHR::shaderConstantData"},
     {spv::CapabilityAbortKHR, "VkPhysicalDeviceShaderAbortFeaturesKHR::shaderAbort"},
+    {spv::CapabilityFloat4EXT, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat4"},
+    {spv::CapabilityFloat6EXT, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat6"},
+    {spv::CapabilityFloat8UnsignedE8M0EXT, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat8UnsignedE8M0"},
+    {spv::CapabilityMXInt8EXT, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderMXInt8"},
+    {spv::CapabilityBitcastExtractEXT, "VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat4 OR VkPhysicalDeviceShaderOCPMicroscalingTypesFeaturesEXT::shaderFloat6"},
+    {spv::CapabilityCooperativeMatrixReductionsEXT, "VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT::cooperativeMatrixReductions OR VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixReductions"},
+    {spv::CapabilityCooperativeMatrixConversionsEXT, "VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT::cooperativeMatrixConversions"},
+    {spv::CapabilityCooperativeMatrixPerElementOperationsEXT, "VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT::cooperativeMatrixPerElementOperations OR VkPhysicalDeviceCooperativeMatrix2FeaturesNV::cooperativeMatrixPerElementOperations"},
+    {spv::CapabilityCooperativeMatrixGetCoordinateEXT, "VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT::cooperativeMatrixGetCoordinate"},
+    {spv::CapabilityCooperativeMatrixLayoutsARM, "VkPhysicalDeviceCooperativeMatrixLayoutsFeaturesARM::cooperativeMatrixArmLayouts"},
     };
 
     // VUs before catch unknown capabilities
@@ -1453,6 +976,8 @@ static inline std::string SpvExtensionRequirements(std::string_view extension) {
     {"SPV_KHR_abort", {{vvl::Extension::_VK_KHR_shader_abort}}},
     {"SPV_KHR_constant_data", {{vvl::Extension::_VK_KHR_shader_constant_data}}},
     {"SPV_EXT_ocp_microscaling_types", {{vvl::Extension::_VK_EXT_shader_ocp_microscaling_types}}},
+    {"SPV_EXT_cooperative_matrix_maintenance1", {{vvl::Extension::_VK_EXT_cooperative_matrix_maintenance1}}},
+    {"SPV_ARM_cooperative_matrix_layouts", {{vvl::Extension::_VK_ARM_cooperative_matrix_layouts}}},
     };
 
     // VUs before catch unknown extensions
@@ -1473,7 +998,7 @@ bool stateless::SpirvValidator::ValidateShaderCapabilitiesAndExtensions(const sp
             const char* vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08739" : "VUID-VkShaderCreateInfoEXT-pCode-08739";
             skip |= LogError(vuid, module_state.handle(), loc,
                              "SPIR-V has Capability (%s) declared, but this is not supported by Vulkan.",
-                             string_SpvCapability(insn_capability));
+                             spv::CapabilityToString(static_cast<spv::Capability>(insn_capability)));
             return skip;  // no known capability to validate
         }
 
@@ -1572,8 +1097,9 @@ bool stateless::SpirvValidator::ValidateShaderCapabilitiesAndExtensions(const sp
         if (has_support == false) {
             const char* vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08740" : "VUID-VkShaderCreateInfoEXT-pCode-08740";
             skip |= LogError(vuid, module_state.handle(), loc,
-                             "SPIR-V Capability %s was declared, but one of the following requirements is required (%s).",
-                             string_SpvCapability(insn_capability), SpvCapabilityRequirements(insn_capability));
+                             "SPIR-V Capability %s was declared, but one of the following requirements must be met (%s).",
+                             spv::CapabilityToString(static_cast<spv::Capability>(insn_capability)),
+                             SpvCapabilityRequirements(insn_capability));
         }
 
         // Portability checks
@@ -1581,8 +1107,8 @@ bool stateless::SpirvValidator::ValidateShaderCapabilitiesAndExtensions(const sp
             if ((VK_FALSE == enabled_features.shaderSampleRateInterpolationFunctions) &&
                 (spv::CapabilityInterpolationFunction == insn_capability)) {
                 skip |= LogError("VUID-RuntimeSpirv-shaderSampleRateInterpolationFunctions-06325", module_state.handle(), loc,
-                                 "SPIR-V (portability error) InterpolationFunction Capability are not supported "
-                                 "by this platform");
+                                 "SPIR-V (portability error) InterpolationFunction Capability is not supported "
+                                 "by this platform.");
             }
         }
     } else if (insn.Opcode() == spv::OpExtension) {
@@ -1632,7 +1158,7 @@ bool stateless::SpirvValidator::ValidateShaderCapabilitiesAndExtensions(const sp
         if (has_support == false) {
             const char* vuid = pipeline ? "VUID-VkShaderModuleCreateInfo-pCode-08742" : "VUID-VkShaderCreateInfoEXT-pCode-08742";
             skip |= LogError(vuid, module_state.handle(), loc,
-                             "SPIR-V Extension %s was declared, but one of the following requirements is required (%s).",
+                             "SPIR-V Extension %s was declared, but one of the following requirements must be met (%s).",
                              extension_name.c_str(), SpvExtensionRequirements(extension_name).c_str());
         }
     }  // spv::OpExtension

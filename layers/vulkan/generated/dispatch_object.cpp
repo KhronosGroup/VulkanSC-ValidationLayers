@@ -28,104 +28,9 @@
 #include "state_tracker/pipeline_state.h"
 #include "containers/custom_containers.h"
 
-#include "thread_tracker/thread_safety_validation.h"
-#include "stateless/stateless_validation.h"
-#include "generated/legacy.h"
-#include "object_tracker/object_lifetime_validation.h"
-#include "state_tracker/state_tracker.h"
-#include "core_checks/core_validation.h"
-#include "best_practices/best_practices_validation.h"
-#include "gpuav/core/gpuav.h"
-#include "sync/sync_validation.h"
-#include "gpu_dump/gpu_dump.h"
-
 #define DISPATCH_MAX_STACK_ALLOCATIONS 32
 
 namespace vvl {
-
-void DispatchInstance::InitValidationObjects() {
-    // Note that this DEFINES THE ORDER IN WHICH THE LAYER VALIDATION OBJECTS ARE CALLED
-    // Anyone using state tracking (LayerObjectTypeStateTracker) must be called after and enable it
-
-    if (!settings.disabled[thread_safety]) {
-        object_dispatch.emplace_back(new threadsafety::Instance(this));
-    }
-    if (!settings.disabled[stateless_checks]) {
-        object_dispatch.emplace_back(new stateless::Instance(this));
-    }
-    if (settings.enabled[legacy_detection]) {
-        object_dispatch.emplace_back(new legacy::Instance(this));
-    }
-    if (!settings.disabled[object_tracking]) {
-        object_dispatch.emplace_back(new object_lifetimes::Instance(this));
-    }
-    if (!settings.disabled[core_checks] || settings.enabled[best_practices] || settings.enabled[gpu_validation] ||
-        settings.enabled[debug_printf_validation] || settings.enabled[sync_validation] || settings.enabled[gpu_dump]) {
-        object_dispatch.emplace_back(new vvl::InstanceState(this));
-    }
-    if (!settings.disabled[core_checks]) {
-        object_dispatch.emplace_back(new core::Instance(this));
-    }
-    if (settings.enabled[best_practices]) {
-        object_dispatch.emplace_back(new bp_state::Instance(this));
-    }
-    if (settings.enabled[gpu_validation] || settings.enabled[debug_printf_validation]) {
-        object_dispatch.emplace_back(new gpuav::Instance(this));
-    }
-    if (settings.enabled[sync_validation]) {
-        object_dispatch.emplace_back(new syncval::Instance(this));
-    }
-    if (settings.enabled[gpu_dump]) {
-        object_dispatch.emplace_back(new gpudump::Instance(this));
-    }
-}
-
-void DispatchDevice::InitValidationObjects() {
-    // Note that this DEFINES THE ORDER IN WHICH THE LAYER VALIDATION OBJECTS ARE CALLED
-    // Anyone using state tracking (LayerObjectTypeStateTracker) must be called after and enable it
-
-    if (!settings.disabled[thread_safety]) {
-        object_dispatch.emplace_back(new threadsafety::Device(
-            this, static_cast<threadsafety::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeThreading))));
-    }
-    if (!settings.disabled[stateless_checks]) {
-        object_dispatch.emplace_back(new stateless::Device(
-            this, static_cast<stateless::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeParameterValidation))));
-    }
-    if (settings.enabled[legacy_detection]) {
-        object_dispatch.emplace_back(new legacy::Device(
-            this, static_cast<legacy::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeLegacy))));
-    }
-    if (!settings.disabled[object_tracking]) {
-        object_dispatch.emplace_back(new object_lifetimes::Device(
-            this, static_cast<object_lifetimes::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeObjectTracker))));
-    }
-    if (!settings.disabled[core_checks] || settings.enabled[best_practices] || settings.enabled[gpu_validation] ||
-        settings.enabled[debug_printf_validation] || settings.enabled[sync_validation] || settings.enabled[gpu_dump]) {
-        object_dispatch.emplace_back(new vvl::DeviceState(
-            this, static_cast<vvl::InstanceState*>(dispatch_instance->GetValidationObject(LayerObjectTypeStateTracker))));
-    }
-    if (!settings.disabled[core_checks]) {
-        object_dispatch.emplace_back(new CoreChecks(
-            this, static_cast<core::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeCoreValidation))));
-    }
-    if (settings.enabled[best_practices]) {
-        object_dispatch.emplace_back(new BestPractices(
-            this, static_cast<bp_state::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeBestPractices))));
-    }
-    if (settings.enabled[gpu_validation] || settings.enabled[debug_printf_validation]) {
-        object_dispatch.emplace_back(new gpuav::Validator(
-            this, static_cast<gpuav::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeGpuAssisted))));
-    }
-    if (settings.enabled[sync_validation]) {
-        object_dispatch.emplace_back(new syncval::SyncValidator(
-            this, static_cast<syncval::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeSyncValidation))));
-    }
-    if (settings.enabled[gpu_dump]) {
-        object_dispatch.emplace_back(new gpudump::GpuDump(
-            this, static_cast<gpudump::Instance*>(dispatch_instance->GetValidationObject(LayerObjectTypeGpuDump))));
-    }
-}
 
 // Unique Objects pNext extension handling function
 void HandleWrapper::UnwrapPnextChainHandles(const void* pNext) {
@@ -7815,6 +7720,37 @@ void DispatchDevice::CmdEndPerTileExecutionQCOM(VkCommandBuffer commandBuffer, c
     device_dispatch_table.CmdEndPerTileExecutionQCOM(commandBuffer, pPerTileEndInfo);
 }
 
+void DispatchDevice::SetLatencySleepModeLegacyNV(VkDevice device, VkBool32 lowLatencyMode, VkBool32 lowLatencyBoost,
+                                                 uint32_t minimumIntervalUs) {
+    device_dispatch_table.SetLatencySleepModeLegacyNV(device, lowLatencyMode, lowLatencyBoost, minimumIntervalUs);
+}
+
+void DispatchDevice::LatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value) {
+    if (!wrap_handles) return device_dispatch_table.LatencySleepLegacyNV(device, signalSemaphore, value);
+    {
+        signalSemaphore = Unwrap(signalSemaphore);
+    }
+    device_dispatch_table.LatencySleepLegacyNV(device, signalSemaphore, value);
+}
+
+void DispatchDevice::SetLatencyMarkerLegacyNV(VkDevice device, uint64_t frameID, uint32_t marker) {
+    device_dispatch_table.SetLatencyMarkerLegacyNV(device, frameID, marker);
+}
+
+void DispatchDevice::GetLatencyTimingsLegacyNV(VkDevice device, void* pTimings) {
+    device_dispatch_table.GetLatencyTimingsLegacyNV(device, pTimings);
+}
+
+void DispatchDevice::QueueNotifyOutOfBandLegacyNV(VkQueue queue, uint32_t queueType) {
+    device_dispatch_table.QueueNotifyOutOfBandLegacyNV(queue, queueType);
+}
+
+void DispatchDevice::GetSleepStatusLegacyNV(VkDevice device, VkBool32* pLowLatencyMode) {
+    device_dispatch_table.GetSleepStatusLegacyNV(device, pLowLatencyMode);
+}
+
+void DispatchDevice::ShutdownLatencyDeviceLegacyNV(VkDevice device) { device_dispatch_table.ShutdownLatencyDeviceLegacyNV(device); }
+
 void DispatchDevice::GetDescriptorSetLayoutSizeEXT(VkDevice device, VkDescriptorSetLayout layout,
                                                    VkDeviceSize* pLayoutSizeInBytes) {
     if (!wrap_handles) return device_dispatch_table.GetDescriptorSetLayoutSizeEXT(device, layout, pLayoutSizeInBytes);
@@ -9912,6 +9848,15 @@ void DispatchDevice::CmdSetComputeOccupancyPriorityNV(VkCommandBuffer commandBuf
                                                       const VkComputeOccupancyPriorityParametersNV* pParameters) {
     device_dispatch_table.CmdSetComputeOccupancyPriorityNV(commandBuffer, pParameters);
 }
+
+VkResult DispatchInstance::GetPhysicalDeviceCooperativeMatrixProperties2EXT(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceCooperativeMatrixInfo2EXT* pCooperativeMatrixInfo,
+    uint32_t* pPropertyCount, VkCooperativeMatrixProperties2EXT* pProperties) {
+    VkResult result = instance_dispatch_table.GetPhysicalDeviceCooperativeMatrixProperties2EXT(
+        physicalDevice, pCooperativeMatrixInfo, pPropertyCount, pProperties);
+
+    return result;
+}
 #ifdef VK_USE_PLATFORM_UBM_SEC
 
 VkResult DispatchInstance::CreateUbmSurfaceSEC(VkInstance instance, const VkUbmSurfaceCreateInfoSEC* pCreateInfo,
@@ -9932,6 +9877,22 @@ VkBool32 DispatchInstance::GetPhysicalDeviceUbmPresentationSupportSEC(VkPhysical
     return result;
 }
 #endif  // VK_USE_PLATFORM_UBM_SEC
+
+void DispatchInstance::GetPhysicalDeviceInternalHandleNV(VkPhysicalDevice physicalDevice, VkInternalHandleNV* pHandle) {
+    instance_dispatch_table.GetPhysicalDeviceInternalHandleNV(physicalDevice, pHandle);
+}
+
+void DispatchDevice::GetDeviceInternalHandleNV(VkDevice device, VkInternalHandleNV* pHandle) {
+    device_dispatch_table.GetDeviceInternalHandleNV(device, pHandle);
+}
+
+void DispatchDevice::GetQueueInternalHandleNV(VkQueue queue, VkInternalHandleNV* pHandle) {
+    device_dispatch_table.GetQueueInternalHandleNV(queue, pHandle);
+}
+
+void DispatchDevice::GetCommandBufferInternalHandleNV(VkCommandBuffer commandBuffer, VkInternalHandleNV* pHandle) {
+    device_dispatch_table.GetCommandBufferInternalHandleNV(commandBuffer, pHandle);
+}
 
 void DispatchDevice::CmdSetPrimitiveRestartIndexEXT(VkCommandBuffer commandBuffer, uint32_t primitiveRestartIndex) {
     device_dispatch_table.CmdSetPrimitiveRestartIndexEXT(commandBuffer, primitiveRestartIndex);

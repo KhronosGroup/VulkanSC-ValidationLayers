@@ -739,6 +739,8 @@ bool PreCallValidateDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKH
                                              const VkAllocationCallbacks* pAllocator, const ErrorObject& error_obj) const override;
 void PreCallRecordDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKHR pipelineBinary,
                                            const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) override;
+bool PreCallValidateGetPipelineKeyKHR(VkDevice device, const VkPipelineCreateInfoKHR* pPipelineCreateInfo,
+                                      VkPipelineBinaryKeyKHR* pPipelineKey, const ErrorObject& error_obj) const override;
 bool PreCallValidateGetPipelineBinaryDataKHR(VkDevice device, const VkPipelineBinaryDataInfoKHR* pInfo,
                                              VkPipelineBinaryKeyKHR* pPipelineBinaryKey, size_t* pPipelineBinaryDataSize,
                                              void* pPipelineBinaryData, const ErrorObject& error_obj) const override;
@@ -1119,6 +1121,8 @@ void PreCallRecordDestroyCudaFunctionNV(VkDevice device, VkCudaFunctionNV functi
 bool PreCallValidateCmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer, const VkCudaLaunchInfoNV* pLaunchInfo,
                                           const ErrorObject& error_obj) const override;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
+bool PreCallValidateLatencySleepLegacyNV(VkDevice device, VkSemaphore signalSemaphore, uint64_t value,
+                                         const ErrorObject& error_obj) const override;
 #ifdef VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateExportMetalObjectsEXT(VkDevice device, VkExportMetalObjectsInfoEXT* pMetalObjectsInfo,
                                           const ErrorObject& error_obj) const override;

@@ -83,7 +83,7 @@ class DeviceState : public vvl::DeviceState {
     std::shared_ptr<vvl::Pipeline> CreateGraphicsPipelineState(
         const VkGraphicsPipelineCreateInfo* create_info, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
         std::shared_ptr<const vvl::RenderPass>&& render_pass, std::shared_ptr<const vvl::PipelineLayout>&& layout,
-        spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) const override;
+        std::vector<spirv::StatelessData>& stateless_data) const override;
     std::shared_ptr<vvl::Pipeline> CreateComputePipelineState(const VkComputePipelineCreateInfo* create_info,
                                                               std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
                                                               std::shared_ptr<const vvl::PipelineLayout>&& layout,

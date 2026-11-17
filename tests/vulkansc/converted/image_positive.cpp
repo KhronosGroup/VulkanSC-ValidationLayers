@@ -102,7 +102,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     image_create_info.mipLevels = 1;
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.tiling = VK_IMAGE_TILING_LINEAR;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
@@ -288,11 +288,15 @@ TEST_F(PositiveImage, ExtendedUsageWithDifferentFormatViews) {
 
     // Since usage is inherited from the image, we need to restrict the usage to a subset
     // Compressed images do not support storage, but we want to sample from the compressed
-    VkImageViewUsageCreateInfo ivu_ci = vku::InitStructHelper();
-    ivu_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    iv_ci.pNext = &ivu_ci;
-    vkt::ImageView view2(*m_device, iv_ci);
-    ASSERT_TRUE(view2 != VK_NULL_HANDLE);
+    if (FormatFeaturesAreSupported(Gpu(), VK_FORMAT_BC3_UNORM_BLOCK, VK_IMAGE_TILING_OPTIMAL,
+                                   VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)) {
+        VkImageViewUsageCreateInfo ivu_ci = vku::InitStructHelper();
+        ivu_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        iv_ci.pNext = &ivu_ci;
+        iv_ci.format = VK_FORMAT_BC3_UNORM_BLOCK;
+        vkt::ImageView view2(*m_device, iv_ci);
+        ASSERT_TRUE(view2 != VK_NULL_HANDLE);
+    }
 }
 
 TEST_F(PositiveImage, ImageCompressionControl) {
@@ -671,6 +675,36 @@ TEST_F(PositiveImage, RemainingMipLevelsBlockTexelView) {
     vkt::ImageView view(*m_device, ivci);
 }
 
+TEST_F(PositiveImage, BlitDepthAspectMaintenance12) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_12_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance12);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat src_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+    const VkFormat dst_format = VK_FORMAT_D32_SFLOAT;
+    if (!FormatFeaturesAreSupported(Gpu(), src_format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_BLIT_SRC_BIT) ||
+        !FormatFeaturesAreSupported(Gpu(), dst_format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
+        GTEST_SKIP() << "No blit feature format support";
+    }
+
+    vkt::Image src_image(*m_device, 32, 32, src_format, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    vkt::Image dst_image(*m_device, 32, 32, dst_format, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+
+    VkImageBlit region;
+    region.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    region.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    region.srcOffsets[0] = {0, 0, 0};
+    region.srcOffsets[1] = {32, 32, 1};
+    region.dstOffsets[0] = {0, 0, 0};
+    region.dstOffsets[1] = {32, 32, 1};
+
+    m_command_buffer.Begin();
+    vk::CmdBlitImage(m_command_buffer, src_image, VK_IMAGE_LAYOUT_GENERAL, dst_image, VK_IMAGE_LAYOUT_GENERAL, 1u, &region,
+                     VK_FILTER_NEAREST);
+    m_command_buffer.End();
+}
+
 TEST_F(PositiveImage, BlitMaintenance8) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredFeature(vkt::Feature::maintenance8);
@@ -863,8 +897,7 @@ TEST_F(PositiveImage, Image3DWith2DArrayCompatIssue) {
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, VK_REMAINING_ARRAY_LAYERS};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_command_buffer.End();
 }
 
@@ -888,6 +921,11 @@ TEST_F(PositiveImage, ImageView2dOf3dBaseLayer) {
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image(*m_device, image_ci);
     vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0u, 1u, 1u, 1u);
+
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_ci.extent = {32u, 32u, 4u};
+    vkt::Image image2(*m_device, image_ci);
+    vkt::ImageView image_view2 = image2.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0u, 1u, 3u, VK_REMAINING_ARRAY_LAYERS);
 }
 
 TEST_F(PositiveImage, FramebufferRemainingArrayLayers) {
@@ -996,6 +1034,36 @@ TEST_F(PositiveImage, ExtendedFlags) {
     m_command_buffer.Begin();
     vk::CmdCopyBufferToImage(m_command_buffer, buffer, image, VK_IMAGE_LAYOUT_GENERAL, 1u, &region);
     m_command_buffer.End();
+}
+
+TEST_F(PositiveImage, ExtendedFlagsZeroCreateFlags) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_EXTENDED_FLAGS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedFlags);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateFlags2CreateInfoKHR create_flags = vku::InitStructHelper();
+    create_flags.flags = 0u;
+
+    VkImageUsageFlags2CreateInfoKHR usage_flags = vku::InitStructHelper(&create_flags);
+    usage_flags.usage = VK_IMAGE_USAGE_2_TRANSFER_DST_BIT_KHR | VK_IMAGE_USAGE_2_SAMPLED_BIT_KHR;
+
+    VkPhysicalDeviceImageFormatInfo2 format_info = vku::InitStructHelper(&usage_flags);
+    format_info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    format_info.type = VK_IMAGE_TYPE_2D;
+    format_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    VkImageFormatProperties2 format_properties = vku::InitStructHelper();
+    vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &format_info, &format_properties);
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper(&usage_flags);
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {32u, 32u, 1u};
+    image_ci.mipLevels = 1u;
+    image_ci.arrayLayers = 1u;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    vkt::Image image(*m_device, image_ci);
 }
 
 TEST_F(PositiveImage, SparsePropertiesExtendedFlags) {
@@ -1447,6 +1515,58 @@ TEST_F(PositiveImage, ImageBlockMatchWindowWithClampToEdge) {
     vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipe);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
+}
+
+TEST_F(PositiveImage, ExtendedUsageUnsupportedUsageBit) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/3737");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::textureCompressionBC);
+    RETURN_IF_SKIP(Init());
+
+    VkFormatProperties format_props;
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), VK_FORMAT_BC1_RGBA_UNORM_BLOCK, &format_props);
+    if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) {
+        GTEST_SKIP() << "BC1 already supports STORAGE, nothing for VK_IMAGE_CREATE_EXTENDED_USAGE_BIT to relax";
+    }
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags =
+        VK_IMAGE_CREATE_EXTENDED_USAGE_BIT | VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    image_ci.extent = {32, 32, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+
+    VkImageViewUsageCreateInfo view_usage_ci = vku::InitStructHelper();
+    view_usage_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageViewCreateInfo view_ci = vku::InitStructHelper(&view_usage_ci);
+    view_ci.image = image;
+    view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_ci.format = VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vkt::ImageView view(*m_device, view_ci);
+}
+
+TEST_F(PositiveImage, ImageTilingControl) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_IMAGE_TILING_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::imageTilingControl);
+    RETURN_IF_SKIP(Init());
+
+    VkImageTilingControlCreateInfoEXT tiling_control = vku::InitStructHelper();
+    tiling_control.tilingControl = VK_IMAGE_TILING_CONTROL_MIN_SIZE_EXT;
+
+    VkImageCreateInfo image_create_info = DefaultImageInfo();
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.pNext = &tiling_control;
+    vkt::Image image(*m_device, image_create_info);
 }
 
 TEST_F(PositiveImage, ImageBlockMatchWindowInstruction) {

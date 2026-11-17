@@ -58,6 +58,7 @@ enum DisableFlags {
     shader_validation,
     shader_validation_caching,
     // Insert new disables above this line
+    // Make sure to add to OutputLayerStatusInfo function
     kMaxDisableFlags,
 };
 
@@ -74,6 +75,7 @@ enum EnableFlags {
     legacy_detection,
     gpu_dump,
     // Insert new enables above this line
+    // Make sure to add to OutputLayerStatusInfo function
     kMaxEnableFlags,
 };
 
@@ -82,9 +84,10 @@ using ValidationEnabled = std::array<bool, kMaxEnableFlags>;
 
 // General settings to be used by all parts of the Validation Layers
 struct GlobalSettings {
-    bool fine_grained_locking = true;
-
     bool debug_disable_spirv_val = false;
+
+    // Only used by the Validation Layer test suite (gpuav_debug_test_lower_limits).
+    bool debug_test_lower_limits = false;
 
     // Have quick way to know if user only has requsted errors as we can skip larger, expensive parts of the code if the user will
     // never see the message
@@ -106,12 +109,16 @@ struct GlobalSettings {
 
     // Option to track the hashes of descriptors in VK_EXT_descriptor_buffer/VK_EXT_descriptor_heap
     bool descriptor_hashing = false;
+    // Default seems like a sane value
+    // will be 2MB of memory to allocate and 64k of descriptors should hopefully be good for most to start
+    uint32_t descriptor_hashing_total_descriptors = 65536;
 };
 
 class DebugReport;
 struct GpuAVSettings;
 struct SyncValSettings;
 struct GpuDumpSettings;
+struct LegacyDetectionSettings;
 struct MessageFormatSettings;
 struct ConfigAndEnvSettings {
     // Matches up with what is passed down to VK_EXT_layer_settings
@@ -133,9 +140,8 @@ struct ConfigAndEnvSettings {
     GpuAVSettings *gpuav_settings;
     SyncValSettings *syncval_settings;
     GpuDumpSettings* gpu_dump_settings;
+    LegacyDetectionSettings* legacy_detection_settings;
 };
-const std::vector<std::string> &GetDisableFlagNameHelper();
-const std::vector<std::string> &GetEnableFlagNameHelper();
 
 // Process validation features, flags and settings specified through extensions, a layer settings file, or environment variables
 void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data);

@@ -18,6 +18,7 @@
  */
 
 #include <spirv/unified1/spirv.hpp>
+#include <cstdint>
 #include <cassert>
 #include <sstream>
 #include <string>
@@ -27,6 +28,7 @@
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vulkan_core.h>
 #include "core_validation.h"
+#include "containers/small_vector.h"
 #include "generated/spirv_grammar_helper.h"
 #include "state_tracker/image_state.h"
 #include "state_tracker/shader_instruction.h"
@@ -38,6 +40,7 @@
 #include "state_tracker/pipeline_state.h"
 #include "containers/limits.h"
 #include "error_message/error_strings.h"
+#include "utils/assert_utils.h"
 #include "utils/vk_api_utils.h"
 #include "utils/image_utils.h"
 
@@ -201,6 +204,164 @@ bool CoreChecks::ValidateInterfaceFragmentOutput(const vvl::Pipeline& pipeline, 
                              entrypoint.Describe().c_str());
         }
     }
+
+    if (const auto& rp_state = pipeline.RenderPassState()) {
+        // Dynamic Rendering is done at draw time incase the user has VK_EXT_dynamic_rendering_unused_attachments we can't do all
+        // the checks at this time
+        if (!rp_state->UsesDynamicRendering()) {
+            skip |= ValidateFsOutputsAgainstRenderPass(module_state, entrypoint, pipeline, create_info_loc);
+        }
+
+        // Warning - crazy GPL logic incoming
+        // - The Input Attachmet shader is in FragmentShader
+        // - The VkPipelineRenderingCreateInfo::colorAttachmentCount is in the FragmentOutput
+        // So we can't validate until here, but the reason we don't is because the Spec Constants might not be resovled (which we
+        // use to know which index into the input array might be touched) So this code is really a "try again" fallback such that
+        // the "normal sane" case will just skip this, but in the case someone is uing GPL in this way, we will still validate their
+        // input attachments
+        if (rp_state->UsesDynamicRendering() && entrypoint.has_input_attachment &&
+            (!pipeline.OwnsLibState(pipeline.fragment_output_state) || !pipeline.OwnsLibState(pipeline.fragment_shader_state))) {
+            for (const auto& variable : entrypoint.resource_interface_variables) {
+                if (variable.decorations.Has(spirv::DecorationSet::input_attachment_bit)) {
+                    skip |= ValidateShaderInputAttachmentDynamicRendering(module_state, entrypoint, variable, pipeline, *rp_state,
+                                                                          create_info_loc);
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+static std::string DescribeInputAttachmentIndex(const spirv::EntryPoint& entrypoint,
+                                                const spirv::ResourceInterfaceVariable& variable, uint32_t index) {
+    std::ostringstream ss;
+    ss << "shader " << entrypoint.Describe() << " ";
+    if (index == spirv::kInvalidValue) {
+        ss << variable.DescribeDescriptor() << " has an InputAttachmentIndex of";
+    } else if (variable.IsArray()) {
+        ss << variable.DescribeDescriptor() << " has an effective InputAttachmentIndex of " << index;
+        ss << " (started at InputAttachmentIndex " << variable.decorations.input_attachment_index_start << " plus index "
+           << (index - variable.decorations.input_attachment_index_start) << " into the array)";
+    } else {
+        ss << variable.DescribeDescriptor() << " has an InputAttachmentIndex of "
+           << variable.decorations.input_attachment_index_start;
+    }
+    return ss.str();
+}
+
+bool CoreChecks::ValidateShaderInputAttachmentDynamicRendering(const spirv::Module& module_state,
+                                                               const spirv::EntryPoint& entrypoint,
+                                                               const spirv::ResourceInterfaceVariable& variable,
+                                                               const vvl::Pipeline& pipeline, const vvl::RenderPass& rp_state,
+                                                               const Location& loc) const {
+    bool skip = false;
+    assert(variable.is_input_attachment);
+
+    // VUID 06061 requires dynamicRenderingLocalRead and if they have, we can just check the colorAttachmentCount
+    if (pipeline.fragment_shader_state && vku::FindStructInPNextChain<VkRenderingInputAttachmentIndexInfo>(
+                                              pipeline.fragment_shader_state->parent.GetCreateInfoPNext())) {
+        return skip;  // has input attachment remapping
+    }
+
+    // Requires the FragmentOutput (so this would show zero if using GPL)
+    if (!pipeline.fragment_output_state) {
+        return skip;
+    }
+    const uint32_t color_count = rp_state.dynamic_pipeline_rendering_create_info.colorAttachmentCount;
+
+    for (const auto i : variable.input_attachment_index_read) {
+        if (i == spirv::kSpecConstant) {
+            // This will ONLY happen in a case where using GPL and we have to re-call this function later and can't resolve the spec
+            // constants This small edge case is not being covered but at the tradeoff to keep the rest of the code somewhat sane.
+            continue;
+        }
+        const bool dynamic_indexing = i == spirv::kInvalidValue;
+
+        // offsets by the InputAttachmentIndex decoration
+        const uint32_t input_attachment_index = variable.decorations.input_attachment_index_start + i;
+
+        if (dynamic_indexing) {
+            // Non-constant index requires GPU-AV, but we can at least detect if InputAttachmentIndex is OOB
+            if (variable.decorations.input_attachment_index_start >= color_count) {
+                const LogObjectList objlist(module_state.handle(), pipeline.Handle());
+                skip |=
+                    LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-09652", objlist, loc,
+                             "%s %" PRIu32 " which is not less than VkPipelineRenderingCreateInfo::colorAttachmentCount (%" PRIu32
+                             ")\nIf VkRenderingInputAttachmentIndexInfo is provided, the index can be set, but without it, it "
+                             "uses the default index values.\nHint: If using Depth/Stencil attachments, you should be omitting "
+                             "the input attachment index in the shader to access the depth/stencil attachments.",
+                             DescribeInputAttachmentIndex(entrypoint, variable, i).c_str(),
+                             variable.decorations.input_attachment_index_start, color_count);
+            }
+        } else if (input_attachment_index >= color_count) {
+            const LogObjectList objlist(module_state.handle(), pipeline.Handle());
+            skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-09652", objlist, loc,
+                             "%s which is not less than VkPipelineRenderingCreateInfo::colorAttachmentCount (%" PRIu32
+                             ")\nIf VkRenderingInputAttachmentIndexInfo is provided, the index can be set, but without it, it "
+                             "uses the default index values.\nHint: If using Depth/Stencil attachments, you should be omitting "
+                             "the input attachment index in the shader to access the depth/stencil attachments.",
+                             DescribeInputAttachmentIndex(entrypoint, variable, input_attachment_index).c_str(), color_count);
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateShaderInputAttachmentRenderPass(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
+                                                         const spirv::ResourceInterfaceVariable& variable,
+                                                         const vvl::Pipeline& pipeline, const vvl::RenderPass& rp_state,
+                                                         const Location& loc) const {
+    bool skip = false;
+    assert(variable.is_input_attachment);
+
+    const auto rpci = rp_state.create_info.ptr();
+    const uint32_t subpass = pipeline.Subpass();
+    if (subpass >= rpci->subpassCount) {
+        return skip;  // validated elsewhere
+    }
+    const auto subpass_description = rpci->pSubpasses[subpass];
+    const auto input_attachments = subpass_description.pInputAttachments;
+
+    for (const auto i : variable.input_attachment_index_read) {
+        assert(i != spirv::kSpecConstant);
+        const bool dynamic_indexing = i == spirv::kInvalidValue;
+
+        // offsets by the InputAttachmentIndex decoration
+        const uint32_t input_attachment_index = variable.decorations.input_attachment_index_start + i;
+
+        if (!input_attachments) {
+            // If there is no input attachment, report error no matter which index is used
+            const LogObjectList objlist(module_state.handle(), pipeline.Handle(), rp_state.Handle());
+            skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
+                             "%s but pSubpasses[%" PRIu32 "].pInputAttachments is NULL.",
+                             DescribeInputAttachmentIndex(entrypoint, variable, input_attachment_index).c_str(), subpass);
+            break;
+        } else if (dynamic_indexing) {
+            // Non-constant index requires GPU-AV, but we can at least detect if InputAttachmentIndex is OOB
+            if (variable.decorations.input_attachment_index_start >= subpass_description.inputAttachmentCount) {
+                const LogObjectList objlist(module_state.handle(), pipeline.Handle(), rp_state.Handle());
+                skip |= LogError(
+                    "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
+                    "%s %" PRIu32 " but that is not less than the pSubpasses[%" PRIu32 "].inputAttachmentCount (%" PRIu32 ").",
+                    DescribeInputAttachmentIndex(entrypoint, variable, i).c_str(),
+                    variable.decorations.input_attachment_index_start, subpass, subpass_description.inputAttachmentCount);
+            }
+        } else if (input_attachment_index >= subpass_description.inputAttachmentCount) {
+            const LogObjectList objlist(module_state.handle(), pipeline.Handle(), rp_state.Handle());
+            skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
+                             "%s but that is not less than the pSubpasses[%" PRIu32 "].inputAttachmentCount (%" PRIu32 ").",
+                             DescribeInputAttachmentIndex(entrypoint, variable, input_attachment_index).c_str(), subpass,
+                             subpass_description.inputAttachmentCount);
+        } else if (input_attachments[input_attachment_index].attachment == VK_ATTACHMENT_UNUSED) {
+            const LogObjectList objlist(module_state.handle(), pipeline.Handle(), rp_state.Handle());
+            skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
+                             "%s but pSubpasses[%" PRIu32 "].pInputAttachments[%" PRIu32 "].attachment is VK_ATTACHMENT_UNUSED.",
+                             DescribeInputAttachmentIndex(entrypoint, variable, input_attachment_index).c_str(), subpass,
+                             input_attachment_index);
+        }
+    }
+
     return skip;
 }
 
@@ -208,10 +369,14 @@ bool CoreChecks::ValidateBuiltInLimits(const spirv::Module& module_state, const 
                                        const vvl::Pipeline* pipeline, const Location& loc) const {
     bool skip = false;
 
-    // Currently all builtin tested are only found in fragment shaders
-    if (entrypoint.execution_model != spv::ExecutionModelFragment) {
-        return skip;
-    }
+    // Input and Output interfaces are counted separately
+    // [0] is Input and [1] is Output
+    uint32_t clip_distance_total[2] = {0, 0};
+    uint32_t cull_distance_total[2] = {0, 0};
+
+    // https://gitlab.khronos.org/vulkan/vulkan/-/work_items/4965
+    const bool skip_clip_cull = phys_dev_props.limits.maxClipDistances == 0 || phys_dev_props.limits.maxCullDistances == 0 ||
+                                phys_dev_props.limits.maxCombinedClipAndCullDistances == 0;
 
     for (const auto* variable : entrypoint.built_in_variables) {
         // Currently don't need to search in structs
@@ -223,12 +388,71 @@ bool CoreChecks::ValidateBuiltInLimits(const spirv::Module& module_state, const 
             const bool glsl_name = module_state.static_data_.source_language != spv::SourceLanguageHLSL &&
                                    module_state.static_data_.source_language != spv::SourceLanguageSlang;
             skip |= LogError(vuid, module_state.handle(), loc,
-                             "shader %s SampleMask BuiltIn (%s) array sizes is %" PRIu32
+                             "shader %s SampleMask BuiltIn (%s) array size is %" PRIu32
                              " which exceeds "
                              "maxSampleMaskWords of %" PRIu32 ".",
                              entrypoint.Describe().c_str(), glsl_name ? "gl_SampleMask[]" : "SV_SampleMask", variable->array_size,
                              phys_dev_props.limits.maxSampleMaskWords);
             break;
+        }
+
+        if (skip_clip_cull) {
+            continue;
+        }
+        // ClipDistance/CullDistance can show up as both a top-level array variable and a member of a Block-decorated struct
+        // Geo/Tess might be wrapped in an extra array (ex. gl_in[] / gl_out[]) which is already stripped out
+        const uint32_t interface_index = variable->storage_class == spv::StorageClassOutput ? 1 : 0;
+        if (variable->type_struct_info) {
+            for (uint32_t i = 0; i < variable->built_in_block.size(); i++) {
+                const spv::BuiltIn member_built_in = variable->built_in_block[i];
+                if (member_built_in == spv::BuiltInClipDistance) {
+                    const uint32_t array_size = module_state.GetFlattenArraySize(*variable->type_struct_info->members[i].insn);
+                    clip_distance_total[interface_index] += array_size;
+                    if (array_size > phys_dev_props.limits.maxClipDistances) {
+                        skip |= LogError("VUID-RuntimeSpirv-maxClipDistances-00708", module_state.handle(), loc,
+                                         "shader %s ClipDistance BuiltIn array size is %" PRIu32
+                                         " which exceeds maxClipDistances of %" PRIu32 ".",
+                                         entrypoint.Describe().c_str(), array_size, phys_dev_props.limits.maxClipDistances);
+                    }
+                } else if (member_built_in == spv::BuiltInCullDistance) {
+                    const uint32_t array_size = module_state.GetFlattenArraySize(*variable->type_struct_info->members[i].insn);
+                    cull_distance_total[interface_index] += array_size;
+                    if (array_size > phys_dev_props.limits.maxCullDistances) {
+                        skip |= LogError("VUID-RuntimeSpirv-maxCullDistances-00709", module_state.handle(), loc,
+                                         "shader %s CullDistance BuiltIn array size is %" PRIu32
+                                         " which exceeds maxCullDistances of %" PRIu32 ".",
+                                         entrypoint.Describe().c_str(), array_size, phys_dev_props.limits.maxCullDistances);
+                    }
+                }
+            }
+        } else if (variable->decorations.built_in == spv::BuiltInClipDistance) {
+            clip_distance_total[interface_index] += variable->array_size;
+            if (variable->array_size > phys_dev_props.limits.maxClipDistances) {
+                skip |= LogError("VUID-RuntimeSpirv-maxClipDistances-00708", module_state.handle(), loc,
+                                 "shader %s ClipDistance BuiltIn array size is %" PRIu32
+                                 " which exceeds maxClipDistances of %" PRIu32 ".",
+                                 entrypoint.Describe().c_str(), variable->array_size, phys_dev_props.limits.maxClipDistances);
+            }
+        } else if (variable->decorations.built_in == spv::BuiltInCullDistance) {
+            cull_distance_total[interface_index] += variable->array_size;
+            if (variable->array_size > phys_dev_props.limits.maxCullDistances) {
+                skip |= LogError("VUID-RuntimeSpirv-maxCullDistances-00709", module_state.handle(), loc,
+                                 "shader %s CullDistance BuiltIn array size is %" PRIu32
+                                 " which exceeds maxCullDistances of %" PRIu32 ".",
+                                 entrypoint.Describe().c_str(), variable->array_size, phys_dev_props.limits.maxCullDistances);
+            }
+        }
+    }
+
+    for (uint32_t i = 0; i < 2 && !skip_clip_cull; i++) {
+        const uint32_t combined_total = clip_distance_total[i] + cull_distance_total[i];
+        if (combined_total > phys_dev_props.limits.maxCombinedClipAndCullDistances) {
+            skip |= LogError("VUID-RuntimeSpirv-maxCombinedClipAndCullDistances-00710", module_state.handle(), loc,
+                             "shader %s has an %s ClipDistance BuiltIn array size of %" PRIu32
+                             " and a CullDistance BuiltIn array size of %" PRIu32 " which sum to %" PRIu32
+                             " and exceed maxCombinedClipAndCullDistances of %" PRIu32 ".",
+                             entrypoint.Describe().c_str(), i == 0 ? "Input" : "Output", clip_distance_total[i],
+                             cull_distance_total[i], combined_total, phys_dev_props.limits.maxCombinedClipAndCullDistances);
         }
     }
 
@@ -255,8 +479,12 @@ bool CoreChecks::ValidatePrimitiveTopology(const spirv::Module& module_state, co
             if (stage_state.entrypoint->execution_mode.Has(spirv::ExecutionModeSet::point_mode_bit)) {
                 tess_output_topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
                 break;
-            } else if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
-                tess_output_topology = stage_state.entrypoint->execution_mode.GetTessellationEvalOutputTopology();
+            } else {
+                // The subdivision mode can be declared in either tessellation shader
+                const VkPrimitiveTopology topology = stage_state.entrypoint->execution_mode.GetTessellationEvalOutputTopology();
+                if (topology != VK_PRIMITIVE_TOPOLOGY_MAX_ENUM) {
+                    tess_output_topology = topology;
+                }
             }
         }
     }
@@ -265,7 +493,7 @@ bool CoreChecks::ValidatePrimitiveTopology(const spirv::Module& module_state, co
     if (has_tess) {
         if (!IsSameTopologyClass(geom_input_topology, tess_output_topology)) {
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00739", module_state.handle(), loc,
-                             "shader %s has declares in the shader input topology %s, but tessellation shader output "
+                             "shader %s declares an input topology of %s, but the tessellation shader output "
                              "topology is %s.",
                              entrypoint.Describe().c_str(), string_VkPrimitiveTopology(geom_input_topology),
                              string_VkPrimitiveTopology(tess_output_topology));
@@ -274,7 +502,7 @@ bool CoreChecks::ValidatePrimitiveTopology(const spirv::Module& module_state, co
         VkPrimitiveTopology vertex_input_topology = pipeline.InputAssemblyState()->topology;
         if (!IsSameTopologyClass(geom_input_topology, vertex_input_topology)) {
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00738", module_state.handle(), loc,
-                             "shader %s has declares in the shader input topology %s, but pipeline was created with "
+                             "shader %s declares an input topology of %s, but the pipeline was created with "
                              "a vertex input primitive topology of %s.",
                              entrypoint.Describe().c_str(), string_VkPrimitiveTopology(geom_input_topology),
                              string_VkPrimitiveTopology(vertex_input_topology));
@@ -391,7 +619,7 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const ShaderStageState& producer
                                          "(SPIR-V Interface) starting at Location %" PRIu32 " Component %" PRIu32
                                          "\nThe output %s has a Vec%" PRIu32 "\nThe input %s has a Vec%" PRIu32
                                          "\nThis mismatch between vector sizes is not allowed, but can be relaxed by enabling "
-                                         "VK_KHR_maintenance4.",
+                                         "maintenance4.",
                                          location, component, producer_entrypoint.Describe().c_str(), output_vec_size,
                                          consumer_entrypoint.Describe().c_str(), input_vec_size);
                         break;  // Only need to report for the first component found
@@ -431,7 +659,8 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const ShaderStageState& producer
                         "WARNING-Shader-OutputNotConsumed", objlist, create_info_loc,
                         "(SPIR-V Interface) %s has an Output value declared at Location %" PRIu32 " Component %" PRIu32
                         ", but there is no corresponding Input declared in %s.\nThis is not invalid, but the write to the "
-                        "unused Output is discarded.\nThe Output variable is:\n  %s",
+                        "unused Output is discarded.\nThe Output variable is:\n  %s\nThis mismatch between vector sizes is not "
+                        "allowed, but can be relaxed by enabling maintenance4.",
                         producer_entrypoint.Describe().c_str(), location, component, consumer_entrypoint.Describe().c_str(),
                         producer_module.DescribeType(output_var->type_id).c_str());
                 }
@@ -496,12 +725,12 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const ShaderStageState& producer
         std::ostringstream msg;
         msg << producer_entrypoint.Describe() << " Output Block {\n";
         for (size_t i = 0; i < output_built_in_block.size(); i++) {
-            msg << '\t' << i << ": " << string_SpvBuiltIn(output_built_in_block[i]) << '\n';
+            msg << '\t' << i << ": " << spv::BuiltInToString(output_built_in_block[i]) << '\n';
         }
         msg << "}\n";
         msg << consumer_entrypoint.Describe() << " Input Block {\n";
         for (size_t i = 0; i < input_built_in_block.size(); i++) {
-            msg << '\t' << i << ": " << string_SpvBuiltIn(input_built_in_block[i]) << '\n';
+            msg << '\t' << i << ": " << spv::BuiltInToString(input_built_in_block[i]) << '\n';
         }
         msg << "}\n";
         const LogObjectList objlist(producer_module.handle(), consumer_module.handle());
@@ -511,11 +740,50 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const ShaderStageState& producer
     return skip;
 }
 
+// https://docs.vulkan.org/spec/latest/chapters/interfaces.html#interfaces-iointerfaces-matching
+bool CoreChecks::ValidateGraphicsLibraryInterpolation(const vvl::Pipeline& pipeline, const ShaderStageState& last_pre_raster,
+                                                      const ShaderStageState& fragment, const Location& create_info_loc) const {
+    bool skip = false;
+    if (phys_dev_ext_props.graphics_pipeline_library_props.graphicsPipelineLibraryIndependentInterpolationDecoration) {
+        return skip;  // the decorations can to be different
+    } else if (!pipeline.pre_raster_state || !pipeline.fragment_shader_state || !last_pre_raster.HasSpirv() ||
+               !fragment.HasSpirv()) {
+        return skip;
+    } else if (&pipeline.pre_raster_state->parent == &pipeline.fragment_shader_state->parent) {
+        return skip;  // Both were compiled in the same library
+    }
+
+    const auto& outputs = last_pre_raster.entrypoint->output_interface_slots;
+    const uint32_t interpolation_mask = spirv::DecorationBase::flat_bit | spirv::DecorationBase::no_perspective_bit;
+    for (const auto& [input_slot, input_var] : fragment.entrypoint->input_interface_slots) {
+        const auto output_it = outputs.find(input_slot);
+        if (output_it == outputs.end()) {
+            continue;
+        }
+        const auto& [output_slot, output_var] = *output_it;
+        if (((output_slot.decoration_flags ^ input_slot.decoration_flags) & interpolation_mask) == 0) {
+            continue;
+        }
+
+        std::ostringstream ss;
+        ss << "(SPIR-V Interface) at Location " << input_slot.Location() << " Component " << input_slot.Component()
+           << ", the Flat or NoPerspective decorations differ between\n";
+        ss << last_pre_raster.entrypoint->Describe() << '\n' << last_pre_raster.spirv_state->DescribeVariable(output_var->id);
+        ss << fragment.entrypoint->Describe() << '\n' << fragment.spirv_state->DescribeVariable(input_var->id);
+        ss << "The pre-rasterization and fragment shaders are in separate graphics pipeline libraries and "
+              "graphicsPipelineLibraryIndependentInterpolationDecoration is VK_FALSE.";
+        const LogObjectList objlist(last_pre_raster.spirv_state->handle(), fragment.spirv_state->handle());
+        skip |= LogError("VUID-RuntimeSpirv-OpVariable-08746", objlist, create_info_loc, "%s", ss.str().c_str());
+
+        break;  // Only need to report the first mismatch
+    }
+    return skip;
+}
+
 // Note - This is missing a variation check for ShaderObjects, but there is one for Dynamic Rendering and likely people using
 // ShaderObject are not using Render Passes
 bool CoreChecks::ValidateFsOutputsAgainstRenderPass(const spirv::Module& module_state, const spirv::EntryPoint& entrypoint,
-                                                    const vvl::Pipeline& pipeline, uint32_t subpass_index,
-                                                    const Location& create_info_loc) const {
+                                                    const vvl::Pipeline& pipeline, const Location& create_info_loc) const {
     bool skip = false;
     // To match with the dynamic rendering case
     if (global_settings.only_report_errors) {
@@ -532,7 +800,10 @@ bool CoreChecks::ValidateFsOutputsAgainstRenderPass(const spirv::Module& module_
     const auto& rp_state = pipeline.RenderPassState();
     ASSERT_AND_RETURN_SKIP(rp_state);
     const auto rpci = rp_state->create_info.ptr();
-    if (subpass_index >= rpci->subpassCount) return skip;
+    const uint32_t subpass_index = pipeline.Subpass();
+    if (subpass_index >= rpci->subpassCount) {
+        return skip;
+    }
 
     const auto subpass = rpci->pSubpasses[subpass_index];
     for (uint32_t i = 0; i < subpass.colorAttachmentCount; ++i) {
@@ -553,7 +824,7 @@ bool CoreChecks::ValidateFsOutputsAgainstRenderPass(const spirv::Module& module_
         // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923
         // Need to redo logic to handle array of outputs
         if (variable->array_size > 1) {
-            return false;
+            return skip;
         }
         // It is not allowed to have Block Fragment or 64-bit vectors output in Frag shader
         // This means all Locations in slots will be the same
@@ -653,19 +924,34 @@ bool CoreChecks::ValidateDrawDynamicRenderingFsOutputs(const LastBound& last_bou
     vvl::Pipeline* pipeline = last_bound_state.pipeline_state;
 
     struct Attachment {
+        uint32_t location = 0;
         const VkRenderingAttachmentInfo* rendering_attachment_info = nullptr;
         const spirv::StageInterfaceVariable* output = nullptr;
         std::optional<uint32_t> mapped_location = std::nullopt;
     };
-    std::map<uint32_t, Attachment> location_map;
+
+    // Use to use a std::map (order matters here) but per-draw is a hot spot and from dumpping the colorAttachmentCount for various
+    // trace, found 6 or 8 is the most any app ever used
+    small_vector<Attachment, 8> attachments;
+
+    auto find_attachment = [&attachments](uint32_t location) -> Attachment& {
+        for (Attachment& attachment : attachments) {
+            if (attachment.location == location) {
+                return attachment;
+            }
+        }
+        Attachment& attachment = attachments.emplace_back();
+        attachment.location = location;
+        return attachment;
+    };
 
     const size_t color_attachment_count = cb_state.rendering_attachments.color_locations.size();
     for (size_t i = 0; i < color_attachment_count; ++i) {
         uint32_t color_location = cb_state.rendering_attachments.color_locations[i];
         if (color_location != VK_ATTACHMENT_UNUSED) {
-            location_map[color_location].rendering_attachment_info =
-                rp_state.dynamic_rendering_begin_rendering_info.pColorAttachments[i].ptr();
-            location_map[color_location].mapped_location = static_cast<uint32_t>(i);
+            Attachment& attachment = find_attachment(color_location);
+            attachment.rendering_attachment_info = rp_state.dynamic_rendering_begin_rendering_info.pColorAttachments[i].ptr();
+            attachment.mapped_location = static_cast<uint32_t>(i);
         }
     }
 
@@ -682,10 +968,11 @@ bool CoreChecks::ValidateDrawDynamicRenderingFsOutputs(const LastBound& last_bou
         }
         // It is not allowed to have Block Fragment or 64-bit vectors output in Frag shader
         // This means all Locations in slots will be the same
-        location_map[variable->interface_slots[0].Location()].output = variable;
+        find_attachment(variable->interface_slots[0].Location()).output = variable;
     }
 
-    for (const auto& [location, attachment_info] : location_map) {
+    for (const Attachment& attachment_info : attachments) {
+        const uint32_t location = attachment_info.location;
         const bool has_attachment =
             attachment_info.rendering_attachment_info && attachment_info.rendering_attachment_info->imageView != VK_NULL_HANDLE;
         const spirv::StageInterfaceVariable* output = attachment_info.output;
@@ -855,9 +1142,10 @@ bool CoreChecks::ValidatePipelineTessellationStages(const ShaderStageState& tesc
                tesc_subdivision != tese_subdivision) {
         const LogObjectList objlist(tesc_stage.spirv_state->handle(), tese_stage.spirv_state->handle());
         skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00733", objlist, create_info_loc,
-                         "Subdivision specified in tessellation control shader is %s, but subdivison type specified in "
+                         "Subdivision specified in tessellation control shader is %s, but subdivision type specified in "
                          "tessellation evaluation shader is %s",
-                         string_SpvExecutionMode(tesc_subdivision), string_SpvExecutionMode(tese_subdivision));
+                         spv::ExecutionModeToString(static_cast<spv::ExecutionMode>(tesc_subdivision)),
+                         spv::ExecutionModeToString(static_cast<spv::ExecutionMode>(tese_subdivision)));
     }
     if (tesc_patch_size == spirv::kInvalidValue && tese_patch_size == spirv::kInvalidValue) {
         const LogObjectList objlist(tesc_stage.spirv_state->handle(), tese_stage.spirv_state->handle());
@@ -877,7 +1165,8 @@ bool CoreChecks::ValidatePipelineTessellationStages(const ShaderStageState& tesc
         skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-stage-00713", device, create_info_loc.dot(Field::pCode),
                          "is using OutputVertices (patch size) %" PRIu32
                          ", which is not between 1 and maxTessellationPatchSize (%" PRIu32 ").",
-                         tesc_patch_size, phys_dev_props.limits.maxTessellationPatchSize);
+                         tesc_patch_size != spirv::kInvalidValue ? tesc_patch_size : tese_patch_size,
+                         phys_dev_props.limits.maxTessellationPatchSize);
     }
 
     return skip;
@@ -920,13 +1209,18 @@ bool CoreChecks::ValidateGraphicsPipelineShaderState(const vvl::Pipeline& pipeli
     // if the shader stages are no good individually, cross-stage validation is pointless.
     if (skip) return true;
 
-    if (pipeline.vertex_input_state && vertex_stage && vertex_stage->entrypoint && vertex_stage->spirv_state &&
+    if (pipeline.vertex_input_state && vertex_stage && vertex_stage->HasSpirv() &&
         !pipeline.IsDynamic(CB_DYNAMIC_STATE_VERTEX_INPUT_EXT)) {
         skip |=
             ValidateInterfaceVertexInput(pipeline, *vertex_stage->spirv_state.get(), *vertex_stage->entrypoint, create_info_loc);
     }
 
-    if (pipeline.fragment_shader_state && fragment_stage && fragment_stage->entrypoint && fragment_stage->spirv_state) {
+    // Thanks to GPL (puke) we might have a library with only the FragmentShader or FragmentOutput.
+    // The ValidateShaderStage() function is called when there is a FragmentShader, but the color attachment info is not known until
+    // we get the FragmentOutput so we need to defer some Fragment Shader checks until here incase Also if rasterization is disabled
+    // none of these checks matter as well... fun right?
+    if (pipeline.fragment_shader_state && pipeline.fragment_output_state && !pipeline.RasterizationDisabled() && fragment_stage &&
+        fragment_stage->HasSpirv()) {
         skip |= ValidateInterfaceFragmentOutput(pipeline, *fragment_stage->spirv_state.get(), *fragment_stage->entrypoint,
                                                 create_info_loc);
     }
@@ -978,18 +1272,11 @@ bool CoreChecks::ValidateGraphicsPipelineShaderState(const vvl::Pipeline& pipeli
             const ShaderStageState& consumer = pipeline.stage_states[consumer_index];
             skip |= ValidateInterfaceBetweenStages(producer, consumer, create_info_loc);
 
-            producer_index = consumer_index;
-        }
-    }
+            if (pipeline.library_create_info && consumer.GetStage() == VK_SHADER_STAGE_FRAGMENT_BIT) {
+                skip |= ValidateGraphicsLibraryInterpolation(pipeline, producer, consumer, create_info_loc);
+            }
 
-    // Don't check any color attachments if rasterization is disabled
-    if (fragment_stage && fragment_stage->entrypoint && fragment_stage->spirv_state && !pipeline.RasterizationDisabled()) {
-        const auto& rp_state = pipeline.RenderPassState();
-        // Dynamic Rendering is done at draw time incase the user has VK_EXT_dynamic_rendering_unused_attachments we can't do all
-        // the checks at this time
-        if (rp_state && !rp_state->UsesDynamicRendering()) {
-            skip |= ValidateFsOutputsAgainstRenderPass(*fragment_stage->spirv_state.get(), *fragment_stage->entrypoint, pipeline,
-                                                       pipeline.Subpass(), create_info_loc);
+            producer_index = consumer_index;
         }
     }
 

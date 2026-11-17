@@ -21,6 +21,7 @@
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/vulkan_core.h>
 #include <cstdint>
+#include <sstream>
 #include "core_checks/cc_state_tracker.h"
 #include "core_validation.h"
 #include "drawdispatch/drawdispatch_vuids.h"
@@ -255,11 +256,18 @@ bool CoreChecks::ValidateDynamicStateIsSet(const LastBound& last_bound_state, co
                 break;
         }
 
-        return LogError(CreateActionVuid(loc.function, vuid), objlist, loc,
-                        "%s state is dynamic, but the command buffer never called %s.\n%s%s", DynamicStateToString(dynamic_state),
-                        DescribeDynamicStateCommand(dynamic_state).c_str(),
-                        DescribeDynamicStateDependency(dynamic_state, pipeline).c_str(),
-                        last_bound_state.cb_state.DescribeInvalidatedState(dynamic_state).c_str());
+        const vvl::CommandBuffer& cb_state = last_bound_state.cb_state;
+        std::ostringstream ss;
+        ss << DynamicStateToString(dynamic_state) << " state is dynamic";
+        if (cb_state.WasDynamicStateInvalidated(dynamic_state)) {
+            ss << " and " << DescribeDynamicStateCommand(dynamic_state)
+               << " was called, but the state was invalidated and needs to be set again."
+               << cb_state.DescribeInvalidatedState(dynamic_state);
+        } else {
+            ss << ", but the command buffer never called " << DescribeDynamicStateCommand(dynamic_state);
+        }
+        ss << '\n' << DescribeDynamicStateDependency(dynamic_state, pipeline);
+        return LogError(CreateActionVuid(loc.function, vuid), objlist, loc, "%s", ss.str().c_str());
     }
     return false;
 }
@@ -351,11 +359,6 @@ bool CoreChecks::ValidateGraphicsDynamicStateSetStatus(const LastBound& last_bou
             skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT, loc);
         }
 
-        if (enabled_features.alphaToOne) {
-            skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT, loc);
-        }
-        skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT, loc);
-
         if (IsExtEnabled(extensions.vk_ext_conservative_rasterization)) {
             skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb,
                                               CB_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT, loc);
@@ -438,14 +441,16 @@ bool CoreChecks::ValidateGraphicsDynamicStateSetStatus(const LastBound& last_bou
             }
         }
 
-        if (vertex_shader_bound) {
-            if (IsExtEnabled(extensions.vk_ext_provoking_vertex)) {
-                skip |=
-                    ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT, loc);
-            }
+        if (IsExtEnabled(extensions.vk_ext_provoking_vertex)) {
+            skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_PROVOKING_VERTEX_MODE_EXT, loc);
         }
 
         if (fragment_shader_bound) {
+            skip |=
+                ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT, loc);
+            if (enabled_features.alphaToOne) {
+                skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT, loc);
+            }
             if (enabled_features.logicOp) {
                 skip |= ValidateDynamicStateIsSet(last_bound_state, state_status_cb, CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT, loc);
             }
@@ -532,7 +537,7 @@ bool CoreChecks::ValidateGraphicsDynamicStateSetStatus(const LastBound& last_bou
         LogObjectList objlist(last_bound_state.cb_state.Handle());
         skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::BIND_VERTEX_BUFFERS_3_STRIDE_13118), objlist, loc,
                          "vkCmdBindVertexBuffers3KHR() was called with at least one of VkBindVertexBuffer3InfoKHR::setStride being "
-                         "VK_TRUE, the pipeline %s was created without VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE or "
+                         "VK_TRUE, but the pipeline %s was created without VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE or "
                          "VK_DYNAMIC_STATE_VERTEX_INPUT_EXT dynamic states",
                          FormatHandle(last_bound_state.pipeline_state->Handle()).c_str());
     }
@@ -574,7 +579,7 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineRenderPass(const LastBound& las
 
     if (rp_state.UsesDynamicRendering()) {
         skip |= ValidateDrawRenderingAttachmentLocation(cb_state, pipeline, loc);
-        skip |= ValidateDrawRenderingInputAttachmentIndex(cb_state, pipeline, loc);
+        skip |= ValidateDrawRenderingInputAttachmentIndex(cb_state, last_bound_state, pipeline, loc);
     }
 
     return skip;
@@ -585,30 +590,6 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineValue(const LastBound& last_bou
     bool skip = false;
     const vvl::CommandBuffer& cb_state = last_bound_state.cb_state;
     const LogObjectList objlist(cb_state.Handle(), pipeline.Handle());
-
-    if (pipeline.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT) && last_bound_state.IsSampleLocationsEnable()) {
-        if (!pipeline.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT)) {
-            if (cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel !=
-                pipeline.MultisampleState()->rasterizationSamples) {
-                skip |= LogError(
-                    CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_LOCATIONS_07482), objlist, loc,
-                    "sampleLocationsPerPixel set with vkCmdSetSampleLocationsEXT() was %s, but "
-                    "VkPipelineMultisampleStateCreateInfo::rasterizationSamples from the pipeline was %s.%s",
-                    string_VkSampleCountFlagBits(cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel),
-                    string_VkSampleCountFlagBits(pipeline.MultisampleState()->rasterizationSamples),
-                    cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT).c_str());
-            }
-        } else if (cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel !=
-                   cb_state.dynamic_state_value.rasterization_samples) {
-            skip |=
-                LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_LOCATIONS_07483), objlist, loc,
-                         "sampleLocationsPerPixel set with vkCmdSetSampleLocationsEXT() was %s, but "
-                         "rasterizationSamples set with vkCmdSetRasterizationSamplesEXT() was %s.%s",
-                         string_VkSampleCountFlagBits(cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel),
-                         string_VkSampleCountFlagBits(cb_state.dynamic_state_value.rasterization_samples),
-                         cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT).c_str());
-        }
-    }
 
     if (!pipeline.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT) &&
         pipeline.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT) && pipeline.MultisampleState() &&
@@ -647,79 +628,6 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineValue(const LastBound& last_bou
                                  "which does not match rasterization samples (%s) set with vkCmdSetRasterizationSamplesEXT().",
                                  string_VkSampleCountFlagBits(sample_locations->sampleLocationsInfo.sampleLocationsPerPixel),
                                  string_VkSampleCountFlagBits(cb_state.dynamic_state_value.rasterization_samples));
-            }
-        }
-    }
-
-    if (pipeline.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT)) {
-        if (!pipeline.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT)) {
-            if (cb_state.dynamic_state_value.samples_mask_samples < pipeline.MultisampleState()->rasterizationSamples) {
-                skip |=
-                    LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_MASK_07472), objlist, loc,
-                             "Currently bound pipeline was created with VkPipelineMultisampleStateCreateInfo::rasterizationSamples "
-                             "%s are greater than samples set with vkCmdSetSampleMaskEXT() were %s.%s",
-                             string_VkSampleCountFlagBits(pipeline.MultisampleState()->rasterizationSamples),
-                             string_VkSampleCountFlagBits(cb_state.dynamic_state_value.samples_mask_samples),
-                             cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT).c_str());
-            }
-        } else if (cb_state.dynamic_state_value.samples_mask_samples < cb_state.dynamic_state_value.rasterization_samples) {
-            skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_MASK_07473), objlist, loc,
-                             "rasterizationSamples set with vkCmdSetRasterizationSamplesEXT() %s are greater than samples "
-                             "set with vkCmdSetSampleMaskEXT() were %s.%s",
-                             string_VkSampleCountFlagBits(cb_state.dynamic_state_value.rasterization_samples),
-                             string_VkSampleCountFlagBits(cb_state.dynamic_state_value.samples_mask_samples),
-                             cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT).c_str());
-        }
-    }
-
-    if (pipeline.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT) &&
-        !enabled_features.primitivesGeneratedQueryWithNonZeroStreams && cb_state.dynamic_state_value.rasterization_stream != 0) {
-        for (const auto& active_query : cb_state.active_queries) {
-            auto query_pool_state = Get<vvl::QueryPool>(active_query.pool);
-            if (!query_pool_state || query_pool_state->create_info.queryType != VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT) {
-                continue;
-            }
-            skip |= LogError(
-                CreateActionVuid(loc.function, vvl::ActionVUID::PRIMITIVES_GENERATED_QUERY_07481), cb_state.Handle(), loc,
-                "query %" PRIu32
-                " in %s with type VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT is active and the last call to "
-                "vkCmdSetRasterizationStreamEXT() set rasterizationStreams as %" PRIu32
-                " (non-zero), but the primitivesGeneratedQueryWithNonZeroStreams "
-                "feature was not enabled.%s",
-                active_query.slot, FormatHandle(active_query.pool).c_str(), cb_state.dynamic_state_value.rasterization_stream,
-                cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT).c_str());
-
-            break;  // only need to check the feature VUs once
-        }
-    }
-
-    // VK_EXT_shader_tile_image
-    {
-        const bool dyn_depth_write_enable = pipeline.IsDynamic(CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE);
-        const bool dyn_stencil_write_mask = pipeline.IsDynamic(CB_DYNAMIC_STATE_STENCIL_WRITE_MASK);
-        auto fragment_entry_point = last_bound_state.GetFragmentEntryPoint();
-        if ((dyn_depth_write_enable || dyn_stencil_write_mask) && fragment_entry_point) {
-            const bool mode_early_fragment_test =
-                fragment_entry_point->execution_mode.Has(spirv::ExecutionModeSet::early_fragment_test_bit);
-            const bool depth_read =
-                pipeline.fragment_shader_state->fragment_shader->spirv->static_data_.has_shader_tile_image_depth_read;
-            const bool stencil_read =
-                pipeline.fragment_shader_state->fragment_shader->spirv->static_data_.has_shader_tile_image_stencil_read;
-
-            if (depth_read && dyn_depth_write_enable && mode_early_fragment_test &&
-                cb_state.dynamic_state_value.depth_write_enable) {
-                skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DEPTH_ENABLE_08715), objlist, loc,
-                                 "Fragment shader contains OpDepthAttachmentReadEXT, but depthWriteEnable parameter in the last "
-                                 "call to vkCmdSetDepthWriteEnable is not false.");
-            }
-
-            if (stencil_read && dyn_stencil_write_mask && mode_early_fragment_test &&
-                ((cb_state.dynamic_state_value.write_mask_front != 0) || (cb_state.dynamic_state_value.write_mask_back != 0))) {
-                skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::STENCIL_WRITE_MASK_08716), objlist, loc,
-                                 "Fragment shader contains OpStencilAttachmentReadEXT, but writeMask parameter in the last "
-                                 "call to vkCmdSetStencilWriteMask is not equal to 0 for both front (%" PRIu32
-                                 ") and back (%" PRIu32 ").",
-                                 cb_state.dynamic_state_value.write_mask_front, cb_state.dynamic_state_value.write_mask_back);
             }
         }
     }
@@ -767,10 +675,10 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineViewportScissor(const LastBound
     if (!pipeline.RasterizationDisabled() && viewport_state && (cb_sub_state.viewport.inherited_depths.empty())) {
         const bool dyn_scissor = pipeline.IsDynamic(CB_DYNAMIC_STATE_SCISSOR);
 
-        // NB (akeley98): Current validation layers do not detect the error where vkCmdSetViewport (or scissor) was called, but
-        // the dynamic state set is overwritten by binding a graphics pipeline with static viewport (scissor) state.
-        // This condition be detected by checking trashedViewportMask & viewportMask (trashedScissorMask & scissorMask) is
-        // nonzero in the range of bits needed by the pipeline.
+        // Unlike every other dynamic state, VK_DYNAMIC_STATE_VIEWPORT/SCISSOR are not checked with
+        // ValidateDynamicStateIsSet() because we need to know which viewport/scissor index is bad.
+        // |mask| says a vkCmdSet* was ever called for that index, |trashed_mask| says the call was later
+        // invalidated (by a pipeline with it as static state, or by vkCmdExecuteCommands).
         if (dyn_viewport) {
             const auto required_viewports_mask = (1 << viewport_state->viewportCount) - 1;
             const auto missing_viewport_mask = ~cb_sub_state.viewport.mask & required_viewports_mask;
@@ -779,6 +687,11 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineViewportScissor(const LastBound
                                  "Dynamic viewport(s) (0x%x) are used by pipeline state object, but were not provided via calls "
                                  "to vkCmdSetViewport().",
                                  missing_viewport_mask);
+            } else if (const uint32_t trashed_viewport_mask = cb_sub_state.viewport.trashed_mask & required_viewports_mask) {
+                skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::VIEWPORT_07831), objlist, loc,
+                                 "Dynamic viewport(s) (0x%x) are used by pipeline state object and vkCmdSetViewport() was called, "
+                                 "but the state was invalidated and needs to be set again.%s",
+                                 trashed_viewport_mask, cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_VIEWPORT).c_str());
             }
         }
 
@@ -790,6 +703,11 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineViewportScissor(const LastBound
                                  "Dynamic scissor(s) (0x%x) are used by pipeline state object, but were not provided via calls "
                                  "to vkCmdSetScissor().",
                                  missing_scissor_mask);
+            } else if (const uint32_t trashed_scissor_mask = cb_sub_state.scissor.trashed_mask & required_scissor_mask) {
+                skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SCISSOR_07832), objlist, loc,
+                                 "Dynamic scissor(s) (0x%x) are used by pipeline state object and vkCmdSetScissor() was called, "
+                                 "but the state was invalidated and needs to be set again.%s",
+                                 trashed_scissor_mask, cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SCISSOR).c_str());
             }
         }
     }
@@ -800,7 +718,7 @@ bool CoreChecks::ValidateDrawDynamicStatePipelineViewportScissor(const LastBound
         const uint32_t max_inherited = uint32_t(cb_sub_state.viewport.inherited_depths.size());
         if (viewport_count > max_inherited) {
             skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::STATE_INHERITED_07850), objlist, loc,
-                             "Pipeline requires more viewports (%" PRIu32 ".) than inherited (viewportDepthCount = %" PRIu32 ".).",
+                             "Pipeline requires more viewports (%" PRIu32 ") than inherited (viewportDepthCount = %" PRIu32 ").",
                              viewport_count, max_inherited);
         }
     }
@@ -936,9 +854,10 @@ bool CoreChecks::ValidateDrawDynamicStateVertex(const LastBound& last_bound_stat
                         skip |= LogError(
                             CreateActionVuid(loc.function, vvl::ActionVUID::VERTEX_INPUT_08734), vert_spirv_state.handle(), loc,
                             "vkCmdSetVertexInputEXT set pVertexAttributeDescriptions[%" PRIu32 "] (binding %" PRIu32
-                            ", location %" PRIu32 ") with format %s but the vertex shader %s is numeric type %s",
+                            ", location %" PRIu32 ") with format %s but the vertex shader %s is numeric type %s%s",
                             attrib->index, attrib->desc.binding, attrib->desc.location, string_VkFormat(attrib->desc.format),
-                            variable_ptr->Describe().c_str(), vert_spirv_state.DescribeType(var_base_type_id).c_str());
+                            variable_ptr->Describe().c_str(), vert_spirv_state.DescribeType(var_base_type_id).c_str(),
+                            shader64 ? "" : "\nHint: This can be allowed if the legacyVertexAttributes feature is enabled.");
                     }
                 } else if (attribute64 && !shader64) {
                     skip |= LogError(
@@ -993,7 +912,8 @@ bool CoreChecks::ValidateDrawDynamicStateVertex(const LastBound& last_bound_stat
             if (!vert_entrypoint.written_built_in_point_size && !enabled_features.maintenance5) {
                 skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::PRIMITIVE_TOPOLOGY_10748), cb_state.Handle(), loc,
                                  "The bound vertex shader (%s) has a PointSize that is not written to, but the bound topology "
-                                 "is set to VK_PRIMITIVE_TOPOLOGY_POINT_LIST.",
+                                 "is set to VK_PRIMITIVE_TOPOLOGY_POINT_LIST.\nHint: This can be allowed in some cases if "
+                                 "maintenance5 feature is enabled.",
                                  FormatHandle(vert_spirv_state.handle()).c_str());
             }
         }
@@ -1099,6 +1019,110 @@ bool CoreChecks::ValidateDrawDynamicStateValue(const LastBound& last_bound_state
     const bool has_pipeline = last_bound_state.pipeline_state != nullptr;
     const bool fragment_shader_bound = has_pipeline || last_bound_state.IsValidShaderObjectBound(ShaderObjectStage::FRAGMENT);
 
+    if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT) && last_bound_state.IsSampleLocationsEnable()) {
+        if (!last_bound_state.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT)) {
+            // Only a Pipeline can have a static rasterizationSamples
+            if (cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel !=
+                pipeline_state->MultisampleState()->rasterizationSamples) {
+                skip |= LogError(
+                    CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_LOCATIONS_07482),
+                    cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), loc,
+                    "sampleLocationsPerPixel set with vkCmdSetSampleLocationsEXT() was %s, but "
+                    "VkPipelineMultisampleStateCreateInfo::rasterizationSamples from the pipeline was %s.%s",
+                    string_VkSampleCountFlagBits(cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel),
+                    string_VkSampleCountFlagBits(pipeline_state->MultisampleState()->rasterizationSamples),
+                    cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT).c_str());
+            }
+        } else if (cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel !=
+                   cb_state.dynamic_state_value.rasterization_samples) {
+            skip |=
+                LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_LOCATIONS_07483),
+                         cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), loc,
+                         "sampleLocationsPerPixel set with vkCmdSetSampleLocationsEXT() was %s, but "
+                         "rasterizationSamples set with vkCmdSetRasterizationSamplesEXT() was %s.%s",
+                         string_VkSampleCountFlagBits(cb_state.dynamic_state_value.sample_locations_info.sampleLocationsPerPixel),
+                         string_VkSampleCountFlagBits(cb_state.dynamic_state_value.rasterization_samples),
+                         cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT).c_str());
+        }
+    }
+
+    if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT) &&
+        cb_state.IsDynamicStateSet(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT)) {
+        if (!last_bound_state.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT)) {
+            // Only a Pipeline can have a static rasterizationSamples
+            if (cb_state.dynamic_state_value.samples_mask_samples < pipeline_state->MultisampleState()->rasterizationSamples) {
+                skip |=
+                    LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_MASK_07472),
+                             cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), loc,
+                             "Currently bound pipeline was created with VkPipelineMultisampleStateCreateInfo::rasterizationSamples "
+                             "(%s) which is greater than the samples set with vkCmdSetSampleMaskEXT() (%s).%s",
+                             string_VkSampleCountFlagBits(pipeline_state->MultisampleState()->rasterizationSamples),
+                             string_VkSampleCountFlagBits(cb_state.dynamic_state_value.samples_mask_samples),
+                             cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT).c_str());
+            }
+        } else if (cb_state.dynamic_state_value.samples_mask_samples < cb_state.dynamic_state_value.rasterization_samples) {
+            skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::SAMPLE_MASK_07473),
+                             cb_state.GetObjectList(VK_PIPELINE_BIND_POINT_GRAPHICS), loc,
+                             "rasterizationSamples set with vkCmdSetRasterizationSamplesEXT() (%s) is greater than the samples "
+                             "set with vkCmdSetSampleMaskEXT() (%s).%s",
+                             string_VkSampleCountFlagBits(cb_state.dynamic_state_value.rasterization_samples),
+                             string_VkSampleCountFlagBits(cb_state.dynamic_state_value.samples_mask_samples),
+                             cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_SAMPLE_MASK_EXT).c_str());
+        }
+    }
+
+    const bool rasterization_stream_used = has_pipeline || last_bound_state.IsValidShaderObjectBound(ShaderObjectStage::GEOMETRY);
+    if (rasterization_stream_used && last_bound_state.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT) &&
+        !enabled_features.primitivesGeneratedQueryWithNonZeroStreams && cb_state.dynamic_state_value.rasterization_stream != 0) {
+        for (const auto& active_query : cb_state.active_queries) {
+            auto query_pool_state = Get<vvl::QueryPool>(active_query.pool);
+            if (!query_pool_state || query_pool_state->create_info.queryType != VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT) {
+                continue;
+            }
+            skip |= LogError(
+                CreateActionVuid(loc.function, vvl::ActionVUID::PRIMITIVES_GENERATED_QUERY_07481), cb_state.Handle(), loc,
+                "query %" PRIu32
+                " in %s with type VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT is active and the last call to "
+                "vkCmdSetRasterizationStreamEXT() set rasterizationStreams as %" PRIu32
+                " (non-zero), but the primitivesGeneratedQueryWithNonZeroStreams "
+                "feature was not enabled.%s",
+                active_query.slot, FormatHandle(active_query.pool).c_str(), cb_state.dynamic_state_value.rasterization_stream,
+                cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT).c_str());
+
+            break;  // only need to check the feature VUs once
+        }
+    }
+
+    const spirv::EntryPoint* fragment_entry_point = last_bound_state.GetFragmentEntryPoint();
+
+    // VK_EXT_shader_tile_image
+    if (fragment_entry_point && fragment_entry_point->execution_mode.Has(spirv::ExecutionModeSet::early_fragment_test_bit)) {
+        const bool dyn_depth_write_enable = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE);
+        const bool dyn_stencil_write_mask = last_bound_state.IsDynamic(CB_DYNAMIC_STATE_STENCIL_WRITE_MASK);
+        const spirv::Module* fragment_spirv = last_bound_state.GetFragmentSpirvModule();
+        if ((dyn_depth_write_enable || dyn_stencil_write_mask) && fragment_spirv) {
+            const bool depth_read = fragment_spirv->static_data_.has_shader_tile_image_depth_read;
+            const bool stencil_read = fragment_spirv->static_data_.has_shader_tile_image_stencil_read;
+
+            if (depth_read && dyn_depth_write_enable && cb_state.dynamic_state_value.depth_write_enable) {
+                skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DEPTH_ENABLE_08715),
+                                 cb_state.GetObjectList(VK_SHADER_STAGE_FRAGMENT_BIT), loc,
+                                 "Fragment shader contains OpDepthAttachmentReadEXT, but the depthWriteEnable parameter in the "
+                                 "last call to vkCmdSetDepthWriteEnable is not VK_FALSE.");
+            }
+
+            if (stencil_read && dyn_stencil_write_mask &&
+                ((cb_state.dynamic_state_value.write_mask_front != 0) || (cb_state.dynamic_state_value.write_mask_back != 0))) {
+                skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::STENCIL_WRITE_MASK_08716),
+                                 cb_state.GetObjectList(VK_SHADER_STAGE_FRAGMENT_BIT), loc,
+                                 "Fragment shader contains OpStencilAttachmentReadEXT, but writeMask parameter in the last "
+                                 "call to vkCmdSetStencilWriteMask is not equal to 0 for both front (%" PRIu32
+                                 ") and back (%" PRIu32 ").",
+                                 cb_state.dynamic_state_value.write_mask_front, cb_state.dynamic_state_value.write_mask_back);
+            }
+        }
+    }
+
     if (!last_bound_state.IsRasterizationDisabled()) {
         if (IsExtEnabled(extensions.vk_ext_discard_rectangles) && last_bound_state.IsDiscardRectangleEnable() &&
             last_bound_state.IsDynamic(CB_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT)) {
@@ -1150,7 +1174,7 @@ bool CoreChecks::ValidateDrawDynamicStateValue(const LastBound& last_bound_state
                                      "coverageToColorLocation (%" PRIu32
                                      ") set by vkCmdSetCoverageToColorLocationNV points to a color attachment with format %s.\n%s",
                                      cb_state.dynamic_state_value.coverage_to_color_location, string_VkFormat(format),
-                                     cb_state.DescribeActiveColorAttachment());
+                                     cb_state.DescribeActiveColorAttachment().c_str());
                     }
                 }
             }
@@ -1159,7 +1183,9 @@ bool CoreChecks::ValidateDrawDynamicStateValue(const LastBound& last_bound_state
         // The VU might "seem" like its not for dynamic, but if not using VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT this check
         // is picked up by VUID-VkGraphicsPipelineCreateInfo-multisampledRenderToSingleSampled-06853 and
         // VUID-vkCmdDraw-multisampledRenderToSingleSampled-07285 already
-        if (!IsMixSamplingSupported() && last_bound_state.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT)) {
+        // After vkCmdBeginCustomResolveEXT the draws write the resolve attachments, as in the static pipeline check
+        if (!IsMixSamplingSupported() && last_bound_state.IsDynamic(CB_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT) &&
+            !core::SubState(cb_state).custom_resolve.started) {
             const VkSampleCountFlagBits rasterization_samples = cb_state.dynamic_state_value.rasterization_samples;
             for (uint32_t i = 0; i < cb_state.active_attachments.size(); ++i) {
                 const auto& attachment_info = cb_state.active_attachments[i];
@@ -1181,7 +1207,7 @@ bool CoreChecks::ValidateDrawDynamicStateValue(const LastBound& last_bound_state
                 const VkPrimitiveTopology topology = last_bound_state.GetRasterizationInputTopology();
                 if (IsLineTopology(topology) || IsPointTopology(topology)) {
                     skip |= LogError(
-                        CreateActionVuid(loc.function, vvl::ActionVUID::CONVERVATIVE_RASTERIZATION_07499), cb_state.Handle(), loc,
+                        CreateActionVuid(loc.function, vvl::ActionVUID::CONSERVATIVE_RASTERIZATION_07499), cb_state.Handle(), loc,
                         "the rasterization input topology is %s and conservativePointAndLineRasterization is VK_FALSE, but "
                         "conservativeRasterizationMode set with vkCmdSetConservativeRasterizationModeEXT() was %s.%s",
                         string_VkPrimitiveTopology(topology),
@@ -1255,38 +1281,96 @@ bool CoreChecks::ValidateDrawDynamicStateValue(const LastBound& last_bound_state
                         ") set with vkCmdSetViewportShadingRatePaletteNV",
                         cb_state.dynamic_state_value.viewport_count, cb_state.dynamic_state_value.shading_rate_palette_count);
                 }
+            } else if (enabled_features.shadingRateImage && last_bound_state.IsShadingRateImageEnable()) {
+                // The palette is not dynamic, so the pipeline supplies the per-viewport array and it has to be large enough
+                // for the viewport count that was set dynamically.
+                const uint32_t shading_rate_palette_count = last_bound_state.GetShadingRatePaletteCount();
+                if (shading_rate_palette_count < cb_state.dynamic_state_value.viewport_count) {
+                    skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::PIPELINE_SHADING_RATE_PALETTE_04139),
+                                     cb_state.Handle(), loc,
+                                     "viewportCount (%" PRIu32
+                                     ") set with vkCmdSetViewportWithCount is greater than "
+                                     "VkPipelineViewportShadingRateImageStateCreateInfoNV::viewportCount (%" PRIu32 ")",
+                                     cb_state.dynamic_state_value.viewport_count, shading_rate_palette_count);
+                }
             }
         }
 
-        if (IsExtEnabled(extensions.vk_nv_viewport_swizzle) && last_bound_state.IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_SWIZZLE_NV)) {
+        if (IsExtEnabled(extensions.vk_nv_viewport_swizzle)) {
             const uint32_t viewport_swizzle_count = last_bound_state.GetViewportSwizzleCount();
-            if (viewport_swizzle_count < cb_state.dynamic_state_value.viewport_count) {
-                vvl::ActionVUID vuid =
-                    has_pipeline ? vvl::ActionVUID::SET_VIEWPORT_SWIZZLE_07493 : vvl::ActionVUID::SET_VIEWPORT_SWIZZLE_09421;
-                skip |= LogError(CreateActionVuid(loc.function, vuid), cb_state.Handle(), loc,
-                                 "viewportCount (%" PRIu32
-                                 ") set with vkCmdSetViewportWithCount is greater than viewportCount (%" PRIu32 ") set with %s",
-                                 cb_state.dynamic_state_value.viewport_count, viewport_swizzle_count,
-                                 has_pipeline ? "VkPipelineViewportSwizzleStateCreateInfoNV" : "vkCmdSetViewportSwizzleNV");
+            if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_SWIZZLE_NV)) {
+                if (viewport_swizzle_count < cb_state.dynamic_state_value.viewport_count) {
+                    vvl::ActionVUID vuid =
+                        has_pipeline ? vvl::ActionVUID::SET_VIEWPORT_SWIZZLE_07493 : vvl::ActionVUID::SET_VIEWPORT_SWIZZLE_09421;
+                    skip |= LogError(CreateActionVuid(loc.function, vuid), cb_state.Handle(), loc,
+                                     "viewportCount (%" PRIu32
+                                     ") set with vkCmdSetViewportWithCount is greater than viewportCount (%" PRIu32
+                                     ") set with vkCmdSetViewportSwizzleNV",
+                                     cb_state.dynamic_state_value.viewport_count, viewport_swizzle_count);
+                }
+            } else if (auto viewport_state = last_bound_state.pipeline_state->ViewportState()) {
+                // Only applies when the pipeline actually chained the struct, otherwise there is no per-viewport swizzle array
+                // to run off the end of.
+                if (const auto* swizzle_state =
+                        vku::FindStructInPNextChain<VkPipelineViewportSwizzleStateCreateInfoNV>(viewport_state->pNext)) {
+                    if (swizzle_state->viewportCount < cb_state.dynamic_state_value.viewport_count) {
+                        skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::PIPELINE_VIEWPORT_SWIZZLE_04141),
+                                         cb_state.Handle(), loc,
+                                         "viewportCount (%" PRIu32
+                                         ") set with vkCmdSetViewportWithCount is greater than "
+                                         "VkPipelineViewportSwizzleStateCreateInfoNV::viewportCount (%" PRIu32 ")",
+                                         cb_state.dynamic_state_value.viewport_count, swizzle_state->viewportCount);
+                    }
+                }
             }
         }
 
-        if (IsExtEnabled(extensions.vk_nv_clip_space_w_scaling) && last_bound_state.IsViewportWScalingEnable() &&
-            last_bound_state.IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV)) {
-            // There is no pipeline equivalent of vkCmdSetViewportWScalingNV
-            if (cb_state.dynamic_state_value.viewport_w_scaling_count < cb_state.dynamic_state_value.viewport_count) {
-                skip |= LogError(
-                    CreateActionVuid(loc.function, vvl::ActionVUID::VIEWPORT_W_SCALING_08636), cb_state.Handle(), loc,
-                    "viewportCount (%" PRIu32 ") set with vkCmdSetViewportWithCount is greater than viewportCount (%" PRIu32
-                    ") set with vkCmdSetViewportWScalingNV",
-                    cb_state.dynamic_state_value.viewport_count, cb_state.dynamic_state_value.viewport_w_scaling_count);
+        if (IsExtEnabled(extensions.vk_nv_clip_space_w_scaling) && last_bound_state.IsViewportWScalingEnable()) {
+            if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV)) {
+                // There is no pipeline equivalent of vkCmdSetViewportWScalingNV
+                if (cb_state.dynamic_state_value.viewport_w_scaling_count < cb_state.dynamic_state_value.viewport_count) {
+                    skip |= LogError(
+                        CreateActionVuid(loc.function, vvl::ActionVUID::VIEWPORT_W_SCALING_08636), cb_state.Handle(), loc,
+                        "viewportCount (%" PRIu32 ") set with vkCmdSetViewportWithCount is greater than viewportCount (%" PRIu32
+                        ") set with vkCmdSetViewportWScalingNV",
+                        cb_state.dynamic_state_value.viewport_count, cb_state.dynamic_state_value.viewport_w_scaling_count);
+                }
+            } else {
+                const uint32_t viewport_w_scaling_count = last_bound_state.GetViewportWScalingCount();
+                if (viewport_w_scaling_count < cb_state.dynamic_state_value.viewport_count) {
+                    skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::PIPELINE_VIEWPORT_W_SCALING_04137),
+                                     cb_state.Handle(), loc,
+                                     "viewportCount (%" PRIu32
+                                     ") set with vkCmdSetViewportWithCount is greater than "
+                                     "VkPipelineViewportWScalingStateCreateInfoNV::viewportCount (%" PRIu32 ")",
+                                     cb_state.dynamic_state_value.viewport_count, viewport_w_scaling_count);
+                }
+            }
+        }
+
+        if (IsExtEnabled(extensions.vk_nv_scissor_exclusive) &&
+            !last_bound_state.IsDynamic(CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV)) {
+            if (auto viewport_state = last_bound_state.pipeline_state->ViewportState()) {
+                // Only applies when the pipeline actually chained the struct, otherwise there is no per-viewport exclusive
+                // scissor array to run off the end of.
+                if (const auto* exclusive_scissor_state =
+                        vku::FindStructInPNextChain<VkPipelineViewportExclusiveScissorStateCreateInfoNV>(viewport_state->pNext)) {
+                    if (exclusive_scissor_state->exclusiveScissorCount < cb_state.dynamic_state_value.viewport_count) {
+                        skip |=
+                            LogError(CreateActionVuid(loc.function, vvl::ActionVUID::PIPELINE_EXCLUSIVE_SCISSOR_04142),
+                                     cb_state.Handle(), loc,
+                                     "viewportCount (%" PRIu32
+                                     ") set with vkCmdSetViewportWithCount is greater than "
+                                     "VkPipelineViewportExclusiveScissorStateCreateInfoNV::exclusiveScissorCount (%" PRIu32 ")",
+                                     cb_state.dynamic_state_value.viewport_count, exclusive_scissor_state->exclusiveScissorCount);
+                    }
+                }
             }
         }
     }
 
     if (last_bound_state.IsDynamic(CB_DYNAMIC_STATE_ALPHA_TO_COVERAGE_ENABLE_EXT) &&
         cb_state.dynamic_state_value.alpha_to_coverage_enable) {
-        auto fragment_entry_point = last_bound_state.GetFragmentEntryPoint();
         if (fragment_entry_point && !fragment_entry_point->has_alpha_to_coverage_variable) {
             LogObjectList objlist(cb_state.Handle());
             if (has_pipeline) {
@@ -1297,7 +1381,7 @@ bool CoreChecks::ValidateDrawDynamicStateValue(const LastBound& last_bound_state
             vvl::ActionVUID vuid =
                 has_pipeline ? vvl::ActionVUID::ALPHA_TO_COVERAGE_COMPONENT_08919 : vvl::ActionVUID::ALPHA_COMPONENT_WORD_08920;
             skip |= LogError(CreateActionVuid(loc.function, vuid), objlist, loc,
-                             "vkCmdSetAlphaToCoverageEnableEXT set alphaToCoverageEnable to true but the bound "
+                             "vkCmdSetAlphaToCoverageEnableEXT set alphaToCoverageEnable to VK_TRUE but the bound "
                              "fragment shader doesn't declare a variable that covers Location 0, Component 3 (alpha channel).");
         }
     }
@@ -1375,8 +1459,36 @@ bool CoreChecks::ValidateDrawRenderingAttachmentLocation(const vvl::CommandBuffe
     return skip;
 }
 
-bool CoreChecks::ValidateDrawRenderingInputAttachmentIndex(const vvl::CommandBuffer& cb_state, const vvl::Pipeline& pipeline_state,
-                                                           const Location& loc) const {
+static bool IsInputAttachmentIndexStaticallyUsed(const spirv::EntryPoint& fragment_entry_point, uint32_t index) {
+    if (index == VK_ATTACHMENT_UNUSED || !fragment_entry_point.has_input_attachment) {
+        return false;
+    }
+    for (const auto& variable : fragment_entry_point.resource_interface_variables) {
+        if (!variable.is_input_attachment) {
+            continue;
+        }
+        const uint32_t start = variable.decorations.input_attachment_index_start;
+        if (start == spirv::kInvalidValue) {
+            continue;  // Variable is missing InputAttachmentIndex, validated elsewhere
+        }
+        for (const uint32_t offset : variable.input_attachment_index_read) {
+            const bool dynamic_indexing = offset == spirv::kInvalidValue;
+            if (dynamic_indexing || offset == spirv::kSpecConstant) {
+                if (variable.array_length == spirv::kRuntimeArray || variable.array_length == spirv::kSpecConstant) {
+                    return true;
+                } else if (index >= start && index < start + variable.array_length) {
+                    return true;
+                }
+            } else if (start + offset == index) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool CoreChecks::ValidateDrawRenderingInputAttachmentIndex(const vvl::CommandBuffer& cb_state, const LastBound& last_bound_state,
+                                                           const vvl::Pipeline& pipeline_state, const Location& loc) const {
     bool skip = false;
     const uint32_t color_index_count = (uint32_t)cb_state.rendering_attachments.color_indexes.size();
 
@@ -1401,69 +1513,101 @@ bool CoreChecks::ValidateDrawRenderingInputAttachmentIndex(const vvl::CommandBuf
         pipeline_stencil_index = info->pStencilInputAttachmentIndex;
     }
 
+    const spirv::EntryPoint* fragment_entry_point = last_bound_state.GetFragmentEntryPoint();
+    if (!fragment_entry_point) {
+        return skip;
+    }
+
     // If the count mismatches, that will either be caught by 06179 or allowed,
     // and we should only check the attachments that will be rendered to
     uint32_t count = std::min(pipeline_color_count, color_index_count);
     for (uint32_t i = 0; i < count; i++) {
-        if (!pipeline_color_indexes && cb_state.rendering_attachments.color_indexes[i] == VK_ATTACHMENT_UNUSED) {
+        const uint32_t pipeline_color_index = pipeline_color_indexes ? pipeline_color_indexes[i] : i;
+        const uint32_t dynamic_color_index = cb_state.rendering_attachments.color_indexes[i];
+        if (pipeline_color_index == dynamic_color_index) {
             continue;
         }
-        uint32_t pipeline_color_index = pipeline_color_indexes ? pipeline_color_indexes[i] : i;
-        if (pipeline_color_index != cb_state.rendering_attachments.color_indexes[i]) {
+        const bool pipeline_index_used = IsInputAttachmentIndexStaticallyUsed(*fragment_entry_point, pipeline_color_index);
+        if (!pipeline_index_used && !IsInputAttachmentIndexStaticallyUsed(*fragment_entry_point, dynamic_color_index)) {
+            continue;
+        }
+        const LogObjectList objlist(cb_state.Handle(), pipeline_state.Handle());
+        std::ostringstream ss;
+        ss << "The pipeline VkRenderingInputAttachmentIndexInfo::pColorAttachmentInputIndices[" << i << "] is "
+           << pipeline_color_index;
+        if (!explicit_pipeline) {
+            ss << " (implicitly because the pipeline was created without VkRenderingInputAttachmentIndexInfo)";
+        }
+        ss << ", but doesn't match this render pass instance because vkCmdSetRenderingInputAttachmentIndices ";
+        if (cb_state.rendering_attachments.set_color_indexes) {
+            ss << "last set pColorAttachmentInputIndices[" << i << "] to " << dynamic_color_index;
+        } else {
+            ss << "was not called in this render pass so the index (" << i << ") is the implicit location";
+        }
+        ss << "\nThe values need to match because input attachment index "
+           << (pipeline_index_used ? pipeline_color_index : dynamic_color_index)
+           << " is statically used in the bound fragment shader.";
+        skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_RENDERING_LOCAL_INDEX_09549), objlist, loc, "%s",
+                         ss.str().c_str());
+        break;
+    }
+
+    if (!EqualValuesOrBothNull(pipeline_depth_index, cb_state.rendering_attachments.depth_index)) {
+        const bool pipeline_index_used =
+            pipeline_depth_index && IsInputAttachmentIndexStaticallyUsed(*fragment_entry_point, *pipeline_depth_index);
+        const bool dynamic_index_used =
+            cb_state.rendering_attachments.depth_index &&
+            IsInputAttachmentIndexStaticallyUsed(*fragment_entry_point, *cb_state.rendering_attachments.depth_index);
+        if (pipeline_index_used || dynamic_index_used) {
             const LogObjectList objlist(cb_state.Handle(), pipeline_state.Handle());
             std::ostringstream ss;
-            ss << "The pipeline VkRenderingInputAttachmentIndexInfo::pColorAttachmentInputIndices[" << i << "] is "
-               << pipeline_color_index;
+            ss << "The pipeline VkRenderingInputAttachmentIndexInfo::pDepthInputAttachmentIndex is "
+               << string_AttachmentPointer(pipeline_depth_index);
             if (!explicit_pipeline) {
                 ss << " (implicitly because the pipeline was created without VkRenderingInputAttachmentIndexInfo)";
             }
             ss << ", but doesn't match this render pass instance because vkCmdSetRenderingInputAttachmentIndices ";
             if (cb_state.rendering_attachments.set_color_indexes) {
-                ss << "last set pColorAttachmentInputIndices[" << i << "] to " << cb_state.rendering_attachments.color_indexes[i];
+                ss << "last set pDepthInputAttachmentIndex to "
+                   << string_AttachmentPointer(cb_state.rendering_attachments.depth_index);
             } else {
-                ss << "was not called in this render pass so the index (" << i << ") is the implicit location";
+                ss << "was not called in this render pass so pDepthInputAttachmentIndex is implicitly NULL";
             }
-            skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_RENDERING_LOCAL_INDEX_09549), objlist, loc,
+            ss << "\nThe values need to match because input attachment index "
+               << (pipeline_index_used ? *pipeline_depth_index : *cb_state.rendering_attachments.depth_index)
+               << " is statically used in the bound fragment shader.";
+            skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_RENDERING_LOCAL_INDEX_10927), objlist, loc,
                              "%s", ss.str().c_str());
-            break;
         }
-    }
-
-    if (!EqualValuesOrBothNull(pipeline_depth_index, cb_state.rendering_attachments.depth_index)) {
-        const LogObjectList objlist(cb_state.Handle(), pipeline_state.Handle());
-        std::ostringstream ss;
-        ss << "The pipeline VkRenderingInputAttachmentIndexInfo::pDepthInputAttachmentIndex is "
-           << string_AttachmentPointer(pipeline_depth_index);
-        if (!explicit_pipeline) {
-            ss << " (implicitly because the pipeline was created without VkRenderingInputAttachmentIndexInfo)";
-        }
-        ss << ", but doesn't match this render pass instance because vkCmdSetRenderingInputAttachmentIndices ";
-        if (cb_state.rendering_attachments.set_color_indexes) {
-            ss << "last set pDepthInputAttachmentIndex to " << string_AttachmentPointer(cb_state.rendering_attachments.depth_index);
-        } else {
-            ss << "was not called in this render pass so pDepthInputAttachmentIndex is implicitly NULL";
-        }
-        skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_RENDERING_LOCAL_INDEX_10927), objlist, loc, "%s",
-                         ss.str().c_str());
     }
 
     if (!EqualValuesOrBothNull(pipeline_stencil_index, cb_state.rendering_attachments.stencil_index)) {
-        const LogObjectList objlist(cb_state.Handle(), pipeline_state.Handle());
-        std::ostringstream ss;
-        ss << "The pipeline VkRenderingInputAttachmentIndexInfo::pStencilInputAttachmentIndex is "
-           << string_AttachmentPointer(pipeline_stencil_index);
-        if (!explicit_pipeline) {
-            ss << " (implicitly because the pipeline was created without VkRenderingInputAttachmentIndexInfo)";
+        const bool pipeline_index_used =
+            pipeline_stencil_index && IsInputAttachmentIndexStaticallyUsed(*fragment_entry_point, *pipeline_stencil_index);
+        const bool dynamic_index_used =
+            cb_state.rendering_attachments.stencil_index &&
+            IsInputAttachmentIndexStaticallyUsed(*fragment_entry_point, *cb_state.rendering_attachments.stencil_index);
+        if (pipeline_index_used || dynamic_index_used) {
+            const LogObjectList objlist(cb_state.Handle(), pipeline_state.Handle());
+            std::ostringstream ss;
+            ss << "The pipeline VkRenderingInputAttachmentIndexInfo::pStencilInputAttachmentIndex is "
+               << string_AttachmentPointer(pipeline_stencil_index);
+            if (!explicit_pipeline) {
+                ss << " (implicitly because the pipeline was created without VkRenderingInputAttachmentIndexInfo)";
+            }
+            ss << ", but doesn't match this render pass instance because vkCmdSetRenderingInputAttachmentIndices ";
+            if (cb_state.rendering_attachments.set_color_indexes) {
+                ss << "last set pStencilInputAttachmentIndex to "
+                   << string_AttachmentPointer(cb_state.rendering_attachments.stencil_index);
+            } else {
+                ss << "was not called in this render pass so pStencilInputAttachmentIndex is implicitly NULL";
+            }
+            ss << "\nThe values need to match because input attachment index "
+               << (pipeline_index_used ? *pipeline_stencil_index : *cb_state.rendering_attachments.stencil_index)
+               << " is statically used in the bound fragment shader.";
+            skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_RENDERING_LOCAL_INDEX_10928), objlist, loc,
+                             "%s", ss.str().c_str());
         }
-        ss << ", but doesn't match this render pass instance because vkCmdSetRenderingInputAttachmentIndices ";
-        if (cb_state.rendering_attachments.set_color_indexes) {
-            ss << "last set pStencilInputAttachmentIndex to "
-               << string_AttachmentPointer(cb_state.rendering_attachments.stencil_index);
-        } else {
-            ss << "was not called in this render pass so pStencilInputAttachmentIndex is implicitly NULL";
-        }
-        skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_RENDERING_LOCAL_INDEX_10928), objlist, loc, "%s",
-                         ss.str().c_str());
     }
     return skip;
 }
@@ -1476,16 +1620,26 @@ bool CoreChecks::ValidateTraceRaysDynamicStateSetStatus(const LastBound& last_bo
     if (pipeline.IsDynamic(CB_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR)) {
         if (!cb_state.dynamic_state_status.rtx_stack_size_cb) {
             const LogObjectList objlist(cb_state.Handle(), pipeline.Handle());
-            skip |= LogError(CreateActionVuid(loc.function, vvl::ActionVUID::RTX_STACK_SIZE_09458), objlist, loc,
+            if (cb_state.WasDynamicStateInvalidated(CB_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR)) {
+                skip |= LogError(
+                    CreateActionVuid(loc.function, vvl::ActionVUID::RTX_STACK_SIZE_09458), objlist, loc,
+                    "VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR state is dynamic and "
+                    "vkCmdSetRayTracingPipelineStackSizeKHR() was called, but the state was invalidated and needs to be set "
+                    "again.%s",
+                    cb_state.DescribeInvalidatedState(CB_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR).c_str());
+            } else {
+                skip |=
+                    LogError(CreateActionVuid(loc.function, vvl::ActionVUID::RTX_STACK_SIZE_09458), objlist, loc,
                              "VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR state is dynamic, but the command buffer never "
                              "called vkCmdSetRayTracingPipelineStackSizeKHR().");
+            }
         }
     } else {
         if (cb_state.dynamic_state_status.rtx_stack_size_pipeline) {
             const LogObjectList objlist(cb_state.Handle(), pipeline.Handle());
             skip |= LogError(
                 CreateActionVuid(loc.function, vvl::ActionVUID::DYNAMIC_STATE_ALL_SET_08608), objlist, loc,
-                "%s doesn't set up VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR,  but since the vkCmdBindPipeline, the "
+                "%s doesn't set up VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR, but since the vkCmdBindPipeline, the "
                 "related dynamic state commands (vkCmdSetRayTracingPipelineStackSizeKHR) have been called in this command buffer.",
                 FormatHandle(pipeline).c_str());
         }
@@ -1717,25 +1871,6 @@ bool CoreChecks::PreCallValidateCmdSetDiscardRectangleEXT(VkCommandBuffer comman
     skip |= ValidateCmd(*cb_state, error_obj.location);
     skip |=
         ForbidInheritedViewportScissor(*cb_state, "VUID-vkCmdSetDiscardRectangleEXT-viewportScissor2D-04788", error_obj.location);
-    for (uint32_t i = 0; i < discardRectangleCount; ++i) {
-        if (pDiscardRectangles[i].offset.x < 0) {
-            skip |= LogError("VUID-vkCmdSetDiscardRectangleEXT-x-00587", commandBuffer,
-                             error_obj.location.dot(Field::pDiscardRectangles, i).dot(Field::offset).dot(Field::x),
-                             "(%" PRId32 ") is negative.", pDiscardRectangles[i].offset.x);
-        }
-        if (pDiscardRectangles[i].offset.y < 0) {
-            skip |= LogError("VUID-vkCmdSetDiscardRectangleEXT-x-00587", commandBuffer,
-                             error_obj.location.dot(Field::pDiscardRectangles, i).dot(Field::offset).dot(Field::y),
-                             "(%" PRId32 ") is negative.", pDiscardRectangles[i].offset.y);
-        }
-    }
-    if (firstDiscardRectangle + discardRectangleCount > phys_dev_ext_props.discard_rectangle_props.maxDiscardRectangles) {
-        skip |=
-            LogError("VUID-vkCmdSetDiscardRectangleEXT-firstDiscardRectangle-00585", commandBuffer,
-                     error_obj.location.dot(Field::firstDiscardRectangle),
-                     "(%" PRIu32 ") + discardRectangleCount (%" PRIu32 ") is not less than maxDiscardRectangles (%" PRIu32 ").",
-                     firstDiscardRectangle, discardRectangleCount, phys_dev_ext_props.discard_rectangle_props.maxDiscardRectangles);
-    }
     return skip;
 }
 
@@ -1769,246 +1904,353 @@ bool CoreChecks::PreCallValidateCmdSetCheckpointNV(VkCommandBuffer commandBuffer
     return ValidateCmd(*cb_state, error_obj.location);
 }
 
-bool CoreChecks::PreCallValidateCmdSetLogicOpEXT(VkCommandBuffer commandBuffer, VkLogicOp logicOp,
-                                                 const ErrorObject& error_obj) const {
+bool CoreChecks::ValidateCmdSetLogicOp(VkCommandBuffer commandBuffer, VkLogicOp logicOp, const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
     if (!enabled_features.extendedDynamicState2LogicOp && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetLogicOpEXT-None-09422", commandBuffer, error_obj.location,
+        const char* vuid = "VUID-vkCmdSetLogicOpEXT-None-09422";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
                          "extendedDynamicState2LogicOp and shaderObject features were not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer, uint32_t patchControlPoints,
-                                                            const ErrorObject& error_obj) const {
+bool CoreChecks::PreCallValidateCmdSetLogicOpEXT(VkCommandBuffer commandBuffer, VkLogicOp logicOp,
+                                                 const ErrorObject& error_obj) const {
+    return ValidateCmdSetLogicOp(commandBuffer, logicOp, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetPatchControlPoints(VkCommandBuffer commandBuffer, uint32_t patchControlPoints,
+                                                  const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
     if (!enabled_features.extendedDynamicState2PatchControlPoints && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetPatchControlPointsEXT-None-09422", commandBuffer, error_obj.location,
+        const char* vuid = "VUID-vkCmdSetPatchControlPointsEXT-None-09422";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
                          "extendedDynamicState2PatchControlPoints and shaderObject features were not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
 
-    if (patchControlPoints > phys_dev_props.limits.maxTessellationPatchSize) {
-        skip |= LogError("VUID-vkCmdSetPatchControlPointsEXT-patchControlPoints-04874", commandBuffer,
-                         error_obj.location.dot(Field::patchControlPoints),
-                         "(%" PRIu32
-                         ") must be less than "
-                         "maxTessellationPatchSize (%" PRIu32 ")",
-                         patchControlPoints, phys_dev_props.limits.maxTessellationPatchSize);
+    if (patchControlPoints == 0) {
+        const char* vuid = "VUID-vkCmdSetPatchControlPointsEXT-patchControlPoints-04874";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::patchControlPoints), "must not be zero");
+    } else if (patchControlPoints > phys_dev_props.limits.maxTessellationPatchSize) {
+        const char* vuid = "VUID-vkCmdSetPatchControlPointsEXT-patchControlPoints-04874";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::patchControlPoints),
+                         "(%" PRIu32 ") must not be greater than maxTessellationPatchSize (%" PRIu32 ")", patchControlPoints,
+                         phys_dev_props.limits.maxTessellationPatchSize);
     }
+    return skip;
+}
+
+bool CoreChecks::PreCallValidateCmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer, uint32_t patchControlPoints,
+                                                            const ErrorObject& error_obj) const {
+    return ValidateCmdSetPatchControlPoints(commandBuffer, patchControlPoints, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetRasterizerDiscardEnable(VkCommandBuffer commandBuffer, VkBool32 rasterizerDiscardEnable,
+                                                       const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState2 && !enabled_features.shaderObject) {
+        const char* vuid = error_obj.location.function == Func::vkCmdSetRasterizerDiscardEnableEXT
+                               ? "VUID-vkCmdSetRasterizerDiscardEnable-None-08970"
+                               : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState2 and shaderObject features were not enabled.");
+        }
+    }
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetRasterizerDiscardEnableEXT(VkCommandBuffer commandBuffer, VkBool32 rasterizerDiscardEnable,
                                                                  const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState2 && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetRasterizerDiscardEnable-None-08970", commandBuffer, error_obj.location,
-                         "extendedDynamicState2 and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetRasterizerDiscardEnable(commandBuffer, rasterizerDiscardEnable, error_obj);
-    return skip;
+    return ValidateCmdSetRasterizerDiscardEnable(commandBuffer, rasterizerDiscardEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetRasterizerDiscardEnable(VkCommandBuffer commandBuffer, VkBool32 rasterizerDiscardEnable,
                                                               const ErrorObject& error_obj) const {
+    return ValidateCmdSetRasterizerDiscardEnable(commandBuffer, rasterizerDiscardEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetDepthBiasEnable(VkCommandBuffer commandBuffer, VkBool32 depthBiasEnable,
+                                               const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState2 && !enabled_features.shaderObject) {
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetDepthBiasEnableEXT ? "VUID-vkCmdSetDepthBiasEnable-None-08970" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState2 and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthBiasEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthBiasEnable,
                                                          const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState2 && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetDepthBiasEnable-None-08970", commandBuffer, error_obj.location,
-                         "extendedDynamicState2 and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetDepthBiasEnable(commandBuffer, depthBiasEnable, error_obj);
-    return skip;
+    return ValidateCmdSetDepthBiasEnable(commandBuffer, depthBiasEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthBiasEnable(VkCommandBuffer commandBuffer, VkBool32 depthBiasEnable,
                                                       const ErrorObject& error_obj) const {
+    return ValidateCmdSetDepthBiasEnable(commandBuffer, depthBiasEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetPrimitiveRestartEnable(VkCommandBuffer commandBuffer, VkBool32 primitiveRestartEnable,
+                                                      const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState2 && !enabled_features.shaderObject) {
+        const char* vuid = error_obj.location.function == Func::vkCmdSetPrimitiveRestartEnableEXT
+                               ? "VUID-vkCmdSetPrimitiveRestartEnable-None-08970"
+                               : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState2 and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer commandBuffer, VkBool32 primitiveRestartEnable,
                                                                 const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState2 && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetPrimitiveRestartEnable-None-08970", commandBuffer, error_obj.location,
-                         "extendedDynamicState2 and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetPrimitiveRestartEnable(commandBuffer, primitiveRestartEnable, error_obj);
-    return skip;
+    return ValidateCmdSetPrimitiveRestartEnable(commandBuffer, primitiveRestartEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetPrimitiveRestartEnable(VkCommandBuffer commandBuffer, VkBool32 primitiveRestartEnable,
                                                              const ErrorObject& error_obj) const {
+    return ValidateCmdSetPrimitiveRestartEnable(commandBuffer, primitiveRestartEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetCullMode(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode,
+                                        const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid = error_obj.location.function == Func::vkCmdSetCullModeEXT ? "VUID-vkCmdSetCullMode-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetCullModeEXT(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode,
                                                   const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetCullMode-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetCullMode(commandBuffer, cullMode, error_obj);
-    return skip;
+    return ValidateCmdSetCullMode(commandBuffer, cullMode, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetCullMode(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode,
                                                const ErrorObject& error_obj) const {
+    return ValidateCmdSetCullMode(commandBuffer, cullMode, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetFrontFace(VkCommandBuffer commandBuffer, VkFrontFace frontFace, const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetFrontFaceEXT ? "VUID-vkCmdSetFrontFace-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetFrontFaceEXT(VkCommandBuffer commandBuffer, VkFrontFace frontFace,
                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetFrontFace-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetFrontFace(commandBuffer, frontFace, error_obj);
-    return skip;
+    return ValidateCmdSetFrontFace(commandBuffer, frontFace, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetFrontFace(VkCommandBuffer commandBuffer, VkFrontFace frontFace,
                                                 const ErrorObject& error_obj) const {
+    return ValidateCmdSetFrontFace(commandBuffer, frontFace, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetPrimitiveTopology(VkCommandBuffer commandBuffer, VkPrimitiveTopology primitiveTopology,
+                                                 const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid = error_obj.location.function == Func::vkCmdSetPrimitiveTopologyEXT
+                               ? "VUID-vkCmdSetPrimitiveTopology-None-08971"
+                               : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetPrimitiveTopologyEXT(VkCommandBuffer commandBuffer, VkPrimitiveTopology primitiveTopology,
                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetPrimitiveTopology-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetPrimitiveTopology(commandBuffer, primitiveTopology, error_obj);
-    return skip;
+    return ValidateCmdSetPrimitiveTopology(commandBuffer, primitiveTopology, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetPrimitiveTopology(VkCommandBuffer commandBuffer, VkPrimitiveTopology primitiveTopology,
                                                         const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    return ValidateCmdSetPrimitiveTopology(commandBuffer, primitiveTopology, error_obj);
 }
 
-bool CoreChecks::PreCallValidateCmdSetViewportWithCountEXT(VkCommandBuffer commandBuffer, uint32_t viewportCount,
-                                                           const VkViewport* pViewports, const ErrorObject& error_obj) const {
+bool CoreChecks::ValidateCmdSetViewportWithCount(VkCommandBuffer commandBuffer, uint32_t viewportCount,
+                                                 const VkViewport* pViewports, const ErrorObject& error_obj) const {
     bool skip = false;
     if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetViewportWithCount-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
+        const char* vuid = error_obj.location.function == Func::vkCmdSetViewportWithCountEXT
+                               ? "VUID-vkCmdSetViewportWithCount-None-08971"
+                               : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
     }
-    skip |= PreCallValidateCmdSetViewportWithCount(commandBuffer, viewportCount, pViewports, error_obj);
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateCmdSetViewportWithCount(VkCommandBuffer commandBuffer, uint32_t viewportCount,
-                                                        const VkViewport* pViewports, const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
     skip |= ForbidInheritedViewportScissor(*cb_state, "VUID-vkCmdSetViewportWithCount-commandBuffer-04819", error_obj.location);
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetScissorWithCountEXT(VkCommandBuffer commandBuffer, uint32_t scissorCount,
-                                                          const VkRect2D* pScissors, const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetScissorWithCount-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetScissorWithCount(commandBuffer, scissorCount, pScissors, error_obj);
-    return skip;
+bool CoreChecks::PreCallValidateCmdSetViewportWithCountEXT(VkCommandBuffer commandBuffer, uint32_t viewportCount,
+                                                           const VkViewport* pViewports, const ErrorObject& error_obj) const {
+    return ValidateCmdSetViewportWithCount(commandBuffer, viewportCount, pViewports, error_obj);
 }
 
-bool CoreChecks::PreCallValidateCmdSetScissorWithCount(VkCommandBuffer commandBuffer, uint32_t scissorCount,
-                                                       const VkRect2D* pScissors, const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+bool CoreChecks::PreCallValidateCmdSetViewportWithCount(VkCommandBuffer commandBuffer, uint32_t viewportCount,
+                                                        const VkViewport* pViewports, const ErrorObject& error_obj) const {
+    return ValidateCmdSetViewportWithCount(commandBuffer, viewportCount, pViewports, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetScissorWithCount(VkCommandBuffer commandBuffer, uint32_t scissorCount, const VkRect2D* pScissors,
+                                                const ErrorObject& error_obj) const {
     bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetScissorWithCountEXT ? "VUID-vkCmdSetScissorWithCount-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     skip |= ValidateCmd(*cb_state, error_obj.location);
     skip |= ForbidInheritedViewportScissor(*cb_state, "VUID-vkCmdSetScissorWithCount-commandBuffer-04820", error_obj.location);
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetDepthTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
-                                                         const ErrorObject& error_obj) const {
+bool CoreChecks::PreCallValidateCmdSetScissorWithCountEXT(VkCommandBuffer commandBuffer, uint32_t scissorCount,
+                                                          const VkRect2D* pScissors, const ErrorObject& error_obj) const {
+    return ValidateCmdSetScissorWithCount(commandBuffer, scissorCount, pScissors, error_obj);
+}
+
+bool CoreChecks::PreCallValidateCmdSetScissorWithCount(VkCommandBuffer commandBuffer, uint32_t scissorCount,
+                                                       const VkRect2D* pScissors, const ErrorObject& error_obj) const {
+    return ValidateCmdSetScissorWithCount(commandBuffer, scissorCount, pScissors, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetDepthTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
+                                               const ErrorObject& error_obj) const {
     bool skip = false;
     if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetDepthTestEnable-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetDepthTestEnableEXT ? "VUID-vkCmdSetDepthTestEnable-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
     }
-    skip |= PreCallValidateCmdSetDepthTestEnable(commandBuffer, depthTestEnable, error_obj);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
+}
+
+bool CoreChecks::PreCallValidateCmdSetDepthTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
+                                                         const ErrorObject& error_obj) const {
+    return ValidateCmdSetDepthTestEnable(commandBuffer, depthTestEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthTestEnable,
                                                       const ErrorObject& error_obj) const {
+    return ValidateCmdSetDepthTestEnable(commandBuffer, depthTestEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetDepthWriteEnable(VkCommandBuffer commandBuffer, VkBool32 depthWriteEnable,
+                                                const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetDepthWriteEnableEXT ? "VUID-vkCmdSetDepthWriteEnable-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthWriteEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthWriteEnable,
                                                           const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetDepthWriteEnable-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetDepthWriteEnable(commandBuffer, depthWriteEnable, error_obj);
-    return skip;
+    return ValidateCmdSetDepthWriteEnable(commandBuffer, depthWriteEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthWriteEnable(VkCommandBuffer commandBuffer, VkBool32 depthWriteEnable,
                                                        const ErrorObject& error_obj) const {
+    return ValidateCmdSetDepthWriteEnable(commandBuffer, depthWriteEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetDepthCompareOp(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
+                                              const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetDepthCompareOpEXT ? "VUID-vkCmdSetDepthCompareOp-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthCompareOpEXT(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
                                                         const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetDepthCompareOp-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetDepthCompareOp(commandBuffer, depthCompareOp, error_obj);
-    return skip;
+    return ValidateCmdSetDepthCompareOp(commandBuffer, depthCompareOp, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthCompareOp(VkCommandBuffer commandBuffer, VkCompareOp depthCompareOp,
                                                      const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    return ValidateCmdSetDepthCompareOp(commandBuffer, depthCompareOp, error_obj);
 }
 
-bool CoreChecks::PreCallValidateCmdSetDepthBoundsTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
-                                                               const ErrorObject& error_obj) const {
+bool CoreChecks::ValidateCmdSetDepthBoundsTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
+                                                     const ErrorObject& error_obj) const {
     bool skip = false;
     if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetDepthBoundsTestEnable-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
+        const char* vuid = error_obj.location.function == Func::vkCmdSetDepthBoundsTestEnableEXT
+                               ? "VUID-vkCmdSetDepthBoundsTestEnable-None-08971"
+                               : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
     }
-    skip |= PreCallValidateCmdSetDepthBoundsTestEnable(commandBuffer, depthBoundsTestEnable, error_obj);
-    return skip;
-}
-
-bool CoreChecks::PreCallValidateCmdSetDepthBoundsTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
-                                                            const ErrorObject& error_obj) const {
-    bool skip = false;
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     skip |= ValidateCmd(*cb_state, error_obj.location);
     if (depthBoundsTestEnable == VK_TRUE && !enabled_features.depthBounds) {
@@ -2019,50 +2261,104 @@ bool CoreChecks::PreCallValidateCmdSetDepthBoundsTestEnable(VkCommandBuffer comm
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetStencilTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 stencilTestEnable,
-                                                           const ErrorObject& error_obj) const {
+bool CoreChecks::PreCallValidateCmdSetDepthBoundsTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
+                                                               const ErrorObject& error_obj) const {
+    return ValidateCmdSetDepthBoundsTestEnable(commandBuffer, depthBoundsTestEnable, error_obj);
+}
+
+bool CoreChecks::PreCallValidateCmdSetDepthBoundsTestEnable(VkCommandBuffer commandBuffer, VkBool32 depthBoundsTestEnable,
+                                                            const ErrorObject& error_obj) const {
+    return ValidateCmdSetDepthBoundsTestEnable(commandBuffer, depthBoundsTestEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetStencilTestEnable(VkCommandBuffer commandBuffer, VkBool32 stencilTestEnable,
+                                                 const ErrorObject& error_obj) const {
     bool skip = false;
     if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetStencilTestEnable-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
+        const char* vuid = error_obj.location.function == Func::vkCmdSetStencilTestEnableEXT
+                               ? "VUID-vkCmdSetStencilTestEnable-None-08971"
+                               : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
     }
-    skip |= PreCallValidateCmdSetStencilTestEnable(commandBuffer, stencilTestEnable, error_obj);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
+}
+
+bool CoreChecks::PreCallValidateCmdSetStencilTestEnableEXT(VkCommandBuffer commandBuffer, VkBool32 stencilTestEnable,
+                                                           const ErrorObject& error_obj) const {
+    return ValidateCmdSetStencilTestEnable(commandBuffer, stencilTestEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetStencilTestEnable(VkCommandBuffer commandBuffer, VkBool32 stencilTestEnable,
                                                         const ErrorObject& error_obj) const {
+    return ValidateCmdSetStencilTestEnable(commandBuffer, stencilTestEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetStencilOp(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, VkStencilOp failOp,
+                                         VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp,
+                                         const ErrorObject& error_obj) const {
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
+        const char* vuid =
+            error_obj.location.function == Func::vkCmdSetStencilOpEXT ? "VUID-vkCmdSetStencilOp-None-08971" : nullptr;
+        if (vuid) {
+            skip |= LogError(vuid, commandBuffer, error_obj.location,
+                             "extendedDynamicState and shaderObject features were not enabled.");
+        }
+    }
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetStencilOpEXT(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, VkStencilOp failOp,
                                                    VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp,
                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetStencilOp-None-08971", commandBuffer, error_obj.location,
-                         "extendedDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= PreCallValidateCmdSetStencilOp(commandBuffer, faceMask, failOp, passOp, depthFailOp, compareOp, error_obj);
-    return skip;
+    return ValidateCmdSetStencilOp(commandBuffer, faceMask, failOp, passOp, depthFailOp, compareOp, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetStencilOp(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, VkStencilOp failOp,
                                                 VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp,
                                                 const ErrorObject& error_obj) const {
+    return ValidateCmdSetStencilOp(commandBuffer, faceMask, failOp, passOp, depthFailOp, compareOp, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetTessellationDomainOrigin(VkCommandBuffer commandBuffer, VkTessellationDomainOrigin domainOrigin,
+                                                        const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    return ValidateCmd(*cb_state, error_obj.location);
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState3TessellationDomainOrigin && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetTessellationDomainOriginEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3TessellationDomainOrigin and shaderObject features were not enabled.");
+    }
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetTessellationDomainOriginEXT(VkCommandBuffer commandBuffer,
                                                                   VkTessellationDomainOrigin domainOrigin,
                                                                   const ErrorObject& error_obj) const {
+    return ValidateCmdSetTessellationDomainOrigin(commandBuffer, domainOrigin, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetDepthClampEnable(VkCommandBuffer commandBuffer, VkBool32 depthClampEnable,
+                                                const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3TessellationDomainOrigin && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetTessellationDomainOriginEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3TessellationDomainOrigin and shaderObject features were not enabled.");
+    if (!enabled_features.extendedDynamicState3DepthClampEnable && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetDepthClampEnableEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3DepthClampEnable and shaderObject features were not enabled.");
+    }
+    if (depthClampEnable != VK_FALSE && !enabled_features.depthClamp) {
+        const char* vuid = "VUID-vkCmdSetDepthClampEnableEXT-depthClamp-07449";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::depthClampEnable),
+                         "is VK_TRUE but the depthClamp feature was not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
@@ -2070,19 +2366,7 @@ bool CoreChecks::PreCallValidateCmdSetTessellationDomainOriginEXT(VkCommandBuffe
 
 bool CoreChecks::PreCallValidateCmdSetDepthClampEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthClampEnable,
                                                           const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState3DepthClampEnable && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetDepthClampEnableEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3DepthClampEnable and shaderObject features were not enabled.");
-    }
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-
-    if (depthClampEnable != VK_FALSE && !enabled_features.depthClamp) {
-        skip |= LogError("VUID-vkCmdSetDepthClampEnableEXT-depthClamp-07449", commandBuffer,
-                         error_obj.location.dot(Field::depthClampEnable), "is VK_TRUE but the depthClamp feature was not enabled.");
-    }
-    return skip;
+    return ValidateCmdSetDepthClampEnable(commandBuffer, depthClampEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthClampRangeEXT(VkCommandBuffer commandBuffer, VkDepthClampModeEXT depthClampMode,
@@ -2092,38 +2376,68 @@ bool CoreChecks::PreCallValidateCmdSetDepthClampRangeEXT(VkCommandBuffer command
     return ValidateCmd(*cb_state, error_obj.location);
 }
 
-bool CoreChecks::PreCallValidateCmdSetPolygonModeEXT(VkCommandBuffer commandBuffer, VkPolygonMode polygonMode,
-                                                     const ErrorObject& error_obj) const {
+bool CoreChecks::ValidateCmdSetPolygonMode(VkCommandBuffer commandBuffer, VkPolygonMode polygonMode,
+                                           const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
     if (!enabled_features.extendedDynamicState3PolygonMode && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetPolygonModeEXT-None-09423", commandBuffer, error_obj.location,
+        const char* vuid = "VUID-vkCmdSetPolygonModeEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
                          "extendedDynamicState3PolygonMode and shaderObject features were not enabled.");
     }
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-
     if ((polygonMode == VK_POLYGON_MODE_LINE || polygonMode == VK_POLYGON_MODE_POINT) && !enabled_features.fillModeNonSolid) {
-        skip |= LogError("VUID-vkCmdSetPolygonModeEXT-fillModeNonSolid-07424", commandBuffer,
-                         error_obj.location.dot(Field::polygonMode),
+        const char* vuid = "VUID-vkCmdSetPolygonModeEXT-fillModeNonSolid-07424";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::polygonMode),
                          "is %s but the "
                          "fillModeNonSolid feature was not enabled.",
                          string_VkPolygonMode(polygonMode));
     } else if (polygonMode == VK_POLYGON_MODE_FILL_RECTANGLE_NV && !IsExtEnabled(extensions.vk_nv_fill_rectangle)) {
-        skip |= LogError("VUID-vkCmdSetPolygonModeEXT-polygonMode-07425", commandBuffer, error_obj.location.dot(Field::polygonMode),
+        const char* vuid = "VUID-vkCmdSetPolygonModeEXT-polygonMode-07425";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::polygonMode),
                          "is VK_POLYGON_MODE_FILL_RECTANGLE_NV but the VK_NV_fill_rectangle "
                          "extension was not enabled.");
     }
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
+}
+
+bool CoreChecks::PreCallValidateCmdSetPolygonModeEXT(VkCommandBuffer commandBuffer, VkPolygonMode polygonMode,
+                                                     const ErrorObject& error_obj) const {
+    return ValidateCmdSetPolygonMode(commandBuffer, polygonMode, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetRasterizationSamples(VkCommandBuffer commandBuffer, VkSampleCountFlagBits rasterizationSamples,
+                                                    const ErrorObject& error_obj) const {
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    bool skip = false;
+    if (!enabled_features.extendedDynamicState3RasterizationSamples && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetRasterizationSamplesEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3RasterizationSamples and shaderObject features were not enabled.");
+    }
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetRasterizationSamplesEXT(VkCommandBuffer commandBuffer,
                                                               VkSampleCountFlagBits rasterizationSamples,
                                                               const ErrorObject& error_obj) const {
+    return ValidateCmdSetRasterizationSamples(commandBuffer, rasterizationSamples, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetSampleMask(VkCommandBuffer commandBuffer, VkSampleCountFlagBits samples,
+                                          const VkSampleMask* pSampleMask, const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3RasterizationSamples && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetRasterizationSamplesEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3RasterizationSamples and shaderObject features were not enabled.");
+    if (!enabled_features.extendedDynamicState3SampleMask && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetSampleMaskEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3SampleMask and shaderObject features were not enabled.");
+    }
+    if (!enabled_features.maintenance10 && !pSampleMask) {
+        const char* vuid = "VUID-vkCmdSetSampleMaskEXT-pSampleMask-10999";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::pSampleMask),
+                         "is NULL.\nHint: This can be allowed in some cases if maintenance10 feature is enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
@@ -2131,15 +2445,17 @@ bool CoreChecks::PreCallValidateCmdSetRasterizationSamplesEXT(VkCommandBuffer co
 
 bool CoreChecks::PreCallValidateCmdSetSampleMaskEXT(VkCommandBuffer commandBuffer, VkSampleCountFlagBits samples,
                                                     const VkSampleMask* pSampleMask, const ErrorObject& error_obj) const {
+    return ValidateCmdSetSampleMask(commandBuffer, samples, pSampleMask, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetAlphaToCoverageEnable(VkCommandBuffer commandBuffer, VkBool32 alphaToCoverageEnable,
+                                                     const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3SampleMask && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetSampleMaskEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3SampleMask and shaderObject features were not enabled.");
-    }
-    if (!enabled_features.maintenance10 && !pSampleMask) {
-        skip |= LogError("VUID-vkCmdSetSampleMaskEXT-pSampleMask-10999", commandBuffer, error_obj.location.dot(Field::pSampleMask),
-                         "is NULL.");
+    if (!enabled_features.extendedDynamicState3AlphaToCoverageEnable && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetAlphaToCoverageEnableEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3AlphaToCoverageEnable and shaderObject features were not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
@@ -2147,11 +2463,22 @@ bool CoreChecks::PreCallValidateCmdSetSampleMaskEXT(VkCommandBuffer commandBuffe
 
 bool CoreChecks::PreCallValidateCmdSetAlphaToCoverageEnableEXT(VkCommandBuffer commandBuffer, VkBool32 alphaToCoverageEnable,
                                                                const ErrorObject& error_obj) const {
+    return ValidateCmdSetAlphaToCoverageEnable(commandBuffer, alphaToCoverageEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetAlphaToOneEnable(VkCommandBuffer commandBuffer, VkBool32 alphaToOneEnable,
+                                                const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3AlphaToCoverageEnable && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetAlphaToCoverageEnableEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3AlphaToCoverageEnable and shaderObject features were not enabled.");
+    if (!enabled_features.extendedDynamicState3AlphaToOneEnable && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetAlphaToOneEnableEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3AlphaToOneEnable and shaderObject features were not enabled.");
+    }
+    if (alphaToOneEnable != VK_FALSE && !enabled_features.alphaToOne) {
+        const char* vuid = "VUID-vkCmdSetAlphaToOneEnableEXT-alphaToOne-07607";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::alphaToOneEnable),
+                         "is VK_TRUE but the alphaToOne feature was not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
@@ -2159,36 +2486,30 @@ bool CoreChecks::PreCallValidateCmdSetAlphaToCoverageEnableEXT(VkCommandBuffer c
 
 bool CoreChecks::PreCallValidateCmdSetAlphaToOneEnableEXT(VkCommandBuffer commandBuffer, VkBool32 alphaToOneEnable,
                                                           const ErrorObject& error_obj) const {
+    return ValidateCmdSetAlphaToOneEnable(commandBuffer, alphaToOneEnable, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetLogicOpEnable(VkCommandBuffer commandBuffer, VkBool32 logicOpEnable,
+                                             const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3AlphaToOneEnable && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetAlphaToOneEnableEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3AlphaToOneEnable and shaderObject features were not enabled.");
+    if (!enabled_features.extendedDynamicState3LogicOpEnable && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetLogicOpEnableEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "extendedDynamicState3LogicOpEnable and shaderObject features were not enabled.");
+    }
+    if (logicOpEnable != VK_FALSE && !enabled_features.logicOp) {
+        const char* vuid = "VUID-vkCmdSetLogicOpEnableEXT-logicOp-07366";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::logicOpEnable),
+                         "is VK_TRUE but the logicOp feature was not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
-
-    if (alphaToOneEnable != VK_FALSE && !enabled_features.alphaToOne) {
-        skip |= LogError("VUID-vkCmdSetAlphaToOneEnableEXT-alphaToOne-07607", commandBuffer,
-                         error_obj.location.dot(Field::alphaToOneEnable), "is VK_TRUE but the alphaToOne feature was not enabled.");
-    }
     return skip;
 }
 
 bool CoreChecks::PreCallValidateCmdSetLogicOpEnableEXT(VkCommandBuffer commandBuffer, VkBool32 logicOpEnable,
                                                        const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    bool skip = false;
-    if (!enabled_features.extendedDynamicState3LogicOpEnable && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetLogicOpEnableEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3LogicOpEnable and shaderObject features were not enabled.");
-    }
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-
-    if (logicOpEnable != VK_FALSE && !enabled_features.logicOp) {
-        skip |= LogError("VUID-vkCmdSetLogicOpEnableEXT-logicOp-07366", commandBuffer, error_obj.location.dot(Field::logicOpEnable),
-                         "is VK_TRUE but the logicOp feature was not enabled.");
-    }
-    return skip;
+    return ValidateCmdSetLogicOpEnable(commandBuffer, logicOpEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetColorBlendEnableEXT(VkCommandBuffer commandBuffer, uint32_t firstAttachment,
@@ -2196,10 +2517,6 @@ bool CoreChecks::PreCallValidateCmdSetColorBlendEnableEXT(VkCommandBuffer comman
                                                           const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3ColorBlendEnable && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetColorBlendEnableEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3ColorBlendEnable and shaderObject features were not enabled.");
-    }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
 }
@@ -2210,60 +2527,7 @@ bool CoreChecks::PreCallValidateCmdSetColorBlendEquationEXT(VkCommandBuffer comm
                                                             const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3ColorBlendEquation && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetColorBlendEquationEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3ColorBlendEquation and shaderObject features were not enabled.");
-    }
     skip |= ValidateCmd(*cb_state, error_obj.location);
-
-    for (uint32_t attachment = 0U; attachment < attachmentCount; ++attachment) {
-        const Location equation_loc = error_obj.location.dot(Field::pColorBlendEquations, attachment);
-        VkColorBlendEquationEXT const& equation = pColorBlendEquations[attachment];
-        if (!enabled_features.dualSrcBlend) {
-            if (IsSecondaryColorInputBlendFactor(equation.srcColorBlendFactor)) {
-                skip |= LogError(
-                    "VUID-VkColorBlendEquationEXT-dualSrcBlend-07357", commandBuffer, equation_loc.dot(Field::srcColorBlendFactor),
-                    "is %s but the dualSrcBlend feature was not enabled.", string_VkBlendFactor(equation.srcColorBlendFactor));
-            }
-            if (IsSecondaryColorInputBlendFactor(equation.dstColorBlendFactor)) {
-                skip |= LogError(
-                    "VUID-VkColorBlendEquationEXT-dualSrcBlend-07358", commandBuffer, equation_loc.dot(Field::dstColorBlendFactor),
-                    "is %s but the dualSrcBlend feature was not enabled.", string_VkBlendFactor(equation.dstColorBlendFactor));
-            }
-            if (IsSecondaryColorInputBlendFactor(equation.srcAlphaBlendFactor)) {
-                skip |= LogError(
-                    "VUID-VkColorBlendEquationEXT-dualSrcBlend-07359", commandBuffer, equation_loc.dot(Field::srcAlphaBlendFactor),
-                    "is %s but the dualSrcBlend feature was not enabled.", string_VkBlendFactor(equation.srcAlphaBlendFactor));
-            }
-            if (IsSecondaryColorInputBlendFactor(equation.dstAlphaBlendFactor)) {
-                skip |= LogError(
-                    "VUID-VkColorBlendEquationEXT-dualSrcBlend-07360", commandBuffer, equation_loc.dot(Field::dstAlphaBlendFactor),
-                    "is %s but the dualSrcBlend feature was not enabled.", string_VkBlendFactor(equation.dstAlphaBlendFactor));
-            }
-        }
-        if (IsAdvanceBlendOperation(equation.colorBlendOp) || IsAdvanceBlendOperation(equation.alphaBlendOp)) {
-            skip |=
-                LogError("VUID-VkColorBlendEquationEXT-colorBlendOp-07361", commandBuffer, equation_loc.dot(Field::colorBlendOp),
-                         "(%s) and alphaBlendOp (%s) must not be an advanced blending operation.",
-                         string_VkBlendOp(equation.colorBlendOp), string_VkBlendOp(equation.alphaBlendOp));
-        }
-        if (IsExtEnabled(extensions.vk_khr_portability_subset) && !enabled_features.constantAlphaColorBlendFactors) {
-            if (equation.srcColorBlendFactor == VK_BLEND_FACTOR_CONSTANT_ALPHA ||
-                equation.srcColorBlendFactor == VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA) {
-                skip |= LogError("VUID-VkColorBlendEquationEXT-constantAlphaColorBlendFactors-07362", commandBuffer,
-                                 equation_loc.dot(Field::srcColorBlendFactor),
-                                 "is %s but the constantAlphaColorBlendFactors feature was not enabled.",
-                                 string_VkBlendFactor(equation.srcColorBlendFactor));
-            }
-            if (equation.dstColorBlendFactor == VK_BLEND_FACTOR_CONSTANT_ALPHA ||
-                equation.dstColorBlendFactor == VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA) {
-                skip |= LogError("VUID-VkColorBlendEquationEXT-constantAlphaColorBlendFactors-07363", commandBuffer,
-                                 equation_loc.dot(Field::dstColorBlendFactor),
-                                 "is %s but the constantAlphaColorBlendFactors feature was not enabled.",
-                                 string_VkBlendFactor(equation.dstColorBlendFactor));
-            }
-        }
-    }
     return skip;
 }
 
@@ -2272,10 +2536,6 @@ bool CoreChecks::PreCallValidateCmdSetColorWriteMaskEXT(VkCommandBuffer commandB
                                                         const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3ColorWriteMask && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetColorWriteMaskEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3ColorWriteMask and shaderObject features were not enabled.");
-    }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
 }
@@ -2383,34 +2643,7 @@ bool CoreChecks::PreCallValidateCmdSetColorBlendAdvancedEXT(VkCommandBuffer comm
                                                             const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    if (!enabled_features.extendedDynamicState3ColorBlendAdvanced && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetColorBlendAdvancedEXT-None-09423", commandBuffer, error_obj.location,
-                         "extendedDynamicState3ColorBlendAdvanced and shaderObject features were not enabled.");
-    }
     skip |= ValidateCmd(*cb_state, error_obj.location);
-
-    for (uint32_t attachment = 0U; attachment < attachmentCount; ++attachment) {
-        VkColorBlendAdvancedEXT const& advanced = pColorBlendAdvanced[attachment];
-        if (advanced.srcPremultiplied == VK_TRUE &&
-            !phys_dev_ext_props.blend_operation_advanced_props.advancedBlendNonPremultipliedSrcColor) {
-            skip |= LogError("VUID-VkColorBlendAdvancedEXT-srcPremultiplied-07505", commandBuffer,
-                             error_obj.location.dot(Field::pColorBlendAdvanced, attachment).dot(Field::srcPremultiplied),
-                             "is VK_TRUE but the advancedBlendNonPremultipliedSrcColor feature was not enabled.");
-        }
-        if (advanced.dstPremultiplied == VK_TRUE &&
-            !phys_dev_ext_props.blend_operation_advanced_props.advancedBlendNonPremultipliedDstColor) {
-            skip |= LogError("VUID-VkColorBlendAdvancedEXT-dstPremultiplied-07506", commandBuffer,
-                             error_obj.location.dot(Field::pColorBlendAdvanced, attachment).dot(Field::dstPremultiplied),
-                             "is VK_TRUE but the advancedBlendNonPremultipliedDstColor feature was not enabled.");
-        }
-        if (advanced.blendOverlap != VK_BLEND_OVERLAP_UNCORRELATED_EXT &&
-            !phys_dev_ext_props.blend_operation_advanced_props.advancedBlendCorrelatedOverlap) {
-            skip |= LogError("VUID-VkColorBlendAdvancedEXT-blendOverlap-07507", commandBuffer,
-                             error_obj.location.dot(Field::pColorBlendAdvanced, attachment).dot(Field::blendOverlap),
-                             "is %s, but the advancedBlendCorrelatedOverlap feature was not enabled.",
-                             string_VkBlendOverlapEXT(advanced.blendOverlap));
-        }
-    }
     return skip;
 }
 
@@ -2433,46 +2666,59 @@ bool CoreChecks::PreCallValidateCmdSetProvokingVertexModeEXT(VkCommandBuffer com
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetLineRasterizationModeEXT(VkCommandBuffer commandBuffer,
-                                                               VkLineRasterizationModeEXT lineRasterizationMode,
-                                                               const ErrorObject& error_obj) const {
+bool CoreChecks::ValidateCmdSetLineRasterizationMode(VkCommandBuffer commandBuffer,
+                                                     VkLineRasterizationModeEXT lineRasterizationMode,
+                                                     const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
     if (!enabled_features.extendedDynamicState3LineRasterizationMode && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetLineRasterizationModeEXT-None-09423", commandBuffer, error_obj.location,
+        const char* vuid = "VUID-vkCmdSetLineRasterizationModeEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
                          "extendedDynamicState3LineRasterizationMode and shaderObject features were not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
 
     if (lineRasterizationMode == VK_LINE_RASTERIZATION_MODE_RECTANGULAR && !enabled_features.rectangularLines) {
-        skip |= LogError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07418", commandBuffer,
-                         error_obj.location.dot(Field::lineRasterizationMode),
+        const char* vuid = "VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07418";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::lineRasterizationMode),
                          "is VK_LINE_RASTERIZATION_MODE_RECTANGULAR "
                          "but the rectangularLines feature was not enabled.");
     } else if (lineRasterizationMode == VK_LINE_RASTERIZATION_MODE_BRESENHAM && !enabled_features.bresenhamLines) {
-        skip |= LogError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07419", commandBuffer,
-                         error_obj.location.dot(Field::lineRasterizationMode),
+        const char* vuid = "VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07419";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::lineRasterizationMode),
                          "is VK_LINE_RASTERIZATION_MODE_BRESENHAM "
                          "but the bresenhamLines feature was not enabled.");
     } else if (lineRasterizationMode == VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH && !enabled_features.smoothLines) {
-        skip |= LogError("VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07420", commandBuffer,
-                         error_obj.location.dot(Field::lineRasterizationMode),
+        const char* vuid = "VUID-vkCmdSetLineRasterizationModeEXT-lineRasterizationMode-07420";
+        skip |= LogError(vuid, commandBuffer, error_obj.location.dot(Field::lineRasterizationMode),
                          "is "
                          "VK_LINE_RASTERIZATION_MODE_RECTANGULAR_SMOOTH but the smoothLines feature was not enabled.");
     }
     return skip;
 }
 
-bool CoreChecks::PreCallValidateCmdSetLineStippleEnableEXT(VkCommandBuffer commandBuffer, VkBool32 stippledLineEnable,
-                                                           const ErrorObject& error_obj) const {
+bool CoreChecks::PreCallValidateCmdSetLineRasterizationModeEXT(VkCommandBuffer commandBuffer,
+                                                               VkLineRasterizationModeEXT lineRasterizationMode,
+                                                               const ErrorObject& error_obj) const {
+    return ValidateCmdSetLineRasterizationMode(commandBuffer, lineRasterizationMode, error_obj);
+}
+
+bool CoreChecks::ValidateCmdSetLineStippleEnable(VkCommandBuffer commandBuffer, VkBool32 stippledLineEnable,
+                                                 const ErrorObject& error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
     if (!enabled_features.extendedDynamicState3LineStippleEnable && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetLineStippleEnableEXT-None-09423", commandBuffer, error_obj.location,
+        const char* vuid = "VUID-vkCmdSetLineStippleEnableEXT-None-09423";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
                          "extendedDynamicState3LineStippleEnable and shaderObject features were not enabled.");
     }
     skip |= ValidateCmd(*cb_state, error_obj.location);
     return skip;
+}
+
+bool CoreChecks::PreCallValidateCmdSetLineStippleEnableEXT(VkCommandBuffer commandBuffer, VkBool32 stippledLineEnable,
+                                                           const ErrorObject& error_obj) const {
+    return ValidateCmdSetLineStippleEnable(commandBuffer, stippledLineEnable, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetDepthClipNegativeOneToOneEXT(VkCommandBuffer commandBuffer, VkBool32 negativeOneToOne,
@@ -2746,19 +2992,29 @@ bool CoreChecks::PreCallValidateCmdSetColorWriteEnableEXT(VkCommandBuffer comman
     return skip;
 }
 
+bool CoreChecks::ValidateCmdSetVertexInput(VkCommandBuffer commandBuffer, uint32_t vertexBindingDescriptionCount,
+                                           const VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions,
+                                           uint32_t vertexAttributeDescriptionCount,
+                                           const VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions,
+                                           const ErrorObject& error_obj) const {
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    bool skip = false;
+    if (!enabled_features.vertexInputDynamicState && !enabled_features.shaderObject) {
+        const char* vuid = "VUID-vkCmdSetVertexInputEXT-None-08546";
+        skip |= LogError(vuid, commandBuffer, error_obj.location,
+                         "vertexInputDynamicState and shaderObject features were not enabled.");
+    }
+    skip |= ValidateCmd(*cb_state, error_obj.location);
+    return skip;
+}
+
 bool CoreChecks::PreCallValidateCmdSetVertexInputEXT(VkCommandBuffer commandBuffer, uint32_t vertexBindingDescriptionCount,
                                                      const VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions,
                                                      uint32_t vertexAttributeDescriptionCount,
                                                      const VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions,
                                                      const ErrorObject& error_obj) const {
-    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
-    bool skip = false;
-    if (!enabled_features.vertexInputDynamicState && !enabled_features.shaderObject) {
-        skip |= LogError("VUID-vkCmdSetVertexInputEXT-None-08546", commandBuffer, error_obj.location,
-                         "vertexInputDynamicState and shaderObject features were not enabled.");
-    }
-    skip |= ValidateCmd(*cb_state, error_obj.location);
-    return skip;
+    return ValidateCmdSetVertexInput(commandBuffer, vertexBindingDescriptionCount, pVertexBindingDescriptions,
+                                     vertexAttributeDescriptionCount, pVertexAttributeDescriptions, error_obj);
 }
 
 bool CoreChecks::PreCallValidateCmdSetCoarseSampleOrderNV(VkCommandBuffer commandBuffer, VkCoarseSampleOrderTypeNV sampleOrderType,

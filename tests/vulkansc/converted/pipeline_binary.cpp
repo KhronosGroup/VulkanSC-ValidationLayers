@@ -80,8 +80,8 @@ TEST_F(NegativePipelineBinary, ReleaseCapturedDataAllocator) {
             return realloc(original, size);
         };
         static VKAPI_ATTR void VKAPI_CALL freeFunc(void*, void* ptr) { free(ptr); };
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
+        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
     };
     const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
 
@@ -182,8 +182,8 @@ TEST_F(NegativePipelineBinary, Destroy) {
             return realloc(original, size);
         };
         static VKAPI_ATTR void VKAPI_CALL freeFunc(void*, void* ptr) { free(ptr); };
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope){};
+        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
+        static VKAPI_ATTR void VKAPI_CALL internalFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
     };
     const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
 
@@ -191,27 +191,32 @@ TEST_F(NegativePipelineBinary, Destroy) {
     binary_create_info.pipeline = pipe;
 
     VkPipelineBinaryHandlesInfoKHR handles_info = vku::InitStructHelper();
-    handles_info.pipelineBinaryCount = 1;
-
-    VkPipelineBinaryKHR pipeline_binary_alloc;
-    handles_info.pPipelineBinaries = &pipeline_binary_alloc;
+    ASSERT_EQ(VK_SUCCESS, vk::CreatePipelineBinariesKHR(device(), &binary_create_info, &allocator, &handles_info));
+    std::vector<VkPipelineBinaryKHR> pipeline_binaries(handles_info.pipelineBinaryCount);
+    handles_info.pPipelineBinaries = pipeline_binaries.data();
     VkResult err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, &allocator, &handles_info);
     ASSERT_EQ(VK_SUCCESS, err);
+    ASSERT_FALSE(pipeline_binaries.empty());
+    const VkPipelineBinaryKHR pipeline_binary_alloc = pipeline_binaries[0];
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyPipelineBinaryKHR-pipelineBinary-09614");
     vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_alloc, nullptr);
     m_errorMonitor->VerifyFound();
-    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_alloc, &allocator);
+    for (uint32_t i = 0; i < handles_info.pipelineBinaryCount; ++i) {
+        vk::DestroyPipelineBinaryKHR(device(), pipeline_binaries[i], &allocator);
+    }
 
-    VkPipelineBinaryKHR pipeline_binary_no_alloc;
-    handles_info.pPipelineBinaries = &pipeline_binary_no_alloc;
+    handles_info.pipelineBinaryCount = static_cast<uint32_t>(pipeline_binaries.size());
     err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handles_info);
     ASSERT_EQ(VK_SUCCESS, err);
+    const VkPipelineBinaryKHR pipeline_binary_no_alloc = pipeline_binaries[0];
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyPipelineBinaryKHR-pipelineBinary-09615");
     vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_no_alloc, &allocator);
     m_errorMonitor->VerifyFound();
-    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_no_alloc, nullptr);
+    for (uint32_t i = 0; i < handles_info.pipelineBinaryCount; ++i) {
+        vk::DestroyPipelineBinaryKHR(device(), pipeline_binaries[i], nullptr);
+    }
 }
 
 TEST_F(NegativePipelineBinary, ComputePipeline) {

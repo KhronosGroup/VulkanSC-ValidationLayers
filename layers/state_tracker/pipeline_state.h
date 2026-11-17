@@ -50,9 +50,9 @@ namespace vvl {
 class PipelineCache : public StateObject {
   public:
     const vku::safe_VkPipelineCacheCreateInfo create_info;
+    const bool is_data_graph_model;
 
-    PipelineCache(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo)
-        : StateObject(pipeline_cache, kVulkanObjectTypePipelineCache), create_info(pCreateInfo) {}
+    PipelineCache(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo);
 
     VkPipelineCache VkHandle() const { return handle_.Cast<VkPipelineCache>(); }
 
@@ -99,7 +99,6 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
     const bool descriptor_heap_mode;
 
     vvl::span<const vku::safe_VkPipelineShaderStageCreateInfo> shader_stages_ci;
-    VkPipelineShaderStageCreateInfo data_graph_shader_stage_ci;
     const vku::safe_VkPipelineLibraryCreateInfoKHR *ray_tracing_library_ci = nullptr;
     // If using a shader module identifier, the module itself is not validated, but the shader stage is still known
     const bool uses_shader_module_id;
@@ -154,8 +153,7 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
 
     Pipeline(const DeviceState &state_data, const VkGraphicsPipelineCreateInfo *pCreateInfo,
              std::shared_ptr<const vvl::PipelineCache> pipe_cache, std::shared_ptr<const vvl::RenderPass> &&rpstate,
-             std::shared_ptr<const vvl::PipelineLayout> &&layout,
-             spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]);
+             std::shared_ptr<const vvl::PipelineLayout> &&layout, std::vector<spirv::StatelessData> *stateless_data);
 
     Pipeline(const DeviceState &state_data, const VkComputePipelineCreateInfo *pCreateInfo,
              std::shared_ptr<const vvl::PipelineCache> &&pipe_cache, std::shared_ptr<const vvl::PipelineLayout> &&layout,
@@ -164,9 +162,6 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
     Pipeline(const DeviceState &state_data, const VkRayTracingPipelineCreateInfoKHR *pCreateInfo,
              std::shared_ptr<const vvl::PipelineCache> &&pipe_cache, std::shared_ptr<const vvl::PipelineLayout> &&layout,
              std::vector<spirv::StatelessData> *stateless_data);
-
-    Pipeline(const DeviceState &state_data, const VkRayTracingPipelineCreateInfoNV *pCreateInfo,
-             std::shared_ptr<const vvl::PipelineCache> &&pipe_cache, std::shared_ptr<const vvl::PipelineLayout> &&layout);
 
     Pipeline(const DeviceState &state_data, const VkDataGraphPipelineCreateInfoARM *pCreateInfo,
              std::shared_ptr<const vvl::PipelineCache> &&pipe_cache, std::shared_ptr<const vvl::PipelineLayout> &&layout,
@@ -266,6 +261,11 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
     // There could be an invalid RenderPass which will not come as null, need to check RenderPassState() if it is valid
     bool IsRenderPassNull() const { return GraphicsCreateInfo().renderPass == VK_NULL_HANDLE; }
 
+    // WARNING - This function is dangerous to use the |set_layouts| if you are inside a command buffer recording
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/10560
+    // While we keep a shared pointer of the vvl::PipelineLayout (in case it is destroyed) we don't save any immutable samplers
+    // If this pipeline layout has |has_immutable_samplers| true, then using this at draw time can lead to undesired effects
+    // (At draw time, you need to use the pipeline found in vkCmdBindDescriptorSets)
     const std::shared_ptr<const vvl::PipelineLayout> PipelineLayoutState() const {
         // TODO A render pass object is required for all of these library states. Which one should be used for an "executable
         // pipeline"?
@@ -461,18 +461,25 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
     // From https://gitlab.khronos.org/vulkan/vulkan/-/issues/3263
     // None of these require VK_EXT_extended_dynamic_state3
     inline bool IsDepthStencilStateDynamic() const {
-        return IsDynamic(CB_DYNAMIC_STATE_DEPTH_TEST_ENABLE) && IsDynamic(CB_DYNAMIC_STATE_DEPTH_WRITE_ENABLE) &&
-               IsDynamic(CB_DYNAMIC_STATE_DEPTH_COMPARE_OP) && IsDynamic(CB_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE) &&
-               IsDynamic(CB_DYNAMIC_STATE_STENCIL_TEST_ENABLE) && IsDynamic(CB_DYNAMIC_STATE_STENCIL_OP) &&
-               IsDynamic(CB_DYNAMIC_STATE_DEPTH_BOUNDS);
+        return (dynamic_state & kDepthStencilStateDynamic) == kDepthStencilStateDynamic;
     }
 
     // If true, VK_EXT_extended_dynamic_state3 must also have been enabled
-    inline bool IsColorBlendStateDynamic() const {
-        return IsDynamic(CB_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT) && IsDynamic(CB_DYNAMIC_STATE_LOGIC_OP_EXT) &&
-               IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT) && IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT) &&
-               IsDynamic(CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT) && IsDynamic(CB_DYNAMIC_STATE_BLEND_CONSTANTS);
+    inline bool IsColorBlendStateDynamic() const { return (dynamic_state & kColorBlendStateDynamic) == kColorBlendStateDynamic; }
+
+    // If true, VK_EXT_extended_dynamic_state3 must also have been enabled
+    inline bool IsRasterizationStateDynamic() const {
+        return (dynamic_state & kRasterizationStateDynamic) == kRasterizationStateDynamic;
     }
+
+    // From VkPipelineColorBlendStateCreateInfo::attachmentCount definition of when it is ignored
+    inline bool IsColorBlendStateAttachmentCountIgnore(bool advance_blend_coherent_operations) const {
+        return IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT) && IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT) &&
+               IsDynamic(CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT) &&
+               (IsDynamic(CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT) || !advance_blend_coherent_operations);
+    }
+
+    std::string DescribeDynamicStateSet(const CBDynamicFlags& states) const;
 
     template <typename CreateInfo>
     static bool EnablesRasterizationStates(const vvl::DeviceState &device_state, const CreateInfo &create_info) {
@@ -560,13 +567,14 @@ class Pipeline : public StateObject, public SubStateManager<PipelineSubState> {
   protected:
     static std::shared_ptr<VertexInputState> CreateVertexInputState(const Pipeline &p, const DeviceState &state,
                                                                     const vku::safe_VkGraphicsPipelineCreateInfo &create_info);
-    static std::shared_ptr<PreRasterState> CreatePreRasterState(
-        const Pipeline &p, const DeviceState &state, const vku::safe_VkGraphicsPipelineCreateInfo &create_info,
-        const std::shared_ptr<const vvl::RenderPass> &rp, spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]);
+    static std::shared_ptr<PreRasterState> CreatePreRasterState(const Pipeline& p, const DeviceState& state,
+                                                                const vku::safe_VkGraphicsPipelineCreateInfo& create_info,
+                                                                const std::shared_ptr<const vvl::RenderPass>& rp,
+                                                                std::vector<spirv::StatelessData>* stateless_data);
     static std::shared_ptr<FragmentShaderState> CreateFragmentShaderState(
         const Pipeline &p, const DeviceState &state, const VkGraphicsPipelineCreateInfo &create_info,
         const vku::safe_VkGraphicsPipelineCreateInfo &safe_create_info, const std::shared_ptr<const vvl::RenderPass> &rp,
-        spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]);
+        std::vector<spirv::StatelessData> *stateless_data);
     static std::shared_ptr<FragmentOutputState> CreateFragmentOutputState(
         const Pipeline &p, const DeviceState &state, const VkGraphicsPipelineCreateInfo &create_info,
         const vku::safe_VkGraphicsPipelineCreateInfo &safe_create_info, const std::shared_ptr<const vvl::RenderPass> &rp);

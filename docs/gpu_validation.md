@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD041 -->
-<!-- Copyright 2015-2025 Valve Corporation -->
-<!-- Copyright 2015-2025 LunarG, Inc. -->
+<!-- Copyright 2015-2026 Valve Corporation -->
+<!-- Copyright 2015-2026 LunarG, Inc. -->
 [![Khronos Vulkan][1]][2]
 
 [1]: https://vulkan.lunarg.com/img/Vulkan_100px_Dec16.png "https://www.khronos.org/vulkan/"
@@ -29,7 +29,9 @@ There are several limitations that may impede the operation of GPU Assisted Vali
 - Vulkan 1.1+ required
 - A Descriptor Slot
     - GPU-AV requires one descriptor set, which means if an application is using all sets in `VkPhysicalDeviceLimits::maxBoundDescriptorSets`, GPU-AV will not work.
-    - GPU-AV will reduce the returned value of `maxBoundDescriptorSets` by one.
+    - GPU-AV uses the last slot (`maxBoundDescriptorSets - 1`, capped at slot `32`).
+    - The returned value of `maxBoundDescriptorSets` is only reduced by one if the deprecated `VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT` is enabled.
+    - With `VK_EXT_descriptor_buffer`, GPU-AV also takes one of the `maxResourceDescriptorBufferBindings` (see [Descriptor Buffer](./gpu_av_descriptor_buffer.md)).
 - `fragmentStoresAndAtomics` and `vertexPipelineStoresAndAtomics` so we can write out information from those stages.
 - `timelineSemaphore` so we don't have a big `vkQueueWaitIdle` after each submission.
 
@@ -63,7 +65,7 @@ By assuming things "should likely be working", we can make GPU-AV much faster
 
 We realize if we don't stop your Device Lost, no one else will. If you are stuck on a nasty bug and need the extra help, this is for you.
 
-**Please turn off Safe Mode**, this will sacrifice performance, but GPU-AV will try to stop things from crashing. We have a way to [select the bad shader](./gpu_av_selective_shader.md) as this will **greatly** improve performance if we only need to validate a smaller surface area.
+**Please turn on Safe Mode**, this will sacrifice performance, but GPU-AV will try to stop things from crashing. We have a way to [reduce the scoped](./gpu_av_scoped.md) as this will **greatly** improve performance if we only need to validate a smaller surface area.
 
 #### Force on Robustness
 
@@ -72,6 +74,12 @@ There is also a "Force robustness on" setting we provide in GPU-AV, this has 2 m
 1. A way for developers to toggle this on and off
 2. Improve GPU-AV performance by assuming the developer relies on [robust behavior to work](https://docs.vulkan.org/guide/latest/robustness.html)
 
+## Make GPU-AV faster with Scoped GPU-AV
+
+The main reason GPU-AV is slow is we need to validate **everything** in case. Sometimes people already know the part of their program crashing and want to only validate that area. `Scoped GPU-AV` is a way to provide the regions of your program to only validate.
+
+More information in [Scoped GPU-AV](./gpu_av_scoped.md)
+
 ## Internal Details
 
 The state of GPU-AV is constantly evolving as we find out what does and doesn't work.
@@ -79,6 +87,10 @@ The state of GPU-AV is constantly evolving as we find out what does and doesn't 
 The following are extra information around GPU-AV for those who want to know:
 
 - [General development advice](./gpu_av_development.md)
-- [How descriptor indexing works](./gpu_av_descriptor_indexing.md)
-- [How post processing works](./gpu_av_post_process.md)
 - [How shader instrumentation works](./gpu_av_shader_instrumentation.md)
+- [How GPU-AV injects its own descriptor](./gpu_av_internal_descriptor.md)
+- [How descriptor indexing works](./gpu_av_descriptor_indexing.md)
+- [How descriptor buffers are handled](./gpu_av_descriptor_buffer.md)
+- [How descriptor heaps are handled](./gpu_av_descriptor_heap.md)
+- [How descriptor hashing works](./gpu_av_descriptor_hashing.md)
+- [How post processing works](./gpu_av_post_process.md)

@@ -27,15 +27,6 @@ namespace vvl {
 class ImageView;
 }  // namespace vvl
 
-static inline uint32_t GetSubpassDepthStencilAttachmentIndex(const vku::safe_VkPipelineDepthStencilStateCreateInfo *pipe_ds_ci,
-                                                             const vku::safe_VkAttachmentReference2 *depth_stencil_ref) {
-    uint32_t depth_stencil_attachment = VK_ATTACHMENT_UNUSED;
-    if (pipe_ds_ci && depth_stencil_ref) {
-        depth_stencil_attachment = depth_stencil_ref->attachment;
-    }
-    return depth_stencil_attachment;
-}
-
 struct SubpassDependencyInfo {
     // For dependencies between subpasses this is a dstSubpass.
     // For external dependencies this can be either srcSubpass or dstSubpass
@@ -62,11 +53,6 @@ struct SubpassDependencyInfo {
     VkSubpassDependency2 implicit_barrier_to_external;
 };
 
-struct SubpassLayout {
-    uint32_t index;
-    VkImageLayout layout;
-};
-
 namespace vvl {
 
 // Vulkan 1.0 has a VkRenderPass object, things like dynamic rendering moved the handle to be across various other structs/calls.
@@ -80,7 +66,9 @@ class RenderPass : public StateObject {
     const bool use_dynamic_rendering_inherited;
 
     const vku::safe_VkRenderingInfo dynamic_rendering_begin_rendering_info;
-    // Note, this is not the exact VkPipelineRenderingCreateInfo passed in, instead it will handle fields being ignored
+    // Note, this is not the exact VkPipelineRenderingCreateInfo passed in, instead it will handle fields being ignored.
+    // When dealing with GPL (puke) you will have to be cautious that viewMask are only in the PreRaster/FragShader and the formats
+    // are only in the FragOutput... nothing could go wrong
     const vku::safe_VkPipelineRenderingCreateInfo dynamic_pipeline_rendering_create_info;
     // when a secondary command buffer is recorded with VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT
     const vku::safe_VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info;
@@ -135,7 +123,6 @@ class RenderPass : public StateObject {
     explicit RenderPass(const VkRenderingInfo& rendering_info);
     // vkBeginCommandBuffer (dynamic rendering in secondary commadn buffer)
     explicit RenderPass(VkCommandBufferInheritanceRenderingInfo const *pInheritanceRenderingInfo);
-
     // vkCreateGraphicsPipelines (dynamic rendering state tied to pipeline state)
     explicit RenderPass(const VkPipelineRenderingCreateInfo& rendering_ci);
 
@@ -150,6 +137,8 @@ class RenderPass : public StateObject {
     // These helpers are because at draw time, we won't know if the values are from VkRenderingInfo or
     // VkCommandBufferInheritanceRenderingInfo
     uint32_t GetDynamicRenderingViewMask() const;
+    // Number of layers rendered to by vkCmdBeginRendering (layerCount is only used when viewMask is 0)
+    uint32_t GetDynamicRenderingLayerCount() const;
     VkRenderingFlags GetRenderingFlags() const;
     const VkMultisampledRenderToSingleSampledInfoEXT *GetMSRTSSInfo(uint32_t subpass) const;
 };

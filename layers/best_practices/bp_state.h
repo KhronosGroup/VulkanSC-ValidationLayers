@@ -25,7 +25,6 @@
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include "state_tracker/image_state.h"
-#include "state_tracker/descriptor_sets.h"
 #include "state_tracker/push_constant_data.h"
 
 class BestPractices;
@@ -155,6 +154,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     CommandBufferStateNV nv;
     uint64_t num_submits = 0;
     uint32_t small_indexed_draw_call_count = 0;
+    vvl::unordered_set<VkPipeline> bound_graphics_pipelines;
 
     std::vector<PushConstantData> push_constant_data_chunks;
 
@@ -225,7 +225,7 @@ class CommandBufferSubState : public vvl::CommandBufferSubState {
     void RecordSetDepthTestEnable(VkBool32 depth_test_enable) final;
     void RecordBindPipeline(VkPipelineBindPoint bind_point, vvl::Pipeline& pipeline) final;
 
-    void Submit(vvl::Queue& queue_state, uint32_t perf_submit_pass, const Location& loc) final;
+    void Submit(vvl::Queue& queue_state, const vvl::QueueSubmission& queue_submission, uint32_t cb_index) final;
 
     // Move to private when possible
     void RecordAttachmentAccess(uint32_t attachment, VkImageAspectFlags aspects);

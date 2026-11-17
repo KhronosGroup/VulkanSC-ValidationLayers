@@ -22,7 +22,7 @@
 
 // NOLINTBEGIN
 
-// This file contains methods for class DispatchInstance  and it is designed to ONLY be
+// This file contains methods for class DispatchInstance and it is designed to ONLY be
 // included into dispatch_object.h.
 
 #pragma once
@@ -306,11 +306,15 @@ VkResult GetPhysicalDeviceQueueFamilyDataGraphOpticalFlowImageFormatsARM(
     const VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties,
     const VkDataGraphOpticalFlowImageFormatInfoARM* pOpticalFlowImageFormatInfo, uint32_t* pFormatCount,
     VkDataGraphOpticalFlowImageFormatPropertiesARM* pImageFormatProperties);
+VkResult GetPhysicalDeviceCooperativeMatrixProperties2EXT(VkPhysicalDevice physicalDevice,
+                                                          const VkPhysicalDeviceCooperativeMatrixInfo2EXT* pCooperativeMatrixInfo,
+                                                          uint32_t* pPropertyCount, VkCooperativeMatrixProperties2EXT* pProperties);
 #ifdef VK_USE_PLATFORM_UBM_SEC
 VkResult CreateUbmSurfaceSEC(VkInstance instance, const VkUbmSurfaceCreateInfoSEC* pCreateInfo,
                              const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface);
 VkBool32 GetPhysicalDeviceUbmPresentationSupportSEC(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                     struct ubm_device* device);
 #endif  // VK_USE_PLATFORM_UBM_SEC
+void GetPhysicalDeviceInternalHandleNV(VkPhysicalDevice physicalDevice, VkInternalHandleNV* pHandle);
 
 // NOLINTEND

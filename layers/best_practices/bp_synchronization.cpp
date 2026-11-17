@@ -19,7 +19,6 @@
 
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/bp_state.h"
-#include "state_tracker/queue_state.h"
 #include "generated/dispatch_functions.h"
 
 bool BestPractices::CheckDependencyInfo(const LogObjectList& objlist, const Location& dep_loc, const VkDependencyInfo& dep_info,
@@ -59,7 +58,7 @@ bool BestPractices::CheckEventSignalingState(const bp_state::CommandBufferSubSta
         skip |= LogWarning("BestPractices-Event-SignalSignaledEvent", objlist, cb_loc,
                            "%s sets event %s which was already set (in this command buffer or in the executed secondary command "
                            "buffers). If this is not the desired behavior, the event must be reset before it is set again.",
-                           FormatHandle(command_buffer.VkHandle()).c_str(), FormatHandle(event).c_str());
+                           FormatHandle(command_buffer.Handle()).c_str(), FormatHandle(event).c_str());
     }
     return skip;
 }
@@ -111,11 +110,25 @@ bool BestPractices::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandBuffer,
 }
 
 bool BestPractices::ValidateAccessLayoutCombination(const Location& loc, VkImage image, VkAccessFlags2 access, VkImageLayout layout,
-                                                    VkImageAspectFlags aspect) const {
+                                                    VkImageAspectFlags aspect, bool is_src) const {
     bool skip = false;
 
     const VkAccessFlags2 all = vvl::kU64Max;  // core validation is responsible for detecting undefined flags.
     VkAccessFlags2 allowed = 0;
+    // Multisample resolve operations use the color attachment accesses even for depth/stencil attachments. The multisample
+    // attachment is only read, so it can be in a read-only layout, while the single sample attachment is also written.
+    // https://docs.vulkan.org/spec/latest/chapters/renderpass.html#renderpass-resolve-operations
+    const VkAccessFlags2 resolve_read_access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+    const VkAccessFlags2 resolve_access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    const VkAccessFlags2 color_attachment_access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                                   VK_ACCESS_COLOR_ATTACHMENT_READ_NONCOHERENT_BIT_EXT;
+    const VkAccessFlags2 depth_stencil_attachment_access =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    const VkAccessFlags2 shader_read_only_access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_SHADER_READ_BIT |
+                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                                                   VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+    const VkAccessFlags2 depth_stencil_read_only_access =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | shader_read_only_access | resolve_read_access;
 
     // Combinations taken from https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/2918
     switch (layout) {
@@ -130,17 +143,13 @@ bool BestPractices::ValidateAccessLayoutCombination(const Location& loc, VkImage
                       VK_ACCESS_COLOR_ATTACHMENT_READ_NONCOHERENT_BIT_EXT;
             break;
         case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-            allowed = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            allowed = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | resolve_access;
             break;
         case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
-            allowed = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
-                      VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+            allowed = depth_stencil_read_only_access;
             break;
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-            allowed = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
-                      VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+            allowed = shader_read_only_access | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
             break;
         case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
             allowed = VK_ACCESS_TRANSFER_READ_BIT;
@@ -153,39 +162,33 @@ bool BestPractices::ValidateAccessLayoutCombination(const Location& loc, VkImage
             break;
         case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
             if (aspect & VK_IMAGE_ASPECT_DEPTH_BIT) {
-                allowed |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                           VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
-                           VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+                allowed |= depth_stencil_read_only_access;
             }
             if (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) {
-                allowed |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                allowed |=
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | resolve_access;
             }
             break;
         case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
             if (aspect & VK_IMAGE_ASPECT_DEPTH_BIT) {
-                allowed |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                allowed |=
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | resolve_access;
             }
             if (aspect & VK_IMAGE_ASPECT_STENCIL_BIT) {
-                allowed |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                           VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
-                           VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+                allowed |= depth_stencil_read_only_access;
             }
             break;
         case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
-            allowed = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            allowed = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | resolve_access;
             break;
         case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
-            allowed = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
-                      VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+            allowed = depth_stencil_read_only_access;
             break;
         case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
-            allowed = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            allowed = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | resolve_access;
             break;
         case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
-            allowed = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
-                      VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+            allowed = depth_stencil_read_only_access;
             break;
         case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
             allowed = VK_ACCESS_NONE;  // PR table says "Must be 0"
@@ -201,16 +204,39 @@ bool BestPractices::ValidateAccessLayoutCombination(const Location& loc, VkImage
         case VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT:
             allowed = VK_ACCESS_FRAGMENT_DENSITY_MAP_READ_BIT_EXT;
             break;
+        case VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL:
+            allowed = color_attachment_access | depth_stencil_attachment_access;
+            break;
+        case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
+            allowed = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_NONCOHERENT_BIT_EXT |
+                      depth_stencil_read_only_access;
+            break;
+        case VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT:
+            allowed = color_attachment_access | depth_stencil_attachment_access | shader_read_only_access;
+            break;
+        case VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ:
+            allowed = color_attachment_access | depth_stencil_attachment_access | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+                      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                      VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+            break;
         default:
             // If a new layout is added, will need to manually add it
             return false;
     }
 
-    if ((allowed | access) != allowed) {
-        skip |= LogWarning("BestPractices-ImageBarrierAccessLayout", image, loc,
-                           "image is %s and accessMask is %s, but for layout %s expected accessMask are %s.",
-                           FormatHandle(image).c_str(), string_VkAccessFlags2(access).c_str(), string_VkImageLayout(layout),
-                           string_VkAccessFlags2(allowed).c_str());
+    const VkAccessFlags2 unexpected = access & ~allowed;
+    if (unexpected != 0) {
+        const Location access_loc = loc.dot(is_src ? Field::srcAccessMask : Field::dstAccessMask);
+        const Location layout_loc = loc.dot(is_src ? Field::oldLayout : Field::newLayout);
+        skip |= LogWarning("BestPractices-ImageBarrierAccessLayout", image, access_loc,
+                           "(%s) contains %s, which is not an access expected for an image in %s (%s) (aspectMask is %s).\n"
+                           "The accesses expected for %s are %s.\n"
+                           "Either remove the unexpected access from %s, or check that %s is the layout %s is in when the "
+                           "access happens.",
+                           string_VkAccessFlags2(access).c_str(), string_VkAccessFlags2(unexpected).c_str(),
+                           layout_loc.Fields().c_str(), string_VkImageLayout(layout), string_VkImageAspectFlags(aspect).c_str(),
+                           string_VkImageLayout(layout), allowed == 0 ? "none (0)" : string_VkAccessFlags2(allowed).c_str(),
+                           access_loc.Fields().c_str(), string_VkImageLayout(layout), FormatHandle(image).c_str());
     }
 
     return skip;
@@ -230,8 +256,8 @@ bool BestPractices::ValidateImageMemoryBarrier(const Location& loc, VkCommandBuf
     }
 
     if (device_state->special_supported.has_maintenance9 && srcQueueFamilyIndex != dstQueueFamilyIndex &&
-        srcQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && srcQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL &&
-        dstQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && dstQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL) {
+        !IsValueIn(srcQueueFamilyIndex, {VK_QUEUE_FAMILY_FOREIGN_EXT, VK_QUEUE_FAMILY_EXTERNAL, VK_QUEUE_FAMILY_IGNORED}) &&
+        !IsValueIn(dstQueueFamilyIndex, {VK_QUEUE_FAMILY_FOREIGN_EXT, VK_QUEUE_FAMILY_EXTERNAL, VK_QUEUE_FAMILY_IGNORED})) {
         auto image_state = Get<vvl::Image>(image);
         const char* warning = enabled_features.maintenance9
                                   ? "is not required, because maintenance9 is enabled"
@@ -268,8 +294,8 @@ bool BestPractices::ValidateImageMemoryBarrier(const Location& loc, VkCommandBuf
         }
     }
 
-    skip |= ValidateAccessLayoutCombination(loc, image, srcAccessMask, oldLayout, aspectMask);
-    skip |= ValidateAccessLayoutCombination(loc, image, dstAccessMask, newLayout, aspectMask);
+    skip |= ValidateAccessLayoutCombination(loc, image, srcAccessMask, oldLayout, aspectMask, true);
+    skip |= ValidateAccessLayoutCombination(loc, image, dstAccessMask, newLayout, aspectMask, false);
 
     return skip;
 }
@@ -279,8 +305,8 @@ bool BestPractices::ValidateBufferMemoryBarrier(const Location& loc, VkCommandBu
     bool skip = false;
 
     if (device_state->special_supported.has_maintenance9 && srcQueueFamilyIndex != dstQueueFamilyIndex &&
-        srcQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && srcQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL &&
-        dstQueueFamilyIndex != VK_QUEUE_FAMILY_FOREIGN_EXT && dstQueueFamilyIndex != VK_QUEUE_FAMILY_EXTERNAL) {
+        !IsValueIn(srcQueueFamilyIndex, {VK_QUEUE_FAMILY_FOREIGN_EXT, VK_QUEUE_FAMILY_EXTERNAL, VK_QUEUE_FAMILY_IGNORED}) &&
+        !IsValueIn(dstQueueFamilyIndex, {VK_QUEUE_FAMILY_FOREIGN_EXT, VK_QUEUE_FAMILY_EXTERNAL, VK_QUEUE_FAMILY_IGNORED})) {
         const char* warning = enabled_features.maintenance9
                                   ? "is not required, because maintenance9 is enabled"
                                   : "could be omitted, if maintenance9 (which is supported by the physical device) were enabled";
@@ -323,31 +349,10 @@ bool BestPractices::PreCallValidateCmdPipelineBarrier(
                                           ". Consider consolidating and re-organizing the frame to use fewer barriers.",
                                           VendorSpecificTag(kBPVendorAMD), num, total_barriers, kMaxRecommendedBarriersSizeAMD);
         }
-    }
-    if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
-        static constexpr std::array<VkImageLayout, 3> read_layouts = {
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        };
 
         for (uint32_t i = 0; i < imageMemoryBarrierCount; i++) {
-            // read to read barriers
-            const auto& image_barrier = pImageMemoryBarriers[i];
-            const bool old_is_read_layout =
-                std::find(read_layouts.begin(), read_layouts.end(), image_barrier.oldLayout) != read_layouts.end();
-            const bool new_is_read_layout =
-                std::find(read_layouts.begin(), read_layouts.end(), image_barrier.newLayout) != read_layouts.end();
-
-            if (old_is_read_layout && new_is_read_layout) {
-                skip |= LogPerformanceWarning("BestPractices-PipelineBarrier-readToReadBarrier", commandBuffer, error_obj.location,
-                                              "%s %s Don't issue read-to-read barriers. "
-                                              "Get the resource in the right state the first time you use it.",
-                                              VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA));
-            }
-
             // general with no storage
-            if (VendorCheckEnabled(kBPVendorAMD) && image_barrier.newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+            if (pImageMemoryBarriers[i].newLayout == VK_IMAGE_LAYOUT_GENERAL) {
                 auto image_state = Get<vvl::Image>(pImageMemoryBarriers[i].image);
                 if (image_state && !(image_state->usage & VK_IMAGE_USAGE_STORAGE_BIT)) {
                     const LogObjectList objlist(commandBuffer, pImageMemoryBarriers[i].image);
@@ -419,14 +424,15 @@ bool BestPractices::PreCallValidateCreateSemaphore(VkDevice device, const VkSema
                                                    const ErrorObject& error_obj) const {
     bool skip = false;
     if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
-        const size_t count = Count<vvl::Semaphore>();
+        // This is called before the new semaphore is tracked, so include it in the count
+        const size_t count = Count<vvl::Semaphore>() + 1;
         if (count > kMaxRecommendedSemaphoreObjectsSizeAMD) {
             skip |= LogPerformanceWarning("BestPractices-SyncObjects-HighNumberOfSemaphores", device, error_obj.location,
-                                          "%s %s High number of vkSemaphore objects created. "
+                                          "%s High number of vkSemaphore objects created. "
                                           "%zu created, but recommended max is %" PRIu32
                                           ".\nMinimize the amount of queue synchronization that is used. "
                                           "Each semaphore has a CPU and GPU overhead cost with it.",
-                                          VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA), count,
+                                          VendorSpecificTag(kBPVendorAMD | kBPVendorNVIDIA).c_str(), count,
                                           kMaxRecommendedSemaphoreObjectsSizeAMD);
         }
     }
@@ -439,14 +445,15 @@ bool BestPractices::PreCallValidateCreateFence(VkDevice device, const VkFenceCre
                                                const ErrorObject& error_obj) const {
     bool skip = false;
     if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
-        const size_t count = Count<vvl::Fence>();
+        // This is called before the new fence is tracked, so include it in the count
+        const size_t count = Count<vvl::Fence>() + 1;
         if (count > kMaxRecommendedFenceObjectsSizeAMD) {
             skip |= LogPerformanceWarning("BestPractices-SyncObjects-HighNumberOfFences", device, error_obj.location,
-                                          "%s %s High number of VkFence objects created. "
+                                          "%s High number of VkFence objects created. "
                                           "%zu created, but recommended max is %" PRIu32
                                           ".\nMinimize the amount of CPU-GPU synchronization that is used. "
                                           "Each fence has a CPU and GPU overhead cost with it.",
-                                          VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA), count,
+                                          VendorSpecificTag(kBPVendorAMD | kBPVendorNVIDIA).c_str(), count,
                                           kMaxRecommendedFenceObjectsSizeAMD);
         }
     }

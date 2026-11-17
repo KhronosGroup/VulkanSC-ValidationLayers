@@ -24,9 +24,6 @@ class LegacyGenerator(BaseGenerator):
     def __init__(self):
         BaseGenerator.__init__(self)
 
-        self.all_device_extensions = set()
-        self.all_instance_extensions = set()
-
     def generate(self):
         self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
             // See {os.path.basename(__file__)} for modifications
@@ -50,11 +47,6 @@ class LegacyGenerator(BaseGenerator):
             * limitations under the License.
             ****************************************************************************/\n''')
         self.write('// NOLINTBEGIN') # Wrap for clang-tidy to ignore
-
-        for extensions in [x.legacy.extensions for x in self.vk.commands.values() if x.legacy and x.legacy.extensions and x.instance]:
-            self.all_instance_extensions.update(extensions)
-        for extensions in [x.legacy.extensions for x in self.vk.commands.values() if x.legacy and x.legacy.extensions and x.device]:
-            self.all_device_extensions.update(extensions)
 
         if self.filename == 'legacy.h':
             self.generateHeader()
@@ -190,26 +182,35 @@ class LegacyGenerator(BaseGenerator):
                     if ({reportedMember}) return false;
                 ''')
 
-            firstCheck = True
             if command.legacy.version:
-                logic = 'if' if firstCheck else 'else if'
-                if firstCheck:
-                    firstCheck = False
+                # We assume if there is a version its because the extension was promoted
+                assert(command.legacy.extensions)
 
                 if command.legacy.supersededBy:
                     replacement = f'which contains {command.legacy.supersededBy} that can be used instead'
 
+                # For instance level |only_supported| is the same as |always|
+                # and consider pApplicationInfo->apiVersion as |only_enabled|
+                #
+                # For device level |only_supported| is found in VkPhysicalDeviceProperties::apiVersion
                 out.append(f'''
-                    {logic} (api_version >= {command.legacy.version.nameApi}) {{
+                    if (legacy_detection_settings.only_enabled && api_version >= {command.legacy.version.nameApi}) {{
                         {reportedMember} = true;
                         LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
                             "{command.name} is a legacy command and this {handleName} was created with {command.legacy.version.name} {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
                     }}''')
 
-            for extension in command.legacy.extensions:
-                logic = 'if' if firstCheck else 'else if'
-                if firstCheck:
-                    firstCheck = False
+                if command.device:
+                    out.append(f'''
+                        else if (legacy_detection_settings.only_supported && phys_dev_props.apiVersion >= {command.legacy.version.nameApi}) {{
+                            {reportedMember} = true;
+                            LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
+                                "{command.name} is a legacy command and this {handleName} supports {command.legacy.version.name} (from VkPhysicalDeviceProperties::apiVersion) {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
+                        }}''')
+
+            # If an EXT and KHR both mark something as legacy, we if/else it to not report multiple errors
+            for index, extension in enumerate(command.legacy.extensions):
+                logic = 'else if' if command.legacy.version or index > 0 else 'if'
 
                 if command.legacy.supersededBy:
                     # Currenty the |supersededBy| only has the version
@@ -225,18 +226,37 @@ class LegacyGenerator(BaseGenerator):
                         print(f'WARNING - need to fix supersededBy logic for {command.name} with {command.legacy.supersededBy}')
                     replacement = f'which contains {new_command} that can be used instead'
 
+                # separate message depending on legacy_detection_settings
                 out.append(f'''
-                    {logic} (IsExtEnabled(extensions.{extension.lower()})) {{
+                    {logic} (legacy_detection_settings.only_enabled && IsExtEnabled(extensions.{extension.lower()})) {{
                         {reportedMember} = true;
                         LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
                             "{command.name} is a legacy command and this {handleName} enabled the {extension} extension {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
                     }}''')
 
+                out.append(f'''
+                    else if (legacy_detection_settings.only_supported && IsExtSupported(extensions.{extension.lower()})) {{
+                        {reportedMember} = true;
+                        LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
+                            "{command.name} is a legacy command and this {handleName} supports the {extension} extension {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
+                    }}''')
+
+            if command.legacy.extensions:
+                extension_names = ' or '.join(command.legacy.extensions)
+                out.append(f'''
+                    else if (legacy_detection_settings.always) {{
+                        {reportedMember} = true;
+                        LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
+                            "{command.name} is a legacy command and there is now the {extension_names} extension {replacement}.{extra}\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}\\nTo limit warnings by only what the {handleName} currently supports/enables, you can adjust the VK_LAYER_LEGACY_DETECTION_MODE (legacy_detection_mode) setting.");
+                    }}''')
+
+
             # For things mark as legacy in Vulkan 1.0
             if command.legacy.version is None and len(command.legacy.extensions) == 0:
                 out.append(f'''
+                           {reportedMember} = true;
                            LogWarning("WARNING-{command.legacy.link}", {objName}, error_obj.location,
-                            "{command.name} is a legacy command.\\nSee more information about this superseding in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
+                            "{command.name} is a legacy command.\\nSee more information about this legacy in the specification: https://docs.vulkan.org/spec/latest/appendices/legacy.html#{command.legacy.link}");
                     ''')
 
             out.append('''

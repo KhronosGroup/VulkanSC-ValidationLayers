@@ -36,7 +36,7 @@ const vvl::unordered_map<VkPipelineStageFlags2, std::string>& GetFeatureNameMap(
         {VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT, "taskShader"},
         {VK_PIPELINE_STAGE_2_SUBPASS_SHADER_BIT_HUAWEI, "subpassShading"},
         {VK_PIPELINE_STAGE_2_INVOCATION_MASK_BIT_HUAWEI, "invocationMask"},
-        {VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR, "rayTracing"},
+        {VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR, "rayTracingPipeline"},
         {VK_PIPELINE_STAGE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR, "shadingRate"},
         {VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, "accelerationStructure"},
         {VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_COPY_BIT_KHR, "rayTracingMaintenance1"},
@@ -737,17 +737,6 @@ static const vvl::unordered_map<VkAccessFlags2, std::array<Entry, 8>>& GetAccess
          }}},
         {VK_ACCESS_2_TRANSFORM_FEEDBACK_COUNTER_WRITE_BIT_EXT,
          ValueType{{
-             {Key(Struct::VkMemoryBarrier2, Field::srcAccessMask), "VUID-VkMemoryBarrier2-srcAccessMask-03920"},
-             {Key(Struct::VkMemoryBarrier2, Field::dstAccessMask), "VUID-VkMemoryBarrier2-dstAccessMask-03920"},
-             {Key(Struct::VkBufferMemoryBarrier2, Field::srcAccessMask), "VUID-VkBufferMemoryBarrier2-srcAccessMask-03920"},
-             {Key(Struct::VkBufferMemoryBarrier2, Field::dstAccessMask), "VUID-VkBufferMemoryBarrier2-dstAccessMask-03920"},
-             {Key(Struct::VkImageMemoryBarrier2, Field::srcAccessMask), "VUID-VkImageMemoryBarrier2-srcAccessMask-03920"},
-             {Key(Struct::VkImageMemoryBarrier2, Field::dstAccessMask), "VUID-VkImageMemoryBarrier2-dstAccessMask-03920"},
-             {Key(Struct::VkMemoryRangeBarrierKHR, Field::srcAccessMask), "VUID-VkMemoryRangeBarrierKHR-srcAccessMask-03920"},
-             {Key(Struct::VkMemoryRangeBarrierKHR, Field::dstAccessMask), "VUID-VkMemoryRangeBarrierKHR-dstAccessMask-03920"},
-         }}},
-        {VK_ACCESS_2_SHADING_RATE_IMAGE_READ_BIT_NV,
-         ValueType{{
              {Key(Struct::VkMemoryBarrier2, Field::srcAccessMask), "VUID-VkMemoryBarrier2-srcAccessMask-03922"},
              {Key(Struct::VkMemoryBarrier2, Field::dstAccessMask), "VUID-VkMemoryBarrier2-dstAccessMask-03922"},
              {Key(Struct::VkBufferMemoryBarrier2, Field::srcAccessMask), "VUID-VkBufferMemoryBarrier2-srcAccessMask-03922"},
@@ -757,7 +746,7 @@ static const vvl::unordered_map<VkAccessFlags2, std::array<Entry, 8>>& GetAccess
              {Key(Struct::VkMemoryRangeBarrierKHR, Field::srcAccessMask), "VUID-VkMemoryRangeBarrierKHR-srcAccessMask-03922"},
              {Key(Struct::VkMemoryRangeBarrierKHR, Field::dstAccessMask), "VUID-VkMemoryRangeBarrierKHR-dstAccessMask-03922"},
          }}},
-        {VK_ACCESS_2_COMMAND_PREPROCESS_READ_BIT_NV,
+        {VK_ACCESS_2_SHADING_RATE_IMAGE_READ_BIT_NV,
          ValueType{{
              {Key(Struct::VkMemoryBarrier2, Field::srcAccessMask), "VUID-VkMemoryBarrier2-srcAccessMask-03923"},
              {Key(Struct::VkMemoryBarrier2, Field::dstAccessMask), "VUID-VkMemoryBarrier2-dstAccessMask-03923"},
@@ -768,7 +757,7 @@ static const vvl::unordered_map<VkAccessFlags2, std::array<Entry, 8>>& GetAccess
              {Key(Struct::VkMemoryRangeBarrierKHR, Field::srcAccessMask), "VUID-VkMemoryRangeBarrierKHR-srcAccessMask-03923"},
              {Key(Struct::VkMemoryRangeBarrierKHR, Field::dstAccessMask), "VUID-VkMemoryRangeBarrierKHR-dstAccessMask-03923"},
          }}},
-        {VK_ACCESS_2_COMMAND_PREPROCESS_WRITE_BIT_NV,
+        {VK_ACCESS_2_COMMAND_PREPROCESS_READ_BIT_NV,
          ValueType{{
              {Key(Struct::VkMemoryBarrier2, Field::srcAccessMask), "VUID-VkMemoryBarrier2-srcAccessMask-03924"},
              {Key(Struct::VkMemoryBarrier2, Field::dstAccessMask), "VUID-VkMemoryBarrier2-dstAccessMask-03924"},
@@ -779,7 +768,7 @@ static const vvl::unordered_map<VkAccessFlags2, std::array<Entry, 8>>& GetAccess
              {Key(Struct::VkMemoryRangeBarrierKHR, Field::srcAccessMask), "VUID-VkMemoryRangeBarrierKHR-srcAccessMask-03924"},
              {Key(Struct::VkMemoryRangeBarrierKHR, Field::dstAccessMask), "VUID-VkMemoryRangeBarrierKHR-dstAccessMask-03924"},
          }}},
-        {VK_PIPELINE_STAGE_2_COMMAND_PREPROCESS_BIT_NV,
+        {VK_ACCESS_2_COMMAND_PREPROCESS_WRITE_BIT_NV,
          ValueType{{
              {Key(Struct::VkMemoryBarrier2, Field::srcAccessMask), "VUID-VkMemoryBarrier2-srcAccessMask-03925"},
              {Key(Struct::VkMemoryBarrier2, Field::dstAccessMask), "VUID-VkMemoryBarrier2-dstAccessMask-03925"},
@@ -1120,8 +1109,8 @@ const std::vector<Entry>& GetQueueCapErrors() {
         {Key(Func::vkCmdWriteTimestamp, Field::pipelineStage), "VUID-vkCmdWriteTimestamp-pipelineStage-04074"},
         {Key(Struct::VkSubpassDependency2, Field::srcStageMask), "VUID-vkCmdBeginRenderPass2-srcStageMask-06453"},
         {Key(Struct::VkSubpassDependency2, Field::dstStageMask), "VUID-vkCmdBeginRenderPass2-dstStageMask-06454"},
-        {Key(Func::vkCmdSetEvent, Field::srcStageMask), "VUID-vkCmdSetEvent2-srcStageMask-03827"},
-        {Key(Func::vkCmdSetEvent, Field::dstStageMask), "VUID-vkCmdSetEvent2-dstStageMask-03828"},
+        {Key(Func::vkCmdSetEvent2, Field::srcStageMask), "VUID-vkCmdSetEvent2-srcStageMask-03827"},
+        {Key(Func::vkCmdSetEvent2, Field::dstStageMask), "VUID-vkCmdSetEvent2-dstStageMask-03828"},
         {Key(Func::vkCmdPipelineBarrier2, Struct::VkMemoryBarrier2, Field::srcStageMask),
          "VUID-vkCmdPipelineBarrier2-srcStageMask-09673"},
         {Key(Func::vkCmdPipelineBarrier2, Struct::VkMemoryBarrier2, Field::dstStageMask),
@@ -1239,12 +1228,24 @@ static const vvl::unordered_map<QueueError, std::vector<Entry>>& GetBarrierQueue
 
 const vvl::unordered_map<QueueError, std::string>& GetQueueErrorSummaryMap() {
     static const vvl::unordered_map<QueueError, std::string> kQueueErrorSummary{
-        {QueueError::kSrcNoExternalExt, "Source queue family must not be VK_QUEUE_FAMILY_EXTERNAL."},
-        {QueueError::kDstNoExternalExt, "Destination queue family must not be VK_QUEUE_FAMILY_EXTERNAL."},
-        {QueueError::kSrcNoForeignExt, "Source queue family must not be VK_QUEUE_FAMILY_FOREIGN_EXT."},
-        {QueueError::kDstNoForeignExt, "Destination queue family must not be VK_QUEUE_FAMILY_FOREIGN_EXT."},
-        {QueueError::kSync1ConcurrentSrc, "Source queue family must be VK_QUEUE_FAMILY_IGNORED or VK_QUEUE_FAMILY_EXTERNAL."},
-        {QueueError::kSync1ConcurrentDst, "Destination queue family must be VK_QUEUE_FAMILY_IGNORED or VK_QUEUE_FAMILY_EXTERNAL."},
+        {QueueError::kSrcNoExternalExt,
+         "Source queue family must not be VK_QUEUE_FAMILY_EXTERNAL.\nHint: This can be allowed if VK_KHR_external_memory "
+         "(or Vulkan 1.1) is enabled."},
+        {QueueError::kDstNoExternalExt,
+         "Destination queue family must not be VK_QUEUE_FAMILY_EXTERNAL.\nHint: This can be allowed if VK_KHR_external_memory "
+         "(or Vulkan 1.1) is enabled."},
+        {QueueError::kSrcNoForeignExt,
+         "Source queue family must not be VK_QUEUE_FAMILY_FOREIGN_EXT.\nHint: This can be allowed if VK_EXT_queue_family_foreign "
+         "is enabled."},
+        {QueueError::kDstNoForeignExt,
+         "Destination queue family must not be VK_QUEUE_FAMILY_FOREIGN_EXT.\nHint: This can be allowed if "
+         "VK_EXT_queue_family_foreign is enabled."},
+        {QueueError::kSync1ConcurrentSrc,
+         "Source queue family must be VK_QUEUE_FAMILY_IGNORED or VK_QUEUE_FAMILY_EXTERNAL.\nHint: This can be allowed if the "
+         "synchronization2 feature is enabled."},
+        {QueueError::kSync1ConcurrentDst,
+         "Destination queue family must be VK_QUEUE_FAMILY_IGNORED or VK_QUEUE_FAMILY_EXTERNAL.\nHint: This can be allowed if "
+         "the synchronization2 feature is enabled."},
         {QueueError::kExclusiveSrc, "Source queue family must be valid when using VK_SHARING_MODE_EXCLUSIVE."},
         {QueueError::kExclusiveDst, "Destination queue family must be valid when using VK_SHARING_MODE_EXCLUSIVE."},
     };
@@ -1526,6 +1527,16 @@ const vvl::unordered_map<ImageError, std::vector<Entry>>& GetImageErrorsMap() {
              {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-image-03320"},
              {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-image-03320"},
          }},
+        {ImageError::kNotDepthOnlyAspect,
+         {
+             {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-image-10749"},
+             {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-image-10749"},
+         }},
+        {ImageError::kNotStencilOnlyAspect,
+         {
+             {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-image-10750"},
+             {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-image-10750"},
+         }},
         {ImageError::kSeparateDepthWithStencilLayout,
          {
              {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-aspectMask-08702"},
@@ -1710,6 +1721,11 @@ const std::string& GetDynamicRenderingBarrierVUID(const Location& loc, DynamicRe
          {
              {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-None-09554"},
              {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-None-09554"},
+         }},
+        {DynamicRenderingBarrierError::kAccessFlags,
+         {
+             {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-None-09586"},
+             {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-None-09586"},
          }},
         {DynamicRenderingBarrierError::kImageLayout,
          {

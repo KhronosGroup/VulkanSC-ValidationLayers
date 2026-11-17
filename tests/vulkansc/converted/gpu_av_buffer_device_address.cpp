@@ -17,6 +17,7 @@
 #include "layer_validation_tests.h"
 #include "pipeline_helper.h"
 #include "descriptor_helper.h"
+#include "gpu_av_helper.h"
 #include "containers/range.h"
 
 class NegativeGpuAVBufferDeviceAddress : public GpuAVBufferDeviceAddressTest {};
@@ -325,16 +326,14 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, UVec3Array) {
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819",
-                                         R"(.*is above address by 12 bytes.*\n.*VkBuffer.*size: 12 bytes.*)");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819", R"(.*VkBuffer.*size: 12 bytes.*)");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
     offset_index_buffer_ptr = index_buffer.Address() + (3 * sizeof(uint32_t));
     memcpy(uniform_buffer_ptr, &offset_index_buffer_ptr, sizeof(VkDeviceAddress));
 
-    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819",
-                                         R"(.*is below address by 1 byte.*\n.*VkBuffer.*size: 12 bytes.*)");
+    m_errorMonitor->SetDesiredErrorRegex("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819", R"(.*VkBuffer.*size: 12 bytes.*)");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -472,6 +471,8 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, ArrayOfStruct) {
     memcpy(buffer_ptr, &index, sizeof(uint32_t));
     memcpy(buffer_ptr + (1 * sizeof(VkDeviceAddress)), &block_ptr, sizeof(VkDeviceAddress));
     memcpy(buffer_ptr + (2 * sizeof(VkDeviceAddress)), &block_ptr, sizeof(VkDeviceAddress));
+    const VkDeviceAddress bad_ptr = 0xffffffffffffff00;
+    memcpy(buffer_ptr + ((1 + index) * sizeof(VkDeviceAddress)), &bad_ptr, sizeof(VkDeviceAddress));
 
     descriptor_set.WriteDescriptorBufferInfo(0, storage_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
@@ -541,7 +542,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreStd140) {
     uniform_buffer_ptr[0] = storage_buffer.Address();
     uniform_buffer_ptr[1] = 5;
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 4 bytes written", 3);
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 4 bytes", 3);
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
@@ -624,7 +625,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreStd140NumerousRanges) {
     uniform_buffer_ptr[0] = storage_buffer_addr;
     uniform_buffer_ptr[1] = 5;  // Will provoke a 4 bytes write past buffer end
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 4 bytes written", 3);
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 4 bytes", 3);
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
@@ -689,7 +690,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreStd430) {
     uniform_buffer_ptr[0] = storage_buffer.Address();
     uniform_buffer_ptr[1] = 5;
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 4 bytes written", 3);
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 4 bytes", 3);
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
@@ -802,7 +803,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreRelaxedBlockLayout) {
     auto uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer_addr;
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 12 bytes written");
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 12 bytes");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
@@ -894,7 +895,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreRelaxedBlockLayoutFront) {
     // The OpStore is aligned to 16 bytes, so need to substract by that
     uniform_buffer_ptr[0] = storage_buffer_addr - 16;
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 4 bytes written");
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 4 bytes");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -953,7 +954,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreScalarBlockLayout) {
     auto uniform_buffer_ptr = static_cast<VkDeviceAddress*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = storage_buffer_addr;
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 12 bytes written");
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 12 bytes");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
@@ -1016,7 +1017,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreScalarBlockLayoutFront) {
     // The OpStore is aligned to 16 bytes, so need to substract by that
     uniform_buffer_ptr[0] = storage_buffer_addr - 16;
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 4 bytes written");
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 4 bytes");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -1087,7 +1088,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, StoreStd430LinkedList) {
         uniform_buffer_ptr[i] = addr;
     }
 
-    m_errorMonitor->SetDesiredError("Out of bounds access: 12 bytes written");
+    m_errorMonitor->SetDesiredError("Out of bounds: trying to write 12 bytes");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 
@@ -1219,6 +1220,68 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, ProxyStructLoad2) {
         "accessed, it is up to the "
         "source language or tooling to detect that and reflect it in the SPIR-V");
     m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVBufferDeviceAddress, ProxyStructLoadDestroyPipelineBeforeSubmitIsProcessed) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
+
+    const char* shader_source = R"glsl(
+        #version 460
+        #extension GL_EXT_scalar_block_layout : require
+        #extension GL_EXT_buffer_reference2 : require
+
+        struct RealCamera {
+            mat4 viewProjection; // [0, 63]
+            vec4 frustum[6]; // [64, 160]
+        };
+        layout(buffer_reference, scalar, buffer_reference_align = 4) restrict readonly buffer CameraBuffer {
+            RealCamera camera;
+        };
+
+        layout(binding = 0, set = 0) buffer OutData {
+            CameraBuffer cameraBuffer;
+            mat4 out_mat;
+        };
+
+        void main() {
+            restrict const RealCamera camera = cameraBuffer.camera;
+            out_mat = camera.viewProjection;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    pipe.cs_ = VkShaderObj(*m_device, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer bda_buffer(*m_device, 64, 0, vkt::device_address);
+    vkt::Buffer in_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+
+    VkDeviceAddress buffer_ptr = bda_buffer.Address();
+    uint8_t* in_buffer_ptr = (uint8_t*)in_buffer.Memory().Map();
+    memcpy(in_buffer_ptr, &buffer_ptr, sizeof(VkDeviceAddress));
+
+    pipe.descriptor_set_.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_.UpdateDescriptorSets();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &pipe.descriptor_set_.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
+    m_command_buffer.End();
+
+    vkt::Semaphore timeline(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+    SubmitWithLastBatchWaitingOnHost(*m_default_queue, m_command_buffer, timeline);
+    timeline.Wait(1, kWaitTimeout);
+    pipe.Destroy();
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819");
+    timeline.Signal(2);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -2514,7 +2577,7 @@ static const char* gpl_vs_source = R"glsl(
         uint x;
     };
     layout(set = 0, binding = 0) uniform UBO {
-        BDA bda; // has garbage
+        BDA bda; // bad pointer
     };
     vec2 vertices[3];
     void main(){
@@ -2535,7 +2598,7 @@ static const char* gpl_fs_source = R"glsl(
         uint x;
     };
     layout(set = 0, binding = 0) uniform UBO {
-        BDA bda; // has garbage
+        BDA bda; // bad pointer
     };
     layout(location = 0) out vec4 uFragColor;
     void main() {
@@ -2561,7 +2624,9 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, BothShaderInSamePipelineGPL) {
                                                  });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    vkt::Buffer uniform_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    vkt::Buffer uniform_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    auto uniform_buffer_ptr = (VkDeviceAddress*)uniform_buffer.Memory().Map();
+    uniform_buffer_ptr[0] = 0xffffffffffffff00;  // bad pointer
     descriptor_set.WriteDescriptorBufferInfo(0, uniform_buffer, 0, VK_WHOLE_SIZE);
     descriptor_set.UpdateDescriptorSets();
 
@@ -2592,17 +2657,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, BothShaderInSamePipelineGPL) {
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[2] = {
-        combined_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {combined_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -2634,7 +2689,9 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, BothShaderInSamePipelineFinalLinkGPL) {
                                                  });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    vkt::Buffer uniform_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    vkt::Buffer uniform_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    auto uniform_buffer_ptr = (VkDeviceAddress*)uniform_buffer.Memory().Map();
+    uniform_buffer_ptr[0] = 0xffffffffffffff00;  // bad pointer
     descriptor_set.WriteDescriptorBufferInfo(0, uniform_buffer, 0, VK_WHOLE_SIZE);
     descriptor_set.UpdateDescriptorSets();
 
@@ -2705,7 +2762,9 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, DifferentShaderLibraryWithIntermediateL
                                                  });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    vkt::Buffer uniform_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    vkt::Buffer uniform_buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    auto uniform_buffer_ptr = (VkDeviceAddress*)uniform_buffer.Memory().Map();
+    uniform_buffer_ptr[0] = 0xffffffffffffff00;  // bad pointer
     descriptor_set.WriteDescriptorBufferInfo(0, uniform_buffer, 0, VK_WHOLE_SIZE);
     descriptor_set.UpdateDescriptorSets();
 
@@ -2720,18 +2779,8 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, DifferentShaderLibraryWithIntermediateL
         pre_raster_lib.CreateGraphicsPipeline();
     }
 
-    VkPipeline intermediate_libraries[2] = {
-        vertex_input_lib,
-        pre_raster_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(intermediate_libraries);
-    link_info.pLibraries = intermediate_libraries;
-
-    VkGraphicsPipelineCreateInfo intermediate_pipe_ci = vku::InitStructHelper(&link_info);
-    intermediate_pipe_ci.layout = pipeline_layout;
-    intermediate_pipe_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
-    vkt::Pipeline intermediate_lib(*m_device, intermediate_pipe_ci);
+    vkt::Pipeline intermediate_lib(*m_device, {vertex_input_lib, pre_raster_lib}, pipeline_layout, VK_NULL_HANDLE,
+                                   VK_PIPELINE_CREATE_LIBRARY_BIT_KHR);
 
     CreatePipelineHelper frag_shader_lib(*this);
     {
@@ -2744,17 +2793,7 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, DifferentShaderLibraryWithIntermediateL
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline exe_libraries[3] = {
-        intermediate_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    link_info.libraryCount = size32(exe_libraries);
-    link_info.pLibraries = exe_libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {intermediate_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -2812,6 +2851,59 @@ TEST_F(NegativeGpuAVBufferDeviceAddress, SecondaryCommandBuffer) {
 
     m_command_buffer.Begin();
     vk::CmdExecuteCommands(m_command_buffer, 1, &secondary.handle());
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVBufferDeviceAddress, ImplicitVectorLoad) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::scalarBlockLayout);
+    RETURN_IF_SKIP(CheckSlangSupport());
+    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
+    InitRenderTarget();
+
+    const char* cs_source = R"slang(
+        struct BDA
+        {
+            uint x;
+            uint4 payload[16]; // offset 4
+        };
+
+        struct Uniforms
+        {
+            BDA* ptr0;
+            BDA* ptr1;
+        };
+
+        [vk::push_constant]
+        Uniforms uniforms;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main() {
+            // Slang will load the entire vector here
+            uniforms.ptr0->x = uniforms.ptr0->payload[0].x;
+        }
+    )slang";
+
+    VkPushConstantRange pc_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkDeviceAddress) * 2};
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {pc_range});
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cp_ci_.layout = pipeline_layout;
+    pipe.cs_ = VkShaderObj(*m_device, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_SLANG);
+    pipe.CreateComputePipeline();
+
+    vkt::Buffer bda_buffer(*m_device, 16, 0, vkt::device_address);
+    auto bda_buffer_addr = bda_buffer.Address();
+
+    m_command_buffer.Begin();
+    vk::CmdPushConstants(m_command_buffer, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(VkDeviceAddress),
+                         &bda_buffer_addr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vk::CmdDispatch(m_command_buffer, 1, 1, 1);
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819");

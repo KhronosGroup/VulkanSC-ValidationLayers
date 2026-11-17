@@ -26,7 +26,7 @@ struct GpuAVSettings {
 
     bool force_on_robustness = false;
     bool select_instrumented_shaders = false;
-    std::vector<std::string> shader_selection_regexes{};
+    std::vector<std::string> shader_selection_patterns{};
 
     bool validate_indirect_draws_buffers = true;
     bool validate_indirect_dispatches_buffers = true;
@@ -79,6 +79,7 @@ struct GpuAVSettings {
     void SetBufferValidationEnabled(bool enabled);
 
     void SetShaderSelectionRegexes(std::vector<std::string> &&shader_selection_regexes);
+    void LoadCDLDump(std::string&& path, std::vector<std::string>& setting_warnings);
     bool MatchesAnyShaderSelectionRegex(const std::string &debug_name);
 
     // For people who are using VkValidationFeatureEnableEXT to set only DebugPrintf (and want the rest of GPU-AV off)

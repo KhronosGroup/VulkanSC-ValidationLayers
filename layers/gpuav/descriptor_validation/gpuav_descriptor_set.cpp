@@ -27,9 +27,11 @@
 #include "gpuav/resources/gpuav_shader_resources.h"
 #include "gpuav/shaders/gpuav_shaders_constants.h"
 #include "gpuav/shaders/setup/descriptor_encoding_update.h"
+#include "state_tracker/bind_point.h"
 #include "state_tracker/descriptor_sets.h"
 #include "containers/limits.h"
 #include "utils/image_utils.h"
+#include "utils/assert_utils.h"
 
 using vvl::DescriptorClass;
 
@@ -121,9 +123,11 @@ static glsl::DescriptorEncoding GetDescriptorEncoding(const vvl::ImageSamplerDes
 }
 
 static glsl::DescriptorEncoding GetDescriptorEncoding(const vvl::AccelerationStructureDescriptor& ac) {
-    uint32_t id = ac.IsKHR() ? GetId(ac.GetAccelerationStructureStateKHR()) : GetId(ac.GetAccelerationStructureStateNV());
+    const uint32_t id = GetId(ac.GetAccelerationStructureStateKHR());
     glsl::DescriptorEncoding encoding(DescriptorClass::AccelerationStructure, id);
-    encoding.dwords_1_2 = SubState(*ac.GetAccelerationStructureStateKHR()).gpu_state.offset_address;
+    if (auto as_state = ac.GetAccelerationStructureStateKHR()) {
+        encoding.dwords_1_2 = SubState(*as_state).gpu_state.offset_address;
+    }
     return encoding;
 }
 
@@ -160,8 +164,7 @@ static glsl::DescriptorEncoding GetDescriptorEncoding(const vvl::MutableDescript
             return glsl::DescriptorEncoding(desc_class, tensor_state ? tensor_state->GetId() : glsl::kNullDescriptor);
         }
         case DescriptorClass::AccelerationStructure: {
-            uint32_t id =
-                desc.IsKHR() ? GetId(desc.GetAccelerationStructureStateKHR()) : GetId(desc.GetAccelerationStructureStateNV());
+            const uint32_t id = GetId(desc.GetAccelerationStructureStateKHR());
             return glsl::DescriptorEncoding(DescriptorClass::AccelerationStructure, id);
         }
         case DescriptorClass::InlineUniform:
@@ -261,21 +264,26 @@ struct DescriptorEncodingUpdateShader {
 
 void DescriptorSetSubState::PerformPushDescriptorsUpdate(vvl::CommandBuffer& cb, uint32_t write_count,
                                                          const VkWriteDescriptorSet* write_descs) {
-    std::lock_guard guard(state_lock_);
-
     gpuav::CommandBufferSubState& cb_sub_state = gpuav::SubState(cb);
+    if (!cb_sub_state.gpuav_.gpuav_settings.shader_instrumentation.descriptor_checks) {
+        return;
+    }
+
+    std::lock_guard guard(state_lock_);
 
     valpipe::ComputePipeline<DescriptorEncodingUpdateShader>& descriptor_encoding_update_pipeline =
         cb_sub_state.gpuav_.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<DescriptorEncodingUpdateShader>>(
             cb_sub_state.gpuav_, Location(vvl::Func::Empty));
 
-    if (!descriptor_encoding_update_pipeline.valid) {
+    if (!descriptor_encoding_update_pipeline.Valid()) {
         return;
     }
 
     valpipe::RestorablePipelineState restorable_state(cb_sub_state, VK_PIPELINE_BIND_POINT_COMPUTE);
 
-    DispatchCmdBindPipeline(cb.VkHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, descriptor_encoding_update_pipeline.pipeline);
+    if (!descriptor_encoding_update_pipeline.BindComputePipeline(cb)) {
+        return;
+    }
 
     for (const VkWriteDescriptorSet& write_desc : vvl::make_span(write_descs, write_count)) {
         const auto [start_binding, binding_count, desc_set_encodings] =
@@ -294,9 +302,8 @@ void DescriptorSetSubState::PerformPushDescriptorsUpdate(vvl::CommandBuffer& cb,
         shader_resources.push_constants.staged_desc_encodings_ptr = desc_set_encodings.offset_address;
         shader_resources.push_constants.start_binding = start_binding;
 
-        if (!descriptor_encoding_update_pipeline.BindShaderResources(cb_sub_state.gpuav_, cb_sub_state, shader_resources)) {
-            return;
-        }
+        ASSERT_AND_RETURN(
+            descriptor_encoding_update_pipeline.BindShaderResources(cb_sub_state.gpuav_, cb_sub_state, shader_resources));
 
         {
             VkBufferMemoryBarrier barrier_write_after_read = vku::InitStructHelper();

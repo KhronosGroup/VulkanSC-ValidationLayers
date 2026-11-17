@@ -27,7 +27,7 @@
 
 // There is a spirv::Instruction used for normal validation.
 // There is a gpuav::spirv::Instruction that is ONLY intended for shader instrumentation (designed so we can build the shader
-// instrumentation as a seperate library). For logging GPU-AV will want to make use of the normal validaiton instruction class, just
+// instrumentation as a separate library). For logging GPU-AV will want to make use of the normal validation instruction class, just
 // alias it with "Instruction" as that name shouldn't collide with anything.
 using Instruction = ::spirv::Instruction;
 
@@ -46,6 +46,7 @@ struct Module;
 
 namespace gpuav {
 class Validator;
+class QueueSubState;
 namespace spirv {
 struct InstrumentationStatus;
 }
@@ -212,7 +213,10 @@ class GpuShaderInstrumentor : public vvl::DeviceProxy {
     VkDescriptorSetLayout GetInstrumentationDescriptorSetLayout(vvl::DescriptorMode mode) {
         return instrumentation_desc_layout_[mode];
     }
-    VkPipelineLayout GetInstrumentationPipelineLayout(vvl::DescriptorMode mode) { return instrumentation_pipeline_layout_[mode]; }
+
+    VkPipelineLayout GetDummyInstrumentationPipelineLayout(vvl::DescriptorMode mode) {
+        return instrumentation_pipeline_layout_[mode];
+    }
 
     // Used for both creating VkPipelineLayout and VkShaderEXT
     vvl::DescriptorMode SelectDescriptorModeFromDSL(uint32_t set_layout_count, const VkDescriptorSetLayout *set_layouts) const;
@@ -223,21 +227,35 @@ class GpuShaderInstrumentor : public vvl::DeviceProxy {
     // sense too)
     mutable bool aborted_ = false;
 
+    // Some errors/warnings only want to report once for the lifetime of the app
+    bool reported_code_type_binary_ = false;
+
     std::atomic<uint32_t> unique_shader_module_id_ = 1;  // zero represents no shader module found
     // The descriptor slot we will be injecting our error buffer into
     uint32_t instrumentation_desc_set_bind_index_ = 0;
     // This is a layout used to "pad" a pipeline layout to fill in any gaps to the selected bind index
     VkDescriptorSetLayout dummy_desc_layout_[vvl::DescriptorModeCount];
     vvl::concurrent_unordered_map<uint32_t, InstrumentedShader> instrumented_shaders_map_;
+    void EraseInstrumentedShaders(const std::vector<uint32_t>& unique_shader_ids);
+
+    // The errors of a vkQueueSubmit are read when its last batch retires, but the app may see an earlier batch complete
+    // and can then destroy what it used. A queue with these batches holds on to the |instrumented_shaders_map_| entries
+    // of everything destroyed until it has parsed the errors
+    std::mutex held_shader_ids_mutex_;
+    vvl::unordered_map<const QueueSubState*, std::vector<uint32_t>> held_shader_ids_;
     std::vector<VkDescriptorSetLayoutBinding> instrumentation_bindings_;
     spirv::DeviceSettings instrumentation_device_settings_;
 
     std::vector<spirv::InternalOnlyDebugPrintf> internal_only_debug_printf_;
 
-    // Size to reserve in front of every resource descriptor buffer
-    VkDeviceSize resource_descriptor_buffer_size_ = 0;
+    // VK_EXT_descriptor_buffer
+    // Each action command advances into the global indirect buffer by this stride
+    VkDeviceSize resource_descriptor_buffer_stride_ = 0;
     // Each vector index maps to the binding number with the offset to map to (with the start offset included)
     std::vector<VkDeviceSize> resource_descriptor_buffer_offsets_;
+    // our way to know if VK_EXT_descriptor_buffer is likely being used
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12676
+    bool hint_descriptor_buffer_ = false;
 
     // VK_EXT_descriptor_heap
     // Each action command advances into the global indirect buffer by this stride
@@ -250,13 +268,10 @@ class GpuShaderInstrumentor : public vvl::DeviceProxy {
     DeviceExtensions modified_extensions;
     DeviceFeatures modified_features;
 
-    // If we should be setting null descriptors for the app (for Descriptor Buffer/Heap)
-    bool set_null_descriptors_ = false;
-
   private:
     bool IsPipelineSelectedForInstrumentation(const void* pipeline_ci_pnext, VkPipeline pipeline, const Location& loc);
-    bool IsShaderSelectedForInstrumentation(vku::safe_VkShaderModuleCreateInfo *modified_shader_module_ci,
-                                            VkShaderModule modified_shader, const Location &loc);
+    bool IsShaderSelectedForInstrumentation(const vku::safe_VkPipelineShaderStageCreateInfo& stage_ci,
+                                            VkShaderModule modified_shader, const Location& loc);
     void AddDescriptorHeapMappings(VkBaseOutStructure *create_info);
     void Cleanup();
     VkDescriptorSetLayout instrumentation_desc_layout_[vvl::DescriptorModeCount];

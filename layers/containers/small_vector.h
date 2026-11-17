@@ -53,7 +53,10 @@ class small_vector {
 
     small_vector(const small_vector &other) : size_(0), capacity_(N), working_store_(GetSmallStore()) { PushBackFrom(other); }
 
-    small_vector(small_vector &&other) : size_(0), capacity_(N), working_store_(GetSmallStore()) {
+    // Only steals the large store or moves the elements into the small store, so it never allocates.
+    // Being noexcept lets std::vector move, instead of copy, a small_vector when it reallocates.
+    small_vector(small_vector&& other) noexcept(std::is_nothrow_move_constructible_v<T>)
+        : size_(0), capacity_(N), working_store_(GetSmallStore()) {
         if (other.large_store_) {
             MoveLargeStore(other);
         } else {
@@ -202,7 +205,7 @@ class small_vector {
     reference emplace_back(Args &&...args) {
         assert(size_ < kMaxCapacity);
         reserve(size_ + 1);
-        new (GetWorkingStore() + size_) value_type(args...);
+        new (GetWorkingStore() + size_) value_type(std::forward<Args>(args)...);
         size_++;
         return back();
     }

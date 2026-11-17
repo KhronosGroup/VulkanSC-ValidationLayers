@@ -703,10 +703,10 @@ TEST_F(NegativeGpuAVShaderDebugInfo, BasicGlslangShaderDebugInfoWithSourceShader
 
     std::vector<uint32_t> cs_spv;
     ASMtoSPV(SPV_ENV_VULKAN_1_2, 0, kBasicGlslShaderSource, cs_spv);
-    const vkt::Shader comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, cs_spv, &descriptor_set.layout_.handle());
+    const vkt::ShaderEXT comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, cs_spv, &descriptor_set.layout_.handle());
 
     m_command_buffer.Begin();
-    m_command_buffer.BindCompShader(comp_shader);
+    m_command_buffer.BindCompShaderEXT(comp_shader);
     vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
                               nullptr);
     vk::CmdDispatch(m_command_buffer, 1, 1, 1);
@@ -1433,7 +1433,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ShaderObjectHandle) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     VkDescriptorSetLayout descriptorSetLayout = descriptor_set.layout_;
     VkShaderStageFlagBits shader_stages[] = {VK_SHADER_STAGE_COMPUTE_BIT};
-    const vkt::Shader comp_shader(*m_device, shader_stages[0], GLSLToSPV(shader_stages[0], comp_src), &descriptorSetLayout);
+    const vkt::ShaderEXT comp_shader(*m_device, shader_stages[0], GLSLToSPV(shader_stages[0], comp_src), &descriptorSetLayout);
 
     const char* object_name = "bad_shader_object";
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
@@ -2209,19 +2209,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, PostProcessingDebugLabelMultipleCommandBuff
 
 TEST_F(NegativeGpuAVShaderDebugInfo, IndirectCommandDebugLabel) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxComputeWorkGroupCount[0] = 2;
-    props.limits.maxComputeWorkGroupCount[1] = 2;
-    props.limits.maxComputeWorkGroupCount[2] = 2;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     RETURN_IF_SKIP(InitState());
 
@@ -2624,19 +2612,7 @@ float4 main() : SV_Target {
     frag_out_lib.InitFragmentOutputLibInfo();
     frag_out_lib.CreateGraphicsPipeline(false);
 
-    VkPipeline libraries[4] = {
-        vertex_input_lib,
-        pre_raster_lib,
-        frag_shader_lib,
-        frag_out_lib,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size32(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.layout = pipeline_layout;
-    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+    vkt::Pipeline exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, frag_shader_lib, frag_out_lib}, pipeline_layout);
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
@@ -2700,19 +2676,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxActionsCommandValidationLimitUnknow
 }
 
 TEST_F(NegativeGpuAVShaderDebugInfo, ReachMaxErrorLoggerLimitUnkown) {
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
-    props.limits.maxComputeWorkGroupCount[0] = 2;
-    props.limits.maxComputeWorkGroupCount[1] = 2;
-    props.limits.maxComputeWorkGroupCount[2] = 2;
-    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
+    RETURN_IF_SKIP(InitGpuAvFramework({kLowerLimitsSetting}));
 
     RETURN_IF_SKIP(InitState());
 
@@ -2786,9 +2750,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, HeapMultipleDraws) {
     VkPipelineCreateFlags2CreateInfoKHR pipeline_create_flags_2_create_info = vku::InitStructHelper();
     pipeline_create_flags_2_create_info.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
 
-    VkDescriptorSetAndBindingMappingEXT mapping = MakeSetAndBindingMapping(0u, 0u);
-    mapping.source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_CONSTANT_OFFSET_EXT;
-    mapping.sourceData.constantOffset.heapOffset = 0;
+    VkDescriptorSetAndBindingMappingEXT mapping = MakeZeroSetAndBindingMappingEXT(0u, 0u);
     VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
     mapping_info.mappingCount = 1u;
     mapping_info.pMappings = &mapping;
@@ -2798,10 +2760,7 @@ TEST_F(NegativeGpuAVShaderDebugInfo, HeapMultipleDraws) {
 
     VkVertexInputBindingDescription input_binding = {0, 3 * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attrib = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attrib;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
+    pipe.SetVertexInput(input_binding, input_attrib);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(&mapping_info), pipe.fs_->GetStageCreateInfo(&mapping_info)};
     pipe.gp_ci_.stageCount = pipe.shader_stages_.size();
     pipe.gp_ci_.pStages = pipe.shader_stages_.data();
@@ -2846,6 +2805,174 @@ TEST_F(NegativeGpuAVShaderDebugInfo, HeapMultipleDraws) {
     m_command_buffer.End();
 
     m_errorMonitor->SetDesiredError("Bad-Draw");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVShaderDebugInfo, GraphicsPipelineLibraryReusedLibrary) {
+    TEST_DESCRIPTION("Make sure the source is found when a library already instrumented by a previous link is re-linked");
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    RETURN_IF_SKIP(InitGpuVUBufferDeviceAddress());
+    InitRenderTarget();
+
+    const char* vs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+        layout(buffer_reference, std430) readonly buffer IndexBuffer {
+            int indices[];
+        };
+        layout(set = 0, binding = 0) readonly buffer foo {
+            IndexBuffer data;
+            int x;
+        };
+        vec2 vertices[3];
+        void main() {
+            vertices[0] = vec2(-1.0, -1.0);
+            vertices[1] = vec2(1.0, -1.0);
+            vertices[2] = vec2(0.0, 1.0);
+            gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+            if (data.indices[0] == 42) {
+                gl_Position = vec4(0.0);
+            }
+        }
+    )glsl";
+
+    const char* fs_source = R"(
+               OpCapability Shader
+               OpCapability PhysicalStorageBufferAddresses
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel PhysicalStorageBuffer64 GLSL450
+               OpEntryPoint Fragment %main "main" %uFragColor %_
+               OpExecutionMode %main OriginUpperLeft
+          %1 = OpString "bad.frag"
+               OpSource GLSL 450 %1 "#version 450
+#extension GL_EXT_buffer_reference : enable
+layout(buffer_reference, std430) readonly buffer IndexBuffer {
+    int indices[];
+};
+layout(set = 0, binding = 0) readonly buffer foo {
+    IndexBuffer data;
+    int x;
+};
+layout(location = 0) out vec4 uFragColor;
+void main() {
+    uFragColor = vec4(float(data.indices[16]));
+}
+"
+               OpSourceExtension "GL_EXT_buffer_reference"
+               OpName %main "main"
+               OpName %uFragColor "uFragColor"
+               OpName %foo "foo"
+               OpMemberName %foo 0 "data"
+               OpMemberName %foo 1 "x"
+               OpName %IndexBuffer "IndexBuffer"
+               OpMemberName %IndexBuffer 0 "indices"
+               OpName %_ ""
+               OpDecorate %uFragColor Location 0
+               OpDecorate %foo Block
+               OpMemberDecorate %foo 0 NonWritable
+               OpMemberDecorate %foo 0 Offset 0
+               OpMemberDecorate %foo 1 NonWritable
+               OpMemberDecorate %foo 1 Offset 8
+               OpDecorate %_runtimearr_int ArrayStride 4
+               OpDecorate %IndexBuffer Block
+               OpMemberDecorate %IndexBuffer 0 NonWritable
+               OpMemberDecorate %IndexBuffer 0 Offset 0
+               OpDecorate %_ NonWritable
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+ %uFragColor = OpVariable %_ptr_Output_v4float Output
+               OpTypeForwardPointer %_ptr_PhysicalStorageBuffer_IndexBuffer PhysicalStorageBuffer
+        %int = OpTypeInt 32 1
+        %foo = OpTypeStruct %_ptr_PhysicalStorageBuffer_IndexBuffer %int
+%_runtimearr_int = OpTypeRuntimeArray %int
+%IndexBuffer = OpTypeStruct %_runtimearr_int
+%_ptr_PhysicalStorageBuffer_IndexBuffer = OpTypePointer PhysicalStorageBuffer %IndexBuffer
+%_ptr_StorageBuffer_foo = OpTypePointer StorageBuffer %foo
+          %_ = OpVariable %_ptr_StorageBuffer_foo StorageBuffer
+      %int_0 = OpConstant %int 0
+%_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer = OpTypePointer StorageBuffer %_ptr_PhysicalStorageBuffer_IndexBuffer
+     %int_16 = OpConstant %int 16
+%_ptr_PhysicalStorageBuffer_int = OpTypePointer PhysicalStorageBuffer %int
+               OpLine %1 11 11
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpLine %1 12 0
+         %20 = OpAccessChain %_ptr_StorageBuffer__ptr_PhysicalStorageBuffer_IndexBuffer %_ %int_0
+         %21 = OpLoad %_ptr_PhysicalStorageBuffer_IndexBuffer %20
+         %24 = OpAccessChain %_ptr_PhysicalStorageBuffer_int %21 %int_0 %int_16
+         %25 = OpLoad %int %24 Aligned 4
+         %26 = OpConvertSToF %float %25
+         %27 = OpCompositeConstruct %v4float %26 %26 %26 %26
+               OpStore %uFragColor %27
+               OpLine %1 13 0
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_2);
+    VkShaderObj good_fs(*m_device, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj bad_fs(*m_device, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
+    vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    auto data = static_cast<VkDeviceAddress*>(in_buffer.Memory().Map());
+    data[0] = block_buffer.Address();
+    descriptor_set.WriteDescriptorBufferInfo(0, in_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    VkViewport viewport = {0, 0, 1, 1, 0, 1};
+    VkRect2D scissor = {{0, 0}, {1, 1}};
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    pre_raster_lib.InitPreRasterLibInfo(&vs.GetStageCreateInfo());
+    pre_raster_lib.vp_state_ci_.pViewports = &viewport;
+    pre_raster_lib.vp_state_ci_.pScissors = &scissor;
+    pre_raster_lib.gp_ci_.layout = pipeline_layout;
+    pre_raster_lib.CreateGraphicsPipeline();
+
+    CreatePipelineHelper good_frag_shader_lib(*this);
+    good_frag_shader_lib.InitFragmentLibInfo(&good_fs.GetStageCreateInfo());
+    good_frag_shader_lib.gp_ci_.layout = pipeline_layout;
+    good_frag_shader_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper bad_frag_shader_lib(*this);
+    bad_frag_shader_lib.InitFragmentLibInfo(&bad_fs.GetStageCreateInfo());
+    bad_frag_shader_lib.gp_ci_.layout = pipeline_layout;
+    bad_frag_shader_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    vkt::Pipeline good_exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, good_frag_shader_lib, frag_out_lib}, pipeline_layout);
+
+    vkt::Pipeline bad_exe_pipe(*m_device, {vertex_input_lib, pre_raster_lib, bad_frag_shader_lib, frag_out_lib}, pipeline_layout);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, bad_exe_pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDraw(m_command_buffer, 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    // VUID-RuntimeSpirv-PhysicalStorageBuffer64-11819
+    m_errorMonitor->SetDesiredError("Shader validation error occurred at bad.frag:12");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

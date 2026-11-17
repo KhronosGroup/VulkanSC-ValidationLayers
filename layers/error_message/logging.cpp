@@ -84,7 +84,7 @@ void DebugReport::SetDebugUtilsSeverityFlags(std::vector<VkLayerDbgFunctionState
 void DebugReport::RemoveDebugUtilsCallback(uint64_t callback) {
     std::vector<VkLayerDbgFunctionState>& callbacks = debug_callback_list;
     auto item = callbacks.begin();
-    for (item = callbacks.begin(); item != callbacks.end(); item++) {
+    for (; item != callbacks.end(); item++) {
         if (item->IsUtils()) {
             if (item->debug_utils_callback_object == CastToHandle<VkDebugUtilsMessengerEXT>(callback)) break;
         } else {
@@ -114,12 +114,14 @@ bool DebugReport::LogMessage(VkFlags msg_flags, std::string_view vuid_text, cons
         return false;
     }
 
-    // We have a few speical VUID we never actually want to suppress.
+    // We have a few special VUID we never actually want to suppress.
     // If a new VUID is added here, make sure to add it in NegativeOther.VuidHashStability test as well.
     const bool skip_checking_limit =
+        // "VVL-DEBUG-PRINTF"
         // We want to print DebugPrintf message forever, otherwise user will mistake duplicate limit for things not printing
         (vuid_hash == 0x4fe1fef9) ||
-        // GPU-DUMP
+        // "GPU-DUMP"
+        // Want to always keep dumping, similar to DebugPrintf
         (vuid_hash == 0xe5c5edc1);
 
     // This lock needs to be here, duplicate_message_count_map is not safe to update on multiple threads
@@ -132,6 +134,9 @@ bool DebugReport::LogMessage(VkFlags msg_flags, std::string_view vuid_text, cons
         auto vuid_count_it = duplicate_message_count_map.find(vuid_hash);
         if (vuid_count_it == duplicate_message_count_map.end()) {
             duplicate_message_count_map.emplace(vuid_hash, 1);
+            if (duplicate_message_limit == 1) {
+                at_message_limit = true;
+            }
         } else if (vuid_count_it->second >= duplicate_message_limit) {
             return false;
         } else {
@@ -188,7 +193,8 @@ bool DebugReport::LogMessage(VkFlags msg_flags, std::string_view vuid_text, cons
                 label_iter->second->Export(queue_labels);
             }
             // If this is a command buffer, add any command buffer labels to the callback data.
-        } else if (VK_OBJECT_TYPE_COMMAND_BUFFER == object_name_info.objectType) {
+            // Only consider first found command buffer, to avoid mixing unrelated label stacks
+        } else if (VK_OBJECT_TYPE_COMMAND_BUFFER == object_name_info.objectType && cmd_buf_labels.empty()) {
             auto label_iter = debug_utils_cmd_buffer_labels.find(reinterpret_cast<VkCommandBuffer>(object_name_info.objectHandle));
             if (label_iter != debug_utils_cmd_buffer_labels.end()) {
                 label_iter->second->Export(cmd_buf_labels);
@@ -304,9 +310,10 @@ std::string DebugReport::CreateMessageText(const Location& loc, std::string_view
 #endif
 #endif  // VULKANSC
 
+            assert(!main_message.empty());
             const auto last_char = main_message.back();
             // Add period at end if forgotten
-            // This provides better seperation between error message and spec text
+            // This provides better separation between error message and spec text
             // (Don't add if end with a number, otherwise it looks like a floating point number)
             if (last_char != '.' && last_char != '\n' && (last_char < '0' || last_char > '9')) {
                 oss << '.';
@@ -328,6 +335,32 @@ std::string DebugReport::CreateMessageText(const Location& loc, std::string_view
     return oss.str();
 }
 
+// Anything that ends up inside a JSON string has to be escaped
+static void AppendJsonEscaped(std::ostringstream& oss, std::string_view text) {
+    // clang-format off
+    for (char c : text) {
+        switch (c) {
+            case '"':  oss << "\\\""; break;
+            case '\\': oss << "\\\\"; break;
+            case '\n': oss << "\\n";  break;
+            case '\r': oss << "\\r";  break;
+            case '\t': oss << "\\t";  break;
+            case '\b': oss << "\\b";  break;
+            case '\f': oss << "\\f";  break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    // JSON requires the remaining control characters use the \u form
+                    const char* hex_digits = "0123456789abcdef";
+                    oss << "\\u00" << hex_digits[(c >> 4) & 0xf] << hex_digits[c & 0xf];
+                } else {
+                    oss << c;
+                }
+                break;
+        }
+    }
+    // clang-format on
+}
+
 std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& loc,
                                            const std::vector<VkDebugUtilsObjectNameInfoEXT>& object_name_infos,
                                            const uint32_t vuid_hash, std::string_view vuid_text, const std::string& main_message,
@@ -346,7 +379,9 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
     oss << "{" << new_line;
 
     if (message_format_settings.display_application_name && !message_format_settings.application_name.empty()) {
-        oss << line_start << "\"AppName\" : \"" << message_format_settings.application_name << "\"," << new_line;
+        oss << line_start << "\"AppName\" : \"";
+        AppendJsonEscaped(oss, message_format_settings.application_name);
+        oss << "\"," << new_line;
     }
 
     {
@@ -366,7 +401,9 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
     }
 
     {
-        oss << line_start << "\"VUID\" : \"" << vuid_text << "\"," << new_line;
+        oss << line_start << "\"VUID\" : \"";
+        AppendJsonEscaped(oss, vuid_text);
+        oss << "\"," << new_line;
     }
 
     {
@@ -377,10 +414,10 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
             oss << line_start << line_start;
             oss << "{\"type\" : \"" << string_VkObjectTypeHandleName(src_object.objectType) << "\", \"handle\" : \"";
             if (0 != src_object.objectHandle) {
-                oss << "0x" << std::hex << src_object.objectHandle;
+                oss << "0x" << std::hex << src_object.objectHandle << std::dec;
                 oss << "\", \"name\" : \"";
                 if (src_object.pObjectName) {
-                    oss << src_object.pObjectName;
+                    AppendJsonEscaped(oss, src_object.pObjectName);
                 }
                 oss << "\"}";
             } else {
@@ -395,13 +432,15 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
     }
 
     {
-        oss << line_start << "\"MessageID\" : \"0x" << std::hex << vuid_hash << "\"," << new_line;
+        oss << line_start << "\"MessageID\" : \"0x" << std::hex << vuid_hash << std::dec << "\"," << new_line;
     }
     {
         oss << line_start << "\"Function\" : \"" << loc.StringFunc() << "\"," << new_line;
     }
     {
-        oss << line_start << "\"Location\" : \"" << loc.Fields() << "\"," << new_line;
+        oss << line_start << "\"Location\" : \"";
+        AppendJsonEscaped(oss, loc.Fields());
+        oss << "\"," << new_line;
     }
     {
         oss << line_start << "\"MainMessage\" : \"";
@@ -411,21 +450,22 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
                 << " times, which is the duplicate_message_limit value, this will be the last time reporting it). ";
         }
 
-        // For cases were where have multi-lines in the message, we need to escape them.
+        // For cases where we have multi-lines in the message, we need to escape them.
         // The idea is the JSON is machine readable and when someone prints the value out, the new lines will resolve then.
-        for (char c : main_message) {
-            if (c == '\n') {
-                oss << "\\n";
-            } else {
-                oss << c;
-            }
+        AppendJsonEscaped(oss, main_message);
+        oss << "\"," << new_line;
+    }
+    {
+        oss << line_start << "\"VkFrameBoundaryEXT::frameID\" : \"";
+        if (loc.frame_id != vvl::kNoIndex64) {
+            oss << loc.frame_id;
         }
         oss << "\"," << new_line;
     }
     {
         oss << line_start << "\"DebugRegion\" : \"";
         if (loc.debug_region && !loc.debug_region->empty()) {
-            oss << loc.debug_region;
+            AppendJsonEscaped(oss, *loc.debug_region);
         }
         oss << "\"," << new_line;
     }
@@ -440,7 +480,9 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
             spec_url_section = found_vuid->second.url_id.data();
         }
         if (spec_text) {
-            oss << line_start << "\"SpecText\" : \"" << spec_text << "\"," << new_line;
+            oss << line_start << "\"SpecText\" : \"";
+            AppendJsonEscaped(oss, spec_text);
+            oss << "\"," << new_line;
         } else {
             oss << line_start << "\"SpecText\" : \"\"," << new_line;
         }
@@ -452,7 +494,9 @@ std::string DebugReport::CreateMessageJson(VkFlags msg_flags, const Location& lo
 #else
             std::string spec_url_base = "https://docs.vulkan.org/spec/latest/";
 #endif
-            oss << line_start << "\"SpecUrl\" : \"" << spec_url_base << spec_url_section << "#" << vuid_text << "\"" << new_line;
+            oss << line_start << "\"SpecUrl\" : \"" << spec_url_base << spec_url_section << "#";
+            AppendJsonEscaped(oss, vuid_text);
+            oss << "\"" << new_line;
 
         } else {
             oss << line_start << "\"SpecUrl\" : \"\"" << new_line;
@@ -469,6 +513,7 @@ void DebugReport::SetUtilsObjectName(const VkDebugUtilsObjectNameInfoEXT* pNameI
     std::unique_lock<std::mutex> lock(debug_output_mutex);
     if (pNameInfo->pObjectName) {
         debug_utils_object_name_map[pNameInfo->objectHandle] = pNameInfo->pObjectName;
+        has_object_names.store(true);
     } else {
         debug_utils_object_name_map.erase(pNameInfo->objectHandle);
     }
@@ -478,8 +523,18 @@ void DebugReport::SetMarkerObjectName(const VkDebugMarkerObjectNameInfoEXT* pNam
     std::unique_lock<std::mutex> lock(debug_output_mutex);
     if (pNameInfo->pObjectName) {
         debug_object_name_map[pNameInfo->object] = pNameInfo->pObjectName;
+        has_object_names.store(true);
     } else {
         debug_object_name_map.erase(pNameInfo->object);
+    }
+}
+
+void DebugReport::EraseObjectName(uint64_t object_handle) {
+    // Skip using the |debug_output_mutex| lock for a fast return if there is no name
+    if (has_object_names.load()) {
+        std::unique_lock<std::mutex> lock(debug_output_mutex);
+        debug_utils_object_name_map.erase(object_handle);
+        debug_object_name_map.erase(object_handle);
     }
 }
 
@@ -554,7 +609,7 @@ void DebugReport::BeginQueueDebugUtilsLabel(VkQueue queue, const VkDebugUtilsLab
         assert(label_state);
         label_state->labels.push_back(label_info);
 
-        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, perserving existing semantics for now
+        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, preserving existing semantics for now
         label_state->insert_label.Reset();
     }
 }
@@ -568,7 +623,7 @@ void DebugReport::EndQueueDebugUtilsLabel(VkQueue queue) {
             label_state->labels.pop_back();
         }
 
-        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, perserving existing semantics for now
+        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, preserving existing semantics for now
         label_state->insert_label.Reset();
     }
 }
@@ -577,7 +632,7 @@ void DebugReport::InsertQueueDebugUtilsLabel(VkQueue queue, const VkDebugUtilsLa
     std::unique_lock<std::mutex> lock(debug_output_mutex);
     auto* label_state = GetLoggingLabelState(&debug_utils_queue_labels, queue, /* insert */ true);
 
-    // TODO: Determine if this is the correct semantics for insert label vs. begin/end, perserving existing semantics for now
+    // TODO: Determine if this is the correct semantics for insert label vs. begin/end, preserving existing semantics for now
     label_state->insert_label = LoggingLabel(label_info);
 }
 
@@ -588,7 +643,7 @@ void DebugReport::BeginCmdDebugUtilsLabel(VkCommandBuffer command_buffer, const 
         assert(label_state);
         label_state->labels.push_back(label_info);
 
-        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, perserving existing semantics for now
+        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, preserving existing semantics for now
         label_state->insert_label.Reset();
     }
 }
@@ -602,7 +657,7 @@ void DebugReport::EndCmdDebugUtilsLabel(VkCommandBuffer command_buffer) {
             label_state->labels.pop_back();
         }
 
-        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, perserving existing semantics for now
+        // TODO: Determine if this is the correct semantics for insert label vs. begin/end, preserving existing semantics for now
         label_state->insert_label.Reset();
     }
 }
@@ -612,7 +667,7 @@ void DebugReport::InsertCmdDebugUtilsLabel(VkCommandBuffer command_buffer, const
     auto* label_state = GetLoggingLabelState(&debug_utils_cmd_buffer_labels, command_buffer, /* insert */ true);
     assert(label_state);
 
-    // TODO: Determine if this is the correct semantics for insert label vs. begin/end, perserving existing semantics for now
+    // TODO: Determine if this is the correct semantics for insert label vs. begin/end, preserving existing semantics for now
     label_state->insert_label = LoggingLabel(label_info);
 }
 
@@ -692,6 +747,7 @@ VKAPI_ATTR VkResult LayerCreateReportCallback(DebugReport* debug_report, bool de
 }
 
 VKAPI_ATTR void ActivateInstanceDebugCallbacks(DebugReport* debug_report) {
+    // Only one of these callbacks is ever set, so current is only updated once
     auto current = debug_report->instance_pnext_chain;
     for (;;) {
         auto create_info = vku::FindStructInPNextChain<VkDebugUtilsMessengerCreateInfoEXT>(current);
@@ -746,7 +802,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL MessengerBreakCallback([[maybe_unused]] VkDebugUt
     // It is annoying to break on some of our internal device creation warnings
     const uint32_t vuid_hash = callback_data ? (uint32_t)callback_data->messageIdNumber : 0;
     if (vuid_hash == 0x86fe6721 ||  // "WARNING-Setting-Limit-Adjusted"
-        vuid_hash == 0x7f1922d7     // "VALIDATION-SETTINGS"
+        vuid_hash == 0x7f1922d7 ||  // "VALIDATION-SETTINGS"
+        vuid_hash == 0xfd7b2292     // "CURRENT-VALIDATION-ENABLED"
     ) {
         return false;
     }
@@ -794,7 +851,8 @@ static std::string CreateDefaultCallbackMessage(VkDebugUtilsMessageSeverityFlagB
         oss << "Verbose Information: ";
     }
 
-    oss << "[ " << callback_data.pMessageIdName << " ] | MessageID = 0x" << std::hex << callback_data.messageIdNumber << '\n';
+    oss << "[ " << callback_data.pMessageIdName << " ] | MessageID = 0x" << std::hex << callback_data.messageIdNumber << std::dec
+        << '\n';
 
     oss << callback_data.pMessage << '\n';
 
@@ -804,7 +862,7 @@ static std::string CreateDefaultCallbackMessage(VkDebugUtilsMessageSeverityFlagB
             const auto& debug_object = callback_data.pObjects[i];
             oss << "    [" << i << "] " << string_VkObjectTypeHandleName(debug_object.objectType);
             if (debug_object.objectHandle) {
-                oss << " 0x" << std::hex << debug_object.objectHandle;
+                oss << " 0x" << std::hex << debug_object.objectHandle << std::dec;
             } else {
                 oss << " VK_NULL_HANDLE";
             }
@@ -841,8 +899,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL MessengerLogCallback(VkDebugUtilsMessageSeverityF
     const size_t total_size = msg_buffer_str.size();
     size_t offset = 0;
     while (offset < total_size) {
-        size_t bytes_to_print = std::min(chunk_size, total_size - offset);
-        __android_log_print(ANDROID_LOG_INFO, "VALIDATION", "%s", msg_buffer_str.c_str() + offset);
+        const size_t bytes_to_print = std::min(chunk_size, total_size - offset);
+        // If you just use "%s" it will re-print the whole remaining string on every iteration
+        __android_log_print(ANDROID_LOG_INFO, "VALIDATION", "%.*s", static_cast<int>(bytes_to_print),
+                            msg_buffer_str.c_str() + offset);
         offset += bytes_to_print;
     }
 #endif

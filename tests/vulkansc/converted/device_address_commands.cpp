@@ -570,6 +570,31 @@ TEST_F(NegativeDeviceAddressCommands, AddressCommandFlagsSync) {
     m_command_buffer.End();
 }
 
+TEST_F(NegativeDeviceAddressCommands, MemoryRangeBarrierEmptyRange) {
+    TEST_DESCRIPTION("A memory range barrier with a size of 0 is invalid");
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+    vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+
+    VkMemoryRangeBarrierKHR range_barrier = vku::InitStructHelper();
+    range_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    range_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    range_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    range_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    range_barrier.addressRange = {buffer.Address(), 0};
+
+    VkMemoryRangeBarriersInfoKHR barriers_info = vku::InitStructHelper();
+    barriers_info.memoryRangeBarrierCount = 1u;
+    barriers_info.pMemoryRangeBarriers = &range_barrier;
+    VkDependencyInfo dependency_info = vku::InitStructHelper(&barriers_info);
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryRangeBarrierKHR-addressRange-12543");
+    m_command_buffer.Barrier(dependency_info);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeDeviceAddressCommands, CmdDrawIndexedIndirectCount2Flags) {
     AddRequiredFeature(vkt::Feature::multiDrawIndirect);
     AddRequiredFeature(vkt::Feature::drawIndirectCount);
@@ -964,7 +989,7 @@ TEST_F(NegativeDeviceAddressCommands, QueryResultsStride) {
 
     VkQueryPoolCreateInfo query_pool_ci = vku::InitStructHelper();
     query_pool_ci.queryType = VK_QUERY_TYPE_OCCLUSION;
-    query_pool_ci.queryCount = 1u;
+    query_pool_ci.queryCount = 2u;
     vkt::QueryPool query_pool(*m_device, query_pool_ci);
 
     vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
@@ -975,6 +1000,8 @@ TEST_F(NegativeDeviceAddressCommands, QueryResultsStride) {
     m_command_buffer.Begin();
     vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
     vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
 
     range.address = buffer.Address() + 1;
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-flags-13077");
@@ -983,9 +1010,12 @@ TEST_F(NegativeDeviceAddressCommands, QueryResultsStride) {
 
     range.address = buffer.Address();
     range.stride = 9;
-    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-flags-13077");
-    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 1u, &range, 0u, 0u);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-queryCount-12540");
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 2u, &range, 0u, 0u);
     m_errorMonitor->VerifyFound();
+
+    // stride is unused for a single query
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 1u, &range, 0u, 0u);
 
     m_command_buffer.End();
 }
@@ -995,7 +1025,7 @@ TEST_F(NegativeDeviceAddressCommands, QueryResults64Stride) {
 
     VkQueryPoolCreateInfo query_pool_ci = vku::InitStructHelper();
     query_pool_ci.queryType = VK_QUERY_TYPE_OCCLUSION;
-    query_pool_ci.queryCount = 1u;
+    query_pool_ci.queryCount = 2u;
     vkt::QueryPool query_pool(*m_device, query_pool_ci);
 
     vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
@@ -1006,6 +1036,8 @@ TEST_F(NegativeDeviceAddressCommands, QueryResults64Stride) {
     m_command_buffer.Begin();
     vk::CmdBeginQuery(m_command_buffer, query_pool, 0u, 0u);
     vk::CmdEndQuery(m_command_buffer, query_pool, 0u);
+    vk::CmdBeginQuery(m_command_buffer, query_pool, 1u, 0u);
+    vk::CmdEndQuery(m_command_buffer, query_pool, 1u);
 
     range.address = buffer.Address() + 1;
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-flags-13078");
@@ -1014,9 +1046,12 @@ TEST_F(NegativeDeviceAddressCommands, QueryResults64Stride) {
 
     range.address = buffer.Address();
     range.stride = 9;
-    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-flags-13078");
-    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 1u, &range, 0u, VK_QUERY_RESULT_64_BIT);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResultsToMemoryKHR-queryCount-12541");
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 2u, &range, 0u, VK_QUERY_RESULT_64_BIT);
     m_errorMonitor->VerifyFound();
+
+    // stride is unused for a single query
+    vk::CmdCopyQueryPoolResultsToMemoryKHR(m_command_buffer, query_pool, 0u, 1u, &range, 0u, VK_QUERY_RESULT_64_BIT);
 
     m_command_buffer.End();
 }
@@ -1384,12 +1419,9 @@ TEST_F(NegativeDeviceAddressCommands, DISABLED_VertexBufferBindingStride) {
 
     CreatePipelineHelper pipe(*this);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription input_binding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexAttributeDescriptions = &attribute;
+    pipe.SetVertexInput(input_binding, attribute);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -2259,6 +2291,13 @@ TEST_F(NegativeDeviceAddressCommands, CopySampleCount) {
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VkImageFormatProperties image_format_properties;
+    GetImageFormatProps(Gpu(), image_ci, image_format_properties);
+    if ((image_format_properties.sampleCounts & VK_SAMPLE_COUNT_2_BIT) == 0) {
+        GTEST_SKIP() << "Required sample count not supported";
+    }
+
     vkt::Image image(*m_device, image_ci);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 
@@ -2888,28 +2927,31 @@ TEST_F(NegativeDeviceAddressCommands, CopyImageLayout) {
 TEST_F(NegativeDeviceAddressCommands, CopyAddressRangeOverlap) {
     RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
 
-    vkt::Buffer buffer(*m_device, 32u * 32u * 4u, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, vkt::device_address);
-    vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Buffer buffer(*m_device, 32u * 32u * 4u, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+    vkt::Image image(*m_device, 32u, 32u, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+
+    VkDeviceAddressRangeEXT range_0 = {buffer.Address(), 64};
+    VkDeviceAddressRangeEXT range_1 = {buffer.Address() + 32, 64};
 
     VkDeviceMemoryImageCopyKHR regions[2];
     regions[0] = vku::InitStructHelper();
-    regions[0].addressRange = buffer.AddressRange();
+    regions[0].addressRange = range_0;
     regions[0].addressFlags = 0u;
     regions[0].addressRowLength = 0u;
     regions[0].addressImageHeight = 0u;
     regions[0].imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u};
     regions[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     regions[0].imageOffset = {0, 0, 0};
-    regions[0].imageExtent = {32u, 4u, 1u};
+    regions[0].imageExtent = {2u, 2u, 1u};
     regions[1] = vku::InitStructHelper();
-    regions[1].addressRange = buffer.AddressRange();
+    regions[1].addressRange = range_1;
     regions[1].addressFlags = 0u;
     regions[1].addressRowLength = 0u;
     regions[1].addressImageHeight = 0u;
     regions[1].imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u};
     regions[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    regions[1].imageOffset = {0, 4, 0};
-    regions[1].imageExtent = {32u, 4u, 1u};
+    regions[1].imageOffset = {4, 4, 0};
+    regions[1].imageExtent = {2u, 2u, 1u};
 
     VkCopyDeviceMemoryImageInfoKHR copy_memory_info = vku::InitStructHelper();
     copy_memory_info.image = image;
@@ -2917,8 +2959,38 @@ TEST_F(NegativeDeviceAddressCommands, CopyAddressRangeOverlap) {
     copy_memory_info.pRegions = regions;
 
     m_command_buffer.Begin();
-    m_errorMonitor->SetDesiredError("VUID-VkCopyDeviceMemoryImageInfoKHR-addressRange-13026");
-    vk::CmdCopyMemoryToImageKHR(m_command_buffer, &copy_memory_info);
+    m_errorMonitor->SetDesiredError("VUID-VkCopyDeviceMemoryImageInfoKHR-pRegions-12473");
+    vk::CmdCopyImageToMemoryKHR(m_command_buffer, &copy_memory_info);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDeviceAddressCommands, CopyDeviceMemoryAddressOverlapRegion) {
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+
+    vkt::Buffer buffer(*m_device, 4096u, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
+    const VkDeviceAddress base = buffer.Address();
+    constexpr VkDeviceSize r_size = 256u;
+
+    VkDeviceMemoryCopyKHR regions[2];
+    regions[0] = vku::InitStruct<VkDeviceMemoryCopyKHR>();
+    regions[0].srcRange = {base, r_size};
+    regions[0].srcFlags = 0u;
+    regions[0].dstRange = {base + 1024u, r_size};
+    regions[0].dstFlags = 0u;
+    regions[1] = vku::InitStruct<VkDeviceMemoryCopyKHR>();
+    regions[1].srcRange = {base + 1024u, r_size};
+    regions[1].srcFlags = 0u;
+    regions[1].dstRange = {base + 2048u, r_size};
+    regions[1].dstFlags = 0u;
+
+    VkCopyDeviceMemoryInfoKHR copy_memory_info = vku::InitStructHelper();
+    copy_memory_info.regionCount = 2;
+    copy_memory_info.pRegions = regions;
+
+    m_command_buffer.Begin();
+    m_errorMonitor->SetDesiredError("VUID-VkCopyDeviceMemoryInfoKHR-srcRange-13015");
+    vk::CmdCopyMemoryKHR(m_command_buffer, &copy_memory_info);
     m_errorMonitor->VerifyFound();
     m_command_buffer.End();
 }
@@ -4337,12 +4409,9 @@ TEST_F(NegativeDeviceAddressCommands, BindVertexBuffers3Stride) {
     VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription input_binding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
     VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R32_SFLOAT, 0};
-    pipe.vi_ci_.pVertexAttributeDescriptions = &attribute;
+    pipe.SetVertexInput(input_binding, attribute);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -4413,5 +4482,202 @@ TEST_F(NegativeDeviceAddressCommands, VertexBufferBindingAddressFlags) {
     m_errorMonitor->SetDesiredError("VUID-VkBindVertexBuffer3InfoKHR-addressFlags-13100");
     vk::CmdBindVertexBuffers3KHR(m_command_buffer, 0, 2u, infos);
     m_errorMonitor->VerifyFound();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDeviceAddressCommands, IndexBufferRangeSize) {
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+    InitRenderTarget();
+
+    vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vkt::device_address);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    VkBindIndexBuffer3InfoKHR info = vku::InitStructHelper();
+    info.addressRange = buffer.AddressRange();
+    info.addressRange.size = 64u;  // 16 indices
+    info.addressFlags = 0u;
+    info.indexType = VK_INDEX_TYPE_UINT32;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer3KHR(m_command_buffer, &info);
+    vk::CmdDrawIndexed(m_command_buffer, 16u, 1u, 0u, 0, 0u);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
+    vk::CmdDrawIndexed(m_command_buffer, 16u, 1u, 1u, 0, 0u);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDeviceAddressCommands, IndexBufferRangeSizeMultiDraw) {
+    AddRequiredExtensions(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiDraw);
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+    InitRenderTarget();
+
+    vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, vkt::device_address);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    VkBindIndexBuffer3InfoKHR info = vku::InitStructHelper();
+    info.addressRange = buffer.AddressRange();
+    info.addressRange.size = 64u;  // 16 indices
+    info.addressFlags = 0u;
+    info.indexType = VK_INDEX_TYPE_UINT32;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindIndexBuffer3KHR(m_command_buffer, &info);
+
+    VkMultiDrawIndexedInfoEXT multi_draw_indices[2] = {{0u, 16u, 0}, {1u, 16u, 0}};
+    vk::CmdDrawMultiIndexedEXT(m_command_buffer, 1u, multi_draw_indices, 1u, 0u, sizeof(VkMultiDrawIndexedInfoEXT), nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
+    vk::CmdDrawMultiIndexedEXT(m_command_buffer, 2u, multi_draw_indices, 1u, 0u, sizeof(VkMultiDrawIndexedInfoEXT), nullptr);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDeviceAddressCommands, VertexAttributeAlignment) {
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+    InitRenderTarget();
+
+    vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vkt::device_address);
+
+    const char* vs_source = R"glsl(
+        #version 450
+        layout(location=0) in float x;
+        void main(){ gl_Position = vec4(x); }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    VkVertexInputBindingDescription input_binding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R32_SFLOAT, 0};
+
+    CreatePipelineHelper pipe(*this);
+    pipe.SetVertexInput(input_binding, attribute);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    VkBindVertexBuffer3InfoKHR info = vku::InitStructHelper();
+    info.setStride = VK_FALSE;
+    info.addressRange = buffer.StridedAddressRange();
+    info.addressFlags = 0u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindVertexBuffers3KHR(m_command_buffer, 0u, 1u, &info);
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+
+    info.addressRange.address += 2;
+    info.addressRange.size -= 2;
+    vk::CmdBindVertexBuffers3KHR(m_command_buffer, 0u, 1u, &info);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-format-10390");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDeviceAddressCommands, VertexAttributeAlignmentPacked) {
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+    InitRenderTarget();
+
+    if (!BufferFormatAndFeaturesSupported(Gpu(), VK_FORMAT_A8B8G8R8_UNORM_PACK32, VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)) {
+        GTEST_SKIP() << "Device does not support VK_FORMAT_A8B8G8R8_UNORM_PACK32 vertex buffers";
+    }
+
+    vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vkt::device_address);
+
+    const char* vs_source = R"glsl(
+        #version 450
+        layout(location=0) in vec4 x;
+        void main(){ gl_Position = x; }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    VkVertexInputBindingDescription input_binding = {0, 4u, VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_A8B8G8R8_UNORM_PACK32, 0};
+
+    CreatePipelineHelper pipe(*this);
+    pipe.SetVertexInput(input_binding, attribute);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    VkBindVertexBuffer3InfoKHR info = vku::InitStructHelper();
+    info.setStride = VK_FALSE;
+    info.addressRange = buffer.StridedAddressRange();
+    info.addressRange.address += 2;
+    info.addressRange.size -= 2;
+    info.addressFlags = 0u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindVertexBuffers3KHR(m_command_buffer, 0u, 1u, &info);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-format-10389");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeDeviceAddressCommands, VertexAttributeAlignmentLegacy64Bit) {
+    AddRequiredExtensions(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::legacyVertexAttributes);
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
+    RETURN_IF_SKIP(InitBasicDeviceAddressCommands());
+    InitRenderTarget();
+
+    if (!BufferFormatAndFeaturesSupported(Gpu(), VK_FORMAT_R64_SFLOAT, VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)) {
+        GTEST_SKIP() << "Device does not support VK_FORMAT_R64_SFLOAT vertex buffers";
+    }
+
+    vkt::Buffer buffer(*m_device, 256u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, vkt::device_address);
+
+    const char* vs_source = R"glsl(
+        #version 450
+        #extension GL_ARB_gpu_shader_fp64 : enable
+        layout(location=0) in double x;
+        void main(){ gl_Position = vec4(float(x)); }
+    )glsl";
+    VkShaderObj vs(*m_device, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    VkVertexInputBindingDescription input_binding = {0, sizeof(double), VK_VERTEX_INPUT_RATE_VERTEX};
+    VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R64_SFLOAT, 0};
+
+    CreatePipelineHelper pipe(*this);
+    pipe.SetVertexInput(input_binding, attribute);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    VkBindVertexBuffer3InfoKHR info = vku::InitStructHelper();
+    info.setStride = VK_FALSE;
+    info.addressRange = buffer.StridedAddressRange();
+    info.addressRange.address += 4;
+    info.addressRange.size -= 4;
+    info.addressFlags = 0u;
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindVertexBuffers3KHR(m_command_buffer, 0u, 1u, &info);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-format-10390");
+    vk::CmdDraw(m_command_buffer, 3u, 1u, 0u, 0u);
+    m_errorMonitor->VerifyFound();
+
+    m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }

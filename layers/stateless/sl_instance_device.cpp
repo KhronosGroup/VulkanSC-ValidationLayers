@@ -21,8 +21,10 @@
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
 #include "generated/dispatch_functions.h"
+#include "generated/extended_flags_helper_generator.h"
 #include "containers/container_utils.h"
 #include "utils/image_utils.h"
+#include "utils/math_utils.h"
 
 namespace stateless {
 // Traits objects to allow string_join to operate on collections of const char *
@@ -376,7 +378,7 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
     } else if (pCreateInfo->ppEnabledLayerNames) {
         skip |= LogError("VUID-VkDeviceCreateInfo-ppEnabledLayerNames-12385", physicalDevice,
                          create_info_loc.dot(Field::ppEnabledLayerNames),
-                         "is %p (not null).\nDevice Layers have never worked since Vulkan 1.0 and only Instance Layers should be "
+                         "is %p (not NULL).\nDevice Layers have never worked since Vulkan 1.0 and only Instance Layers should be "
                          "used instead: https://docs.vulkan.org/spec/latest/appendices/legacy.html#legacy-devicelayers",
                          pCreateInfo->ppEnabledLayerNames);
     }
@@ -500,11 +502,11 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
                                                                 VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES};
         while (current) {
             if (IsValueIn(current->sType, illegal_feature_structs_with_11)) {
-                skip |= LogError("VUID-VkDeviceCreateInfo-pNext-02829", physicalDevice, error_obj.location,
-                                 "If the pNext chain includes a VkPhysicalDeviceVulkan11Features structure, then "
-                                 "it must not include a %s structure. The features in %s were promoted in Vulkan 1.1 and is also "
-                                 "found in VkPhysicalDeviceVulkan11Features. To prevent one feature setting something to VK_TRUE "
-                                 "and the other to VK_FALSE, only one struct containing the feature is allowed.\n%s",
+                skip |= LogError("VUID-VkDeviceCreateInfo-pNext-02829", physicalDevice, create_info_loc.dot(Field::pNext),
+                                 "chain includes a VkPhysicalDeviceVulkan11Features structure, then it must not "
+                                 "include a %s structure. The features in %s were promoted in Vulkan 1.1 and is also found in "
+                                 "VkPhysicalDeviceVulkan11Features. To prevent one feature setting something to VK_TRUE and the "
+                                 "other to VK_FALSE, only one struct containing the feature is allowed.\n%s",
                                  string_VkStructureName(current->sType), string_VkStructureName(current->sType),
                                  PrintPNextChain(Struct::VkDeviceCreateInfo, pCreateInfo->pNext).c_str());
                 break;
@@ -561,8 +563,7 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
         if (vulkan_12_features->samplerMirrorClampToEdge == VK_FALSE &&
             enabled_extensions.find(vvl::Extension::_VK_KHR_sampler_mirror_clamp_to_edge) != enabled_extensions.end()) {
             skip |= LogError("VUID-VkDeviceCreateInfo-ppEnabledExtensionNames-02832", physicalDevice, error_obj.location,
-                             " %s is enabled but VkPhysicalDeviceVulkan12Features::samplerMirrorClampToEdge "
-                             "is not VK_TRUE.",
+                             "%s is enabled but VkPhysicalDeviceVulkan12Features::samplerMirrorClampToEdge is not VK_TRUE.",
                              VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
         }
         if (vulkan_12_features->descriptorIndexing == VK_FALSE &&
@@ -682,7 +683,15 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
                                  "is VK_QUEUE_FAMILY_IGNORED, but it is required to provide a valid queue family index value.");
             }
 
-            if (queue_create_info.pQueuePriorities != nullptr) {
+            if (queue_create_info.pQueuePriorities == nullptr) {
+                const auto* maintenance12_features =
+                    vku::FindStructInPNextChain<VkPhysicalDeviceMaintenance12FeaturesKHR>(pCreateInfo->pNext);
+                if (!maintenance12_features || !maintenance12_features->maintenance12) {
+                    skip |= LogError("VUID-VkDeviceQueueCreateInfo-maintenance12-12535", physicalDevice,
+                                     create_info_loc.dot(Field::pQueueCreateInfos, i).dot(Field::pQueuePriorities),
+                                     "is NULL, but the maintenance12 feature is not enabled.");
+                }
+            } else {
                 for (uint32_t j = 0; j < queue_create_info.queueCount; ++j) {
                     const float queue_priority = queue_create_info.pQueuePriorities[j];
                     if (!(queue_priority >= 0.f) || !(queue_priority <= 1.f)) {
@@ -704,7 +713,8 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
             }
             if (((queue_create_info.flags & VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT) != 0) && (protected_memory == VK_FALSE)) {
                 skip |= LogError(
-                    "VUID-VkDeviceQueueCreateInfo-flags-02861", physicalDevice, create_info_loc.dot(Field::flags),
+                    "VUID-VkDeviceQueueCreateInfo-flags-02861", physicalDevice,
+                    create_info_loc.dot(Field::pQueueCreateInfos, i).dot(Field::flags),
                     "includes VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT, but the protectedMemory feature is not being enabled.");
             }
         }
@@ -862,14 +872,13 @@ bool Instance::manual_PreCallValidateCreateDevice(VkPhysicalDevice physicalDevic
     }
 
     if (const auto* device_group_ci = vku::FindStructInPNextChain<VkDeviceGroupDeviceCreateInfo>(pCreateInfo->pNext)) {
-        for (uint32_t i = 0; i < device_group_ci->physicalDeviceCount - 1; ++i) {
+        for (uint32_t i = 0; i + 1 < device_group_ci->physicalDeviceCount; ++i) {
             for (uint32_t j = i + 1; j < device_group_ci->physicalDeviceCount; ++j) {
                 if (device_group_ci->pPhysicalDevices[i] == device_group_ci->pPhysicalDevices[j]) {
-                    skip |=
-                        LogError("VUID-VkDeviceGroupDeviceCreateInfo-pPhysicalDevices-00375", physicalDevice, error_obj.location,
-                                 "VkDeviceGroupDeviceCreateInfo has a duplicated physical device "
-                                 "in pPhysicalDevices [%" PRIu32 "] and [%" PRIu32 "].",
-                                 i, j);
+                    skip |= LogError("VUID-VkDeviceGroupDeviceCreateInfo-pPhysicalDevices-00375", physicalDevice,
+                                     create_info_loc.pNext(Struct::VkDeviceGroupDeviceCreateInfo, Field::pPhysicalDevices, i),
+                                     "and pPhysicalDevices[%" PRIu32 "] are both %s.", j,
+                                     FormatHandle(device_group_ci->pPhysicalDevices[i]).c_str());
                 }
             }
         }
@@ -904,7 +913,7 @@ bool Instance::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties2(
         const auto has_stencil_usage_2 =
             vku::FindStructInPNextChain<VkImageStencilUsage2CreateInfoKHR>(pImageFormatInfo->pNext) != nullptr;
         if (has_stencil_usage && has_stencil_usage_2) {
-            skip |= LogError("VUID-vkCreateImage-pNext-12442", physicalDevice, format_info_loc.dot(Field::pNext),
+            skip |= LogError("VUID-VkImageCreateInfo-pNext-12442", physicalDevice, format_info_loc.dot(Field::pNext),
                              "contains both VkImageStencilUsageCreateInfo and VkImageStencilUsage2CreateInfoKHR.");
         }
         const auto stencil_usage = GetImageStencilUsageFlags(pImageFormatInfo->pNext);
@@ -931,7 +940,8 @@ bool Instance::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties2(
             if (pImageFormatInfo->tiling != VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT) {
                 skip |= LogError("VUID-VkPhysicalDeviceImageFormatInfo2-tiling-02249", physicalDevice,
                                  format_info_loc.dot(Field::tiling),
-                                 "(%s) but no VkPhysicalDeviceImageDrmFormatModifierInfoEXT in pNext chain.\n%s",
+                                 "is %s, but the pNext chain includes VkPhysicalDeviceImageDrmFormatModifierInfoEXT (which "
+                                 "requires VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT).\n%s",
                                  string_VkImageTiling(pImageFormatInfo->tiling),
                                  PrintPNextChain(Struct::VkPhysicalDeviceImageFormatInfo2, pImageFormatInfo->pNext).c_str());
             }
@@ -946,12 +956,12 @@ bool Instance::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties2(
                                 format_info_loc.pNext(Struct::VkPhysicalDeviceImageDrmFormatModifierInfoEXT, Field::sharingMode),
                                 "is VK_SHARING_MODE_CONCURRENT, but queueFamilyIndexCount is 0 (needs to be at least 1).");
                         }
-                    } else if (image_drm_format->queueFamilyIndexCount <= 1) {
+                    } else {
                         skip |= LogError(
                             "VUID-VkPhysicalDeviceImageDrmFormatModifierInfoEXT-sharingMode-02315", physicalDevice,
                             format_info_loc.pNext(Struct::VkPhysicalDeviceImageDrmFormatModifierInfoEXT, Field::sharingMode),
                             "is VK_SHARING_MODE_CONCURRENT, but queueFamilyIndexCount is %" PRIu32
-                            " (Needs to be at least 2)\nHint: queueFamilyIndexCount can be 1 if the VK_KHR_maintenance11 extension "
+                            " (must be at least 2)\nHint: queueFamilyIndexCount can be 1 if the VK_KHR_maintenance11 extension "
                             "is supported on the device.",
                             image_drm_format->queueFamilyIndexCount);
                     }
@@ -1007,6 +1017,28 @@ bool Instance::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties2(
                     "viewFormatCount.");
             }
         }
+
+        if (vku::FindStructInPNextChain<VkFilterCubicImageViewImageFormatPropertiesEXT>(pImageFormatProperties->pNext)) {
+            const auto* image_view_info =
+                vku::FindStructInPNextChain<VkPhysicalDeviceImageViewImageFormatInfoEXT>(pImageFormatInfo->pNext);
+            if (!image_view_info) {
+                skip |= LogError(
+                    "VUID-VkFilterCubicImageViewImageFormatPropertiesEXT-pNext-02627", physicalDevice,
+                    error_obj.location.dot(Field::pImageFormatProperties)
+                        .pNext(Struct::VkFilterCubicImageViewImageFormatPropertiesEXT),
+                    "is included in the pNext chain of pImageFormatProperties, but "
+                    "VkPhysicalDeviceImageViewImageFormatInfoEXT is not included in the pNext chain of pImageFormatInfo.\n%s",
+                    PrintPNextChain(Struct::VkPhysicalDeviceImageFormatInfo2, pImageFormatInfo->pNext).c_str());
+            } else if (!IsImageViewTypeCompatibleWithImageType(physical_device_extensions.at(physicalDevice),
+                                                               image_view_info->imageViewType, pImageFormatInfo->type,
+                                                               GetImageCreateFlags(*pImageFormatInfo))) {
+                skip |= LogError("VUID-VkFilterCubicImageViewImageFormatPropertiesEXT-pNext-02627", physicalDevice,
+                                 format_info_loc.pNext(Struct::VkPhysicalDeviceImageViewImageFormatInfoEXT, Field::imageViewType),
+                                 "(%s) is not compatible with (%s) that has (%s).",
+                                 string_VkImageViewType(image_view_info->imageViewType), string_VkImageType(pImageFormatInfo->type),
+                                 string_VkImageCreateFlags2KHR(GetImageCreateFlags(*pImageFormatInfo)).c_str());
+            }
+        }
     }
 
     return skip;
@@ -1022,7 +1054,8 @@ bool Instance::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties(VkPh
 
     if (tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT) {
         skip |= LogError("VUID-vkGetPhysicalDeviceImageFormatProperties-tiling-02248", physicalDevice,
-                         error_obj.location.dot(Field::tiling), "is VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT.");
+                         error_obj.location.dot(Field::tiling),
+                         "is VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT (Use vkGetPhysicalDeviceImageFormatProperties2 instead).");
     }
 
     return skip;
@@ -1104,8 +1137,10 @@ bool Instance::ValidateGetPhysicalDeviceFormatProperties2(VkPhysicalDevice physi
             const char* vuid = context.error_obj.location.function == Func::vkGetPhysicalDeviceFormatProperties
                                    ? "VUID-vkGetPhysicalDeviceFormatProperties-None-12272"
                                    : "VUID-vkGetPhysicalDeviceFormatProperties2-None-12273";
-            skip |=
-                LogError(vuid, physicalDevice, context.error_obj.location.dot(Field::format), "is %s.", string_VkFormat(format));
+            skip |= LogError(vuid, physicalDevice, context.error_obj.location.dot(Field::format),
+                             "is %s.\nHint: This format can be used with Vulkan 1.3, "
+                             "VK_KHR_maintenance5, or VK_EXT_ycbcr_2plane_444_formats.",
+                             string_VkFormat(format));
         }
     }
 
@@ -1127,6 +1162,129 @@ bool Instance::manual_PreCallValidateGetPhysicalDeviceFormatProperties2(VkPhysic
                                                                         VkFormatProperties2* pFormatProperties,
                                                                         const Context& context) const {
     return ValidateGetPhysicalDeviceFormatProperties2(physicalDevice, format, pFormatProperties, context);
+}
+
+bool Instance::manual_PreCallValidateGetPhysicalDeviceCooperativeMatrixProperties2EXT(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceCooperativeMatrixInfo2EXT* pCooperativeMatrixInfo,
+    uint32_t* pPropertyCount, VkCooperativeMatrixProperties2EXT* pProperties, const Context& context) const {
+    bool skip = false;
+    const auto& error_obj = context.error_obj;
+    const Location info_loc = error_obj.location.dot(Field::pCooperativeMatrixInfo);
+
+    // We can't use SpecialSupported because this is at Instance level
+    // This makes a bit of hard assumption VK_KHR_maintenance5 is supported for anyone who supports this CoopMat extension such that
+    // we can query these features here
+    VkPhysicalDeviceCooperativeMatrixMaintenance1FeaturesEXT cooperative_matrix_maintenance1 = vku::InitStructHelper();
+    VkPhysicalDeviceCooperativeMatrix2FeaturesNV cooperative_matrix2 = vku::InitStructHelper(&cooperative_matrix_maintenance1);
+    VkPhysicalDeviceSubgroupSizeControlFeatures subgroup_size_control = vku::InitStructHelper(&cooperative_matrix2);
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&subgroup_size_control);
+    DispatchGetPhysicalDeviceFeatures2Helper(api_version, physicalDevice, &features2);
+
+    if (!cooperative_matrix_maintenance1.cooperativeMatrixProperties2) {
+        return LogError("VUID-vkGetPhysicalDeviceCooperativeMatrixProperties2EXT-cooperativeMatrixProperties2-13371",
+                        physicalDevice, error_obj.location, "cooperativeMatrixProperties2 is not supported by physicalDevice.");
+    }
+
+    const VkScopeKHR scope = pCooperativeMatrixInfo->scope;
+    const uint32_t invocations = pCooperativeMatrixInfo->invocations;
+    const uint32_t subgroup_size = pCooperativeMatrixInfo->subgroupSize;
+
+    if (scope != VK_SCOPE_SUBGROUP_KHR && scope != VK_SCOPE_WORKGROUP_KHR) {
+        skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-scope-13372", physicalDevice, info_loc.dot(Field::scope),
+                         "is %s, but must be VK_SCOPE_SUBGROUP_KHR or VK_SCOPE_WORKGROUP_KHR.", string_VkScopeKHR(scope));
+    }
+
+    if (subgroup_size != 0 && !IsPowerOfTwo(subgroup_size)) {
+        skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-subgroupSize-13374", physicalDevice,
+                         info_loc.dot(Field::subgroupSize), "is %" PRIu32 ", which is not a power of two.", subgroup_size);
+    }
+
+    if (scope == VK_SCOPE_SUBGROUP_KHR && subgroup_size != 0) {
+        if (subgroup_size_control.subgroupSizeControl) {
+            VkPhysicalDeviceSubgroupSizeControlProperties subgroup_size_control_props = vku::InitStructHelper();
+            VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&subgroup_size_control_props);
+            DispatchGetPhysicalDeviceProperties2Helper(api_version, physicalDevice, &props2);
+
+            if (subgroup_size < subgroup_size_control_props.minSubgroupSize) {
+                skip |=
+                    LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-scope-13375", physicalDevice,
+                             info_loc.dot(Field::subgroupSize), "is %" PRIu32 ", which is less than minSubgroupSize (%" PRIu32 ").",
+                             subgroup_size, subgroup_size_control_props.minSubgroupSize);
+            }
+            if (subgroup_size > subgroup_size_control_props.maxSubgroupSize) {
+                skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-scope-13376", physicalDevice,
+                                 info_loc.dot(Field::subgroupSize),
+                                 "is %" PRIu32 ", which is greater than maxSubgroupSize (%" PRIu32 ").", subgroup_size,
+                                 subgroup_size_control_props.maxSubgroupSize);
+            }
+        } else {
+            VkPhysicalDeviceSubgroupProperties subgroup_props = vku::InitStructHelper();
+            VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&subgroup_props);
+            DispatchGetPhysicalDeviceProperties2Helper(api_version, physicalDevice, &props2);
+
+            if (subgroup_size != subgroup_props.subgroupSize) {
+                skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-scope-13377", physicalDevice,
+                                 info_loc.dot(Field::subgroupSize),
+                                 "is %" PRIu32 ", but subgroupSizeControl is not supported and subgroupSize is %" PRIu32 ".",
+                                 subgroup_size, subgroup_props.subgroupSize);
+            }
+        }
+    }
+
+    if (scope == VK_SCOPE_WORKGROUP_KHR) {
+        if (!cooperative_matrix2.cooperativeMatrixWorkgroupScope) {
+            skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-cooperativeMatrixWorkgroupScope-13373", physicalDevice,
+                             info_loc.dot(Field::scope),
+                             "is VK_SCOPE_WORKGROUP_KHR, but cooperativeMatrixWorkgroupScope is not supported.\nWith "
+                             "VK_EXT_cooperative_matrix_maintenance1 alone, scope must be VK_SCOPE_SUBGROUP_KHR.");
+        } else {
+            VkPhysicalDeviceCooperativeMatrix2PropertiesNV cooperative_matrix2_props = vku::InitStructHelper();
+            VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&cooperative_matrix2_props);
+            DispatchGetPhysicalDeviceProperties2Helper(api_version, physicalDevice, &props2);
+
+            if (invocations > cooperative_matrix2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize) {
+                skip |= LogError(
+                    "VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-scope-13380", physicalDevice, info_loc.dot(Field::invocations),
+                    "is %" PRIu32 ", which is greater than cooperativeMatrixWorkgroupScopeMaxWorkgroupSize (%" PRIu32 ").",
+                    invocations, cooperative_matrix2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize);
+            }
+        }
+        if (!IsPowerOfTwo(invocations)) {
+            skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-invocations-13378", physicalDevice,
+                             info_loc.dot(Field::invocations), "is %" PRIu32 ", which is not a power of two.", invocations);
+        }
+        if (subgroup_size != 0 && (invocations % subgroup_size) != 0) {
+            skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-subgroupSize-13379", physicalDevice,
+                             info_loc.dot(Field::invocations),
+                             "is %" PRIu32 ", which is not a multiple of subgroupSize (%" PRIu32 ").", invocations, subgroup_size);
+        }
+
+    } else if (invocations != 0) {
+        skip |= LogError("VUID-VkPhysicalDeviceCooperativeMatrixInfo2EXT-invocations-13381", physicalDevice,
+                         info_loc.dot(Field::invocations), "is %" PRIu32 ", but scope is %s, so invocations must be zero.",
+                         invocations, string_VkScopeKHR(scope));
+    }
+
+    return skip;
+}
+
+bool Device::manual_PreCallValidateCreatePrivateDataSlot(VkDevice device, const VkPrivateDataSlotCreateInfo* pCreateInfo,
+                                                         const VkAllocationCallbacks* pAllocator,
+                                                         VkPrivateDataSlot* pPrivateDataSlot, const Context& context) const {
+    bool skip = false;
+    const auto& error_obj = context.error_obj;
+    if (!enabled_features.privateData) {
+        skip |= LogError("VUID-vkCreatePrivateDataSlot-privateData-04564", device, error_obj.location,
+                         "privateData feature was not enabled.");
+    }
+    if (((pCreateInfo->flags & VK_PRIVATE_DATA_SLOT_CREATE_BASE_OBJECT_HANDLE_BIT_NV) != 0) &&
+        !enabled_features.privateDataBaseHandle) {
+        skip |= LogError("VUID-VkPrivateDataSlotCreateInfo-flags-12501", device,
+                         error_obj.location.dot(Field::pCreateInfo).dot(Field::flags),
+                         "contains VK_PRIVATE_DATA_SLOT_CREATE_BASE_OBJECT_HANDLE_BIT_NV, but the privateDataBaseHandle feature "
+                         "was not enabled.");
+    }
+    return skip;
 }
 
 }  // namespace stateless

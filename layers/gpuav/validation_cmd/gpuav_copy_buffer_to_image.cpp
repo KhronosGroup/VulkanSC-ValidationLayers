@@ -25,6 +25,7 @@
 #include "generated/gpuav_offline_spirv.h"
 #include "containers/limits.h"
 #include "containers/container_utils.h"
+#include "utils/assert_utils.h"
 
 namespace gpuav {
 namespace valcmd {
@@ -72,6 +73,13 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
         return;
     }
 
+    // TODO https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/12657
+    for (LastBound& last_bound : cb_state.base.lastBound) {
+        if (last_bound.GetDescriptorMode() == vvl::DescriptorModeBuffer) {
+            return;
+        }
+    }
+
     // No need to perform validation if VK_EXT_depth_range_unrestricted is enabled
     if (IsExtEnabled(gpuav.extensions.vk_ext_depth_range_unrestricted)) {
         return;
@@ -93,8 +101,8 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
         gpuav.shared_resources_cache.GetOrCreate<ValidationCommandsGpuavState>(gpuav, loc);
     valpipe::ComputePipeline<CopyBufferToImageValidationShader>& validation_pipeline =
         gpuav.shared_resources_cache.GetOrCreate<valpipe::ComputePipeline<CopyBufferToImageValidationShader>>(
-            gpuav, loc, val_cmd_gpuav_state.error_logging_desc_set_layout_);
-    if (!validation_pipeline.valid) {
+            gpuav, loc, val_cmd_gpuav_state.desc_set_mode.error_logging_desc_set_layout_);
+    if (!validation_pipeline.Valid()) {
         gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to create CopyBufferToImageValidationShader.");
         return;
     }
@@ -138,7 +146,11 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
 
         auto gpu_regions_u32_ptr = (uint32_t*)copy_src_regions_mem_buffer_range.offset_mapped_ptr;
 
-        const uint32_t block_size = image_state->GetFormat() == VK_FORMAT_D32_SFLOAT ? 4 : 5;
+        // Buffer addressing for a depth aspect copy uses the depth aspect format, not the image format
+        // https://docs.vulkan.org/spec/latest/chapters/copies.html#copies-buffers-images-rotation-addressing
+        // So even something like VK_FORMAT_D32_SFLOAT_S8_UINT each texel is 4 bytes in the buffer
+        // no matter how the implementation stores D32S8 in image memory.
+        const uint32_t block_size = 4;
         const VkExtent3D image_extent = image_state->GetExtent();
         uint32_t gpu_regions_count = 0;
         BufferImageCopy* gpu_regions_ptr =
@@ -159,7 +171,8 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
             BufferImageCopy& gpu_region = gpu_regions_ptr[gpu_regions_count];
             gpu_region.src_buffer_byte_offset = static_cast<uint32_t>(cpu_region.bufferOffset);
             gpu_region.start_layer = cpu_region.imageSubresource.baseArrayLayer;
-            gpu_region.layer_count = cpu_region.imageSubresource.layerCount;
+            gpu_region.layer_count =
+                image_state->NormalizeSubresourceRange(RangeFromLayers(cpu_region.imageSubresource)).layerCount;
             gpu_region.row_extent = std::max(cpu_region.bufferRowLength, image_extent.width * block_size);
             gpu_region.slice_extent = std::max(cpu_region.bufferImageHeight, image_extent.height * gpu_region.row_extent);
             gpu_region.layer_extent = image_extent.depth * gpu_region.slice_extent;
@@ -177,11 +190,6 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
                          cpu_region.imageExtent.width * cpu_region.imageExtent.height * cpu_region.imageExtent.depth);
 
             ++gpu_regions_count;
-
-            if (gpu_regions_count == 0) {
-                // Nothing to validate
-                return;
-            }
         }
 
         gpu_regions_u32_ptr[0] = image_extent.width;
@@ -196,11 +204,8 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
         shader_resources.src_buffer_binding.info = {copy_buffer_to_img_info->srcBuffer, 0, VK_WHOLE_SIZE};
         shader_resources.copy_src_regions_buffer_binding.info = copy_src_regions_mem_buffer_range.GetDescriptorBufferInfo();
 
-        if (!BindShaderResources(validation_pipeline, gpuav, cb_state, cb_state.compute_index, cb_state.GetErrorLoggerIndex(),
-                                 shader_resources)) {
-            gpuav.InternalError(cb_state.VkHandle(), loc, "Failed to GetManagedDescriptorSet in BindShaderResources");
-            return;
-        }
+        ASSERT_AND_RETURN(validation_pipeline.BindShaderResources(
+            gpuav, cb_state, shader_resources, valpipe::ErrorLogging{cb_state.compute_index, cb_state.GetErrorLoggerIndex()}));
 
         group_count_x = max_texels_count_in_regions / 64 + uint32_t(max_texels_count_in_regions % 64 > 0);
     }
@@ -208,7 +213,9 @@ void CopyBufferToImage(Validator& gpuav, const Location& loc, CommandBufferSubSt
     // Setup validation pipeline
     // ---
     {
-        DispatchCmdBindPipeline(cb_state.VkHandle(), VK_PIPELINE_BIND_POINT_COMPUTE, validation_pipeline.pipeline);
+        if (!validation_pipeline.BindComputePipeline(gpuav, cb_state)) {
+            return;
+        }
 
         DispatchCmdDispatch(cb_state.VkHandle(), group_count_x, 1, 1);
     }

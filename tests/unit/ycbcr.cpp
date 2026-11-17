@@ -26,11 +26,16 @@ TEST_F(NegativeYcbcr, Sampler) {
     AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
     RETURN_IF_SKIP(Init());
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
+    // Best guess at a multi-planar format that has some chroma format features missing
+    const VkFormat mp_format = VK_FORMAT_G16_B16R16_2PLANE_420_UNORM;
+    const VkFormatFeatureFlags2 features = m_device->FormatFeaturesLinear(mp_format) | m_device->FormatFeaturesOptimal(mp_format);
+
+    const VkFormatFeatureFlags2 cosited = VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT;
+    const VkFormatFeatureFlags2 midpoint = VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT;
+    const VkFormatFeatureFlags2 linear_filter = VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT;
+    const VkFormatFeatureFlags2 forceable =
+        VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT;
+    const VkFormatFeatureFlags2 separate = VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT;
 
     VkSamplerYcbcrConversion ycbcr_conv = VK_NULL_HANDLE;
     VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper();
@@ -54,64 +59,62 @@ TEST_F(NegativeYcbcr, Sampler) {
     vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
     m_errorMonitor->VerifyFound();
 
-    // Force the multi-planar format support desired format features
-    VkFormat mp_format = VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM;
-    VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, &formatProps);
-    formatProps.linearTilingFeatures = 0;
-    formatProps.optimalTilingFeatures = 0;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, formatProps);
-
-    // Check that errors are caught when format feature don't exist
+    // Check that errors are caught when format features don't exist
     sycci.format = mp_format;
 
     // No Chroma Sampler Bit set
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-format-01650");
-    // 01651 set off twice for both xChromaOffset and yChromaOffset
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01651");
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01651");
-    vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
-    m_errorMonitor->VerifyFound();
+    if (!(features & (cosited | midpoint))) {
+        sycci.xChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-format-01650");
+        // 01651 set off twice for both xChromaOffset and yChromaOffset
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01651");
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01651");
+        vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
+        m_errorMonitor->VerifyFound();
+    }
 
     // Cosited feature supported, but midpoint samples set
-    formatProps.linearTilingFeatures = 0;
-    formatProps.optimalTilingFeatures = VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, formatProps);
-    sycci.xChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
-    sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01652");
-    vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
-    m_errorMonitor->VerifyFound();
-
-    // Moving support to Linear to test that it checks either linear or optimal
-    formatProps.linearTilingFeatures = VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT;
-    formatProps.optimalTilingFeatures = 0;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, formatProps);
-    sycci.xChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
-    sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01652");
-    vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
-    m_errorMonitor->VerifyFound();
+    if ((features & cosited) && !(features & midpoint)) {
+        sycci.forceExplicitReconstruction = VK_FALSE;
+        sycci.chromaFilter = VK_FILTER_NEAREST;
+        sycci.xChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
+        sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01652");
+        vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
+        m_errorMonitor->VerifyFound();
+    }
 
     // Using forceExplicitReconstruction without feature bit
-    sycci.forceExplicitReconstruction = VK_TRUE;
-    sycci.xChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
-    sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-forceExplicitReconstruction-01656");
-    vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
-    m_errorMonitor->VerifyFound();
+    if ((features & cosited) && !(features & forceable)) {
+        sycci.forceExplicitReconstruction = VK_TRUE;
+        sycci.chromaFilter = VK_FILTER_NEAREST;
+        sycci.xChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-forceExplicitReconstruction-01656");
+        vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
+        m_errorMonitor->VerifyFound();
+    }
 
     // Linear chroma filtering without feature bit
+    if ((features & cosited) && !(features & linear_filter)) {
+        sycci.forceExplicitReconstruction = VK_FALSE;
+        sycci.chromaFilter = VK_FILTER_LINEAR;
+        sycci.xChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-chromaFilter-01657");
+        vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // The rest needs a valid SamplerYcbcrConversion using a linear chromaFilter, and a format that will hit 01645
+    if (!(features & cosited) || !(features & linear_filter) || (features & separate)) {
+        return;
+    }
     sycci.forceExplicitReconstruction = VK_FALSE;
     sycci.chromaFilter = VK_FILTER_LINEAR;
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-chromaFilter-01657");
-    vk::CreateSamplerYcbcrConversion(device(), &sycci, nullptr, &ycbcr_conv);
-    m_errorMonitor->VerifyFound();
-
-    // Add linear feature bit so can create valid SamplerYcbcrConversion
-    formatProps.linearTilingFeatures = VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT;
-    formatProps.optimalTilingFeatures = VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, formatProps);
+    sycci.xChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
+    sycci.yChromaOffset = VK_CHROMA_LOCATION_COSITED_EVEN;
     vkt::SamplerYcbcrConversion conversion(*m_device, sycci);
 
     // Try to create a Sampler with non-matching filters without feature bit set
@@ -280,23 +283,10 @@ TEST_F(NegativeYcbcr, Formats) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
     if (!FormatIsSupported(Gpu(), VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM)) {
         GTEST_SKIP() << "VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM is unsupported";
     }
-
-    // Set format features as needed for tests
-    VkFormatProperties formatProps;
     const VkFormat mp_format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, &formatProps);
-    formatProps.optimalTilingFeatures |= VK_FORMAT_FEATURE_TRANSFER_SRC_BIT;
-    formatProps.optimalTilingFeatures = formatProps.optimalTilingFeatures & ~VK_FORMAT_FEATURE_DISJOINT_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, formatProps);
 
     // Create ycbcr image with all valid values
     // Each test changes needed values and returns them back after
@@ -342,10 +332,16 @@ TEST_F(NegativeYcbcr, Formats) {
     }
     image_create_info = reset_create_info;
 
-    // Test using a format that doesn't support disjoint
-    image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
-    CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-imageCreateFormatFeatures-02260");
-    image_create_info = reset_create_info;
+    {
+        const VkFormat no_disjoint_format = VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16;
+        const VkFormatFeatureFlags2 features = m_device->FormatFeaturesOptimal(no_disjoint_format);
+        if ((features & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT) && !(features & VK_FORMAT_FEATURE_2_DISJOINT_BIT)) {
+            image_create_info.format = no_disjoint_format;
+            image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
+            CreateImageTest(image_create_info, "VUID-VkImageCreateInfo-imageCreateFormatFeatures-02260");
+        }
+        image_create_info = reset_create_info;
+    }
 
     {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-format-parameter");
@@ -374,23 +370,10 @@ TEST_F(NegativeYcbcr, FormatsLimits) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
     if (!FormatIsSupported(Gpu(), VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM)) {
         GTEST_SKIP() << "VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM is unsupported";
     }
-
-    // Set format features as needed for tests
-    VkFormatProperties formatProps;
     const VkFormat mp_format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, &formatProps);
-    formatProps.optimalTilingFeatures |= VK_FORMAT_FEATURE_TRANSFER_SRC_BIT;
-    formatProps.optimalTilingFeatures = formatProps.optimalTilingFeatures & ~VK_FORMAT_FEATURE_DISJOINT_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), mp_format, formatProps);
 
     // Create ycbcr image with all valid values
     // Each test changes needed values and returns them back after
@@ -968,7 +951,7 @@ TEST_F(NegativeYcbcr, BindMemory2Disjoint) {
     mp_image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
 
     // Check for support of format used by all multi-planar tests
-    // Need seperate boolean as its valid to do tests that support YCbCr but not disjoint
+    // Need separate boolean as its valid to do tests that support YCbCr but not disjoint
     bool mp_disjoint_support = false;
 
     VkFormatProperties mp_format_properties;
@@ -1162,7 +1145,7 @@ TEST_F(NegativeYcbcr, BindMemory2DisjointUnsupported) {
     mp_image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
 
     // Check for support of format used by all multi-planar tests
-    // Need seperate boolean as its valid to do tests that support YCbCr but not disjoint
+    // Need separate boolean as its valid to do tests that support YCbCr but not disjoint
     bool mp_disjoint_support = false;
     VkFormatProperties mp_format_properties;
     vk::GetPhysicalDeviceFormatProperties(m_device->Physical(), mp_format, &mp_format_properties);
@@ -1456,6 +1439,61 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat2Plane) {
     CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-image-01586");
 }
 
+TEST_F(NegativeYcbcr, MultiplanePlaneViewFormat) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+        GTEST_SKIP() << "Required formats/features not supported";
+    }
+
+    VkImageCreateInfo ci = vku::InitStructHelper();
+    ci.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci.extent = {128, 128, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 1;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    if (!IsImageFormatSupported(Gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM);
+    VkSamplerYcbcrConversionInfo ycbcr_info = vku::InitStructHelper();
+    ycbcr_info.conversion = conversion;
+
+    VkImageViewCreateInfo ivci = vku::InitStructHelper(&ycbcr_info);
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.subresourceRange.layerCount = 1;
+    ivci.subresourceRange.baseMipLevel = 0;
+    ivci.subresourceRange.levelCount = 1;
+
+    {
+        vkt::Image image(*m_device, ci, vkt::set_layout);
+        ivci.image = image;
+        ivci.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+        ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
+        CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-image-01586");
+    }
+
+    {
+        ci.flags = 0;
+        vkt::Image image(*m_device, ci, vkt::set_layout);
+        ivci.pNext = nullptr;
+        ivci.image = image;
+        ivci.format = VK_FORMAT_R8G8_UNORM;
+        ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
+        m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-12397");
+        CreateImageViewTest(ivci, "VUID-VkImageViewCreateInfo-image-01586");
+    }
+}
+
 TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
     TEST_DESCRIPTION("Create a VkImageView with multiple planar aspect masks");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1625,11 +1663,7 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
         GTEST_SKIP() << "Required format features not supported.";
     }
 
-    VkImageDrmFormatModifierListCreateInfoEXT mod_list = vku::InitStructHelper();
-    mod_list.pDrmFormatModifiers = mods.data();
-    mod_list.drmFormatModifierCount = mods.size();
-
-    VkImageCreateInfo image_create_info = vku::InitStructHelper(&mod_list);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.flags = VK_IMAGE_CREATE_DISJOINT_BIT;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = format;
@@ -1639,6 +1673,17 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    mods = GetSupportedDrmModifiers(Gpu(), mods, image_create_info);
+    if (mods.empty()) {
+        GTEST_SKIP() << "Required format features not supported.";
+    }
+
+    VkImageDrmFormatModifierListCreateInfoEXT mod_list = vku::InitStructHelper();
+    mod_list.pDrmFormatModifiers = mods.data();
+    mod_list.drmFormatModifierCount = mods.size();
+    image_create_info.pNext = &mod_list;
+
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkImageMemoryRequirementsInfo2 mem_req_info2 = vku::InitStructHelper();
@@ -2237,8 +2282,8 @@ TEST_F(NegativeYcbcr, DescriptorIndexShaderObject) {
     )glsl";
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-12205");
-    const vkt::Shader comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
-                                  &descriptor_set.layout_.handle());
+    const vkt::ShaderEXT comp_shader(*m_device, VK_SHADER_STAGE_COMPUTE_BIT, GLSLToSPV(VK_SHADER_STAGE_COMPUTE_BIT, cs_source),
+                                     &descriptor_set.layout_.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -2277,5 +2322,75 @@ TEST_F(NegativeYcbcr, MutableFullImageView) {
     ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-format-12398");
     vkt::ImageView view(*m_device, ivci);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, YcbcrDegammaFeatureNotEnabled) {
+    TEST_DESCRIPTION("Try to use Ycbcr degamma in Ycbcr conversion sampler, but the ycbcrDegamma feature isn't enabled.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    RETURN_IF_SKIP(Init());
+
+    constexpr VkFormat format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+    if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+        GTEST_SKIP() << "VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM doesn't support sampled-image and chroma-samples, skipping test.";
+    }
+
+    VkSamplerYcbcrConversionYcbcrDegammaCreateInfoQCOM ycbcr_degamma_ci = vku::InitStructHelper();
+    ycbcr_degamma_ci.enableYDegamma = VK_TRUE;
+    VkSamplerYcbcrConversionCreateInfo ycbcr_conversion_ci = vkt::SamplerYcbcrConversion::DefaultConversionInfo(format);
+    ycbcr_conversion_ci.pNext = &ycbcr_degamma_ci;
+
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-pNext-09207");
+    vkt::SamplerYcbcrConversion sampler_ycbcr_conversion1{*m_device, ycbcr_conversion_ci};
+    m_errorMonitor->VerifyFound();
+
+    ycbcr_degamma_ci.enableYDegamma = VK_FALSE;
+    ycbcr_degamma_ci.enableCbCrDegamma = VK_TRUE;
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-pNext-09208");
+    vkt::SamplerYcbcrConversion sampler_ycbcr_conversion2{*m_device, ycbcr_conversion_ci};
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, Non8BitFormatYcbcrDegamma) {
+    TEST_DESCRIPTION("Try to use Ycbcr degamma in Ycbcr conversion sampler, but the ycbcr format isn't 8-bit.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    AddRequiredExtensions(VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::samplerYcbcrConversion);
+    AddRequiredFeature(vkt::Feature::ycbcrDegamma);
+    RETURN_IF_SKIP(Init());
+
+    constexpr std::array<VkFormat, 6> ycbcr_format_candidates{
+        VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16,
+        VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16,
+        VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16,
+        VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16,
+        VK_FORMAT_G16_B16R16_2PLANE_420_UNORM,
+        VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM,
+    };
+    VkFormat supported_ycbcr_format = VK_FORMAT_UNDEFINED;
+    for (const VkFormat format : ycbcr_format_candidates) {
+        if (FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL,
+                                       VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+            supported_ycbcr_format = format;
+            break;
+        }
+    }
+    if (supported_ycbcr_format == VK_FORMAT_UNDEFINED) {
+        GTEST_SKIP() << "Failed to find non-8-bit format that supports sampled-image and chroma-samples from candidates, skipping test.";
+    }
+
+    VkSamplerYcbcrConversionYcbcrDegammaCreateInfoQCOM ycbcr_degamma_ci = vku::InitStructHelper();
+    ycbcr_degamma_ci.enableYDegamma = VK_TRUE;
+    ycbcr_degamma_ci.enableCbCrDegamma = VK_TRUE;
+    VkSamplerYcbcrConversionCreateInfo ycbcr_conversion_ci = vkt::SamplerYcbcrConversion::DefaultConversionInfo(supported_ycbcr_format);
+    ycbcr_conversion_ci.pNext = &ycbcr_degamma_ci;
+
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-pNext-09209");
+    vkt::SamplerYcbcrConversion sampler_ycbcr_conversion{*m_device, ycbcr_conversion_ci};
     m_errorMonitor->VerifyFound();
 }

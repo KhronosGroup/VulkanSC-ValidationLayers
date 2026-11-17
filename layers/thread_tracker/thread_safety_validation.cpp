@@ -20,14 +20,76 @@
 #include "containers/span.h"
 #include "containers/container_utils.h"
 
+// Get current thread description on Windows
+#if defined(_WIN32)
+#include <windows.h>
+#include <vector>
+static std::string GetWin32ThreadDescription() {
+    // GetThreadDescription is missing before Windows 10 1607 so resolve at runtime
+    using GetThreadDescriptionFunc = HRESULT(WINAPI*)(HANDLE, PWSTR*);
+    static const GetThreadDescriptionFunc get_thread_description = reinterpret_cast<GetThreadDescriptionFunc>(
+        (void*)::GetProcAddress(::GetModuleHandleW(L"kernel32.dll"), "GetThreadDescription"));
+
+    if (!get_thread_description) {
+        return {};
+    }
+    PWSTR description = nullptr;
+    if (FAILED(get_thread_description(::GetCurrentThread(), &description))) {
+        return {};
+    }
+    const int buffer_size = ::WideCharToMultiByte(CP_UTF8, 0, description, -1, nullptr, 0, nullptr, nullptr);
+    if (buffer_size <= 0) {
+        ::LocalFree(description);
+        return {};
+    }
+    std::vector<char> buffer(buffer_size);
+    const int bytes_written = ::WideCharToMultiByte(CP_UTF8, 0, description, -1, buffer.data(), buffer_size, nullptr, nullptr);
+    ::LocalFree(description);
+    if (bytes_written <= 0) {
+        return {};
+    }
+    return std::string(buffer.data());
+}
+#endif
+
+// Get thread name on Linux, Android (API >= 26) and Mac
+#if defined(__linux__) || defined(__APPLE__)
+#include <pthread.h>
+static std::string GetPThreadName() {
+    char name[64] = {};  // on linux only 16 bytes are used, on Mac it can be more
+    if (pthread_getname_np(pthread_self(), name, sizeof(name)) != 0) {
+        return {};
+    }
+    // On Linux unnamed thread goes with default name (executable).
+    // On Mac default thread name is empty (similar to Windows)
+    return name;
+}
+#endif
+
 namespace threadsafety {
 
 static std::atomic_uint32_t next_thread_id{1};  // 0 is reserved as default state (no thread)
-static vvl::concurrent_unordered_map<uint32_t, std::thread::id, 4> thread_id_map;
+
+// Entries are intentionally retained after thread exit, so the map grows with the
+// total number of registered threads. The overhead is about 100 bytes per thread.
+// Cleanup using thread_local destructors adds TLS destruction order and library
+// unloading concerns (Android < 28 can unload libraries with pending destructors)
+static vvl::concurrent_unordered_map<uint32_t, ThreadInfo, 4> thread_id_map;
+
+std::string GetCurrentThreadName() {
+#if defined(_WIN32)
+    return GetWin32ThreadDescription();
+#elif defined(__linux__) || defined(__APPLE__)  // this also includes Android
+    return GetPThreadName();
+#else
+    return {};
+#endif
+}
 
 static uint32_t RegisterCurrentThread() {
     const uint32_t id = next_thread_id.fetch_add(1);
-    thread_id_map.insert(id, std::this_thread::get_id());
+    const std::string thread_name = GetCurrentThreadName();
+    thread_id_map.insert(id, ThreadInfo{std::this_thread::get_id(), thread_name});
     return id;
 }
 
@@ -36,9 +98,9 @@ uint32_t GetCurrentInternalThreadId() {
     return tls_id;
 }
 
-std::thread::id GetStdThreadIdFromInternal(uint32_t internal_thread_id) {
+ThreadInfo GetThreadInfo(uint32_t internal_thread_id) {
     auto it = thread_id_map.find(internal_thread_id);
-    return it != thread_id_map.end() ? it->second : std::thread::id{};
+    return it != thread_id_map.end() ? it->second : ThreadInfo{};
 }
 
 ReadLockGuard Device::ReadLock() const { return ReadLockGuard(validation_object_mutex, std::defer_lock); }
@@ -99,6 +161,22 @@ void Device::PostCallRecordCreateDescriptorSetLayout(VkDevice device, const VkDe
         }
         dsl_read_only_map.insert_or_assign(*pSetLayout, read_only);
     }
+}
+
+void Device::PreCallRecordDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout,
+                                                     const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+    StartWriteObject(descriptorSetLayout, record_obj.location);
+    // Host access to descriptorSetLayout must be externally synchronized
+}
+
+void Device::PostCallRecordDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout,
+                                                      const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+    FinishWriteObject(descriptorSetLayout, record_obj.location);
+    DestroyObject(descriptorSetLayout);
+    dsl_read_only_map.erase(descriptorSetLayout);
+    // Host access to descriptorSetLayout must be externally synchronized
 }
 
 void Device::PreCallRecordAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
@@ -440,6 +518,7 @@ void Device::PreCallRecordDestroyCommandPool(VkDevice device, VkCommandPool comm
     // remove references to implicitly freed command pools
     for (auto command_buffer : pool_command_buffers_map[commandPool]) {
         DestroyObject(command_buffer);
+        command_pool_map.erase(command_buffer);
     }
     pool_command_buffers_map[commandPool].clear();
     pool_command_buffers_map.erase(commandPool);
@@ -615,12 +694,6 @@ void Instance::PostCallRecordGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysi
             CreateObject(pProperties[i].displayPlaneProperties.currentDisplay);
         }
     }
-}
-
-void Instance::PreCallRecordGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
-                                                                uint32_t* pDisplayCount, VkDisplayKHR* pDisplays,
-                                                                const RecordObject& record_obj) {
-    // Nothing to do for this pre-call function
 }
 
 void Instance::PostCallRecordGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
@@ -865,20 +938,36 @@ void Device::PreCallRecordWaitForPresentKHR(VkDevice device, VkSwapchainKHR swap
                                             const RecordObject& record_obj) {
     StartReadObjectParentInstance(device, record_obj.location);
 
-    // Do not track swapchain parameter for vkWaitForPresentKHR.
-    // vkWaitForPresentKHR has exception to external synchronization rules that swapchain
-    // passed to it can be used by the functions (except vkDestroySwapchainKHR) in other threads.
-
-    // NOTE: when we add support for tracking opposite side of the thread conflict (planned functionality),
-    // then it would be possible to account for vkWaitForPresentKHR + vkDestroySwapchainKHR combination.
-    // In that case we still need to consider if that's something that's worth to do.
-    // Code for checking that combination will interact with main thread safety detection code,
-    // so it should be simple and robust addition in order not to break main thread safety detection code
-    // in a subtle way (threading!). Ratio risk/value looks too high now.
+    // Both vkWaitForPresentKHR and vkWaitForPresent2KHR allow concurrent swapchain access,
+    // except for vkDestroySwapchainKHR. Do not track the swapchain here.
+    // TODO: Wait-versus-destroy conflicts are currently not detected and require separate tracking
 }
 
 void Device::PostCallRecordWaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t presentId, uint64_t timeout,
                                              const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain,
+                                             const VkPresentWait2InfoKHR* pPresentWait2Info, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+    // Do not track the swapchain, for the same reason as PreCallRecordWaitForPresentKHR.
+}
+
+void Device::PostCallRecordWaitForPresent2KHR(VkDevice device, VkSwapchainKHR swapchain,
+                                              const VkPresentWait2InfoKHR* pPresentWait2Info, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void Device::PreCallRecordSetLatencyMarkerNV(VkDevice device, VkSwapchainKHR swapchain,
+                                             const VkSetLatencyMarkerInfoNV* pLatencyMarkerInfo, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+    // VK_NV_low_latency2 allows the swapchain to be used concurrently by any command except vkDestroySwapchainKHR.
+    // Do not track the swapchain, for the same reason as PreCallRecordWaitForPresentKHR.
+}
+
+void Device::PostCallRecordSetLatencyMarkerNV(VkDevice device, VkSwapchainKHR swapchain,
+                                              const VkSetLatencyMarkerInfoNV* pLatencyMarkerInfo, const RecordObject& record_obj) {
     FinishReadObjectParentInstance(device, record_obj.location);
 }
 
@@ -892,11 +981,9 @@ void Device::PostCallRecordCreatePipelineBinariesKHR(VkDevice device, const VkPi
                                                      const VkAllocationCallbacks* pAllocator,
                                                      VkPipelineBinaryHandlesInfoKHR* pBinaries, const RecordObject& record_obj) {
     FinishReadObjectParentInstance(device, record_obj.location);
-    if (record_obj.result == VK_SUCCESS) {
+    if ((record_obj.result == VK_SUCCESS || record_obj.result == VK_INCOMPLETE) && pBinaries->pPipelineBinaries) {
         for (uint32_t i = 0; i < pBinaries->pipelineBinaryCount; ++i) {
-            if (pBinaries->pPipelineBinaries != nullptr) {
-                CreateObject(pBinaries->pPipelineBinaries[i]);
-            }
+            CreateObject(pBinaries->pPipelineBinaries[i]);
         }
     }
 }

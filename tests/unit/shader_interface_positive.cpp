@@ -335,12 +335,8 @@ TEST_F(PositiveShaderInterface, FragmentOutputNotWrittenDynamicRendering) {
     // Valid because no Output variable is declared
     VkShaderObj fs(*m_device, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkFormat color_formats = VK_FORMAT_B8G8R8A8_UNORM;
-    VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
-
-    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    CreatePipelineHelper pipe(*this);
+    pipe.SetDynamicRendering({VK_FORMAT_B8G8R8A8_UNORM});
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.cb_attachments_.colorWriteMask = 0xf;  // all components
     pipe.CreateGraphicsPipeline();
@@ -1757,10 +1753,8 @@ TEST_F(PositiveShaderInterface, BlockFragmentLocation) {
                OpSource Unknown 0
                OpMemberName %FsOut 0 "color"
                OpName %FsOut "FsOut"
-               OpMemberDecorate %FsOut 0 Offset 0
                OpDecorate %FsOut Block
                OpMemberDecorate %FsOut 0 Location 0
-               OpMemberDecorate %ShaderLink 0 Offset 0
                OpDecorate %ShaderLink Block
                OpMemberDecorate %ShaderLink 0 Location 0
        %void = OpTypeVoid

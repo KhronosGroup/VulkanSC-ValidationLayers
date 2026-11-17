@@ -49,7 +49,6 @@
 namespace chassis {
 struct CreateGraphicsPipelines;
 struct CreateComputePipelines;
-struct CreateRayTracingPipelinesNV;
 struct CreateRayTracingPipelinesKHR;
 struct CreateDataGraphPipelinesARM;
 struct CreateShaderModule;
@@ -58,6 +57,7 @@ struct ShaderBinaryData;
 struct CreatePipelineLayout;
 struct CreateBuffer;
 struct CmdBindDescriptorBuffers;
+struct AllocateMemory;
 }  // namespace chassis
 
 namespace vvl {
@@ -69,6 +69,7 @@ struct GlobalSettings;
 struct GpuAVSettings;
 struct SyncValSettings;
 struct GpuDumpSettings;
+struct LegacyDetectionSettings;
 
 // Because of GPL, we currently create our Pipeline state objects before the PreCallValidate
 // Each chassis layer will need to track its own state
@@ -94,6 +95,7 @@ class BaseInstance : public Logger {
     GpuAVSettings& gpuav_settings;
     const SyncValSettings& syncval_settings;
     const GpuDumpSettings& gpu_dump_settings;
+    const LegacyDetectionSettings& legacy_detection_settings;
 
     const ValidationDisabled& disabled;
     const ValidationEnabled& enabled;
@@ -110,6 +112,7 @@ class BaseInstance : public Logger {
           gpuav_settings(instance->settings.gpuav_settings),
           syncval_settings(instance->settings.syncval_settings),
           gpu_dump_settings(instance->settings.gpu_dump_settings),
+          legacy_detection_settings(instance->settings.legacy_detection_settings),
           disabled(instance->settings.disabled),
           enabled(instance->settings.enabled),
           instance(instance->instance),
@@ -152,10 +155,13 @@ class BaseDevice : public Logger {
     const VkPhysicalDeviceVulkan13Properties& phys_dev_props_core13;
     const VkPhysicalDeviceVulkan14Properties& phys_dev_props_core14;
     const DeviceExtensionProperties& phys_dev_ext_props;
-    const GlobalSettings& global_settings;
+    // Settings are not always const because we might need to update them during vkCreateDevice
+    // when we know the extensions enabled
+    GlobalSettings& global_settings;
     GpuAVSettings& gpuav_settings;
     const SyncValSettings& syncval_settings;
     const GpuDumpSettings& gpu_dump_settings;
+    const LegacyDetectionSettings& legacy_detection_settings;
 
     const ValidationDisabled& disabled;
     const ValidationEnabled& enabled;
@@ -191,6 +197,7 @@ class BaseDevice : public Logger {
           gpuav_settings(dispatch_dev->settings.gpuav_settings),
           syncval_settings(dispatch_dev->settings.syncval_settings),
           gpu_dump_settings(dispatch_dev->settings.gpu_dump_settings),
+          legacy_detection_settings(dispatch_dev->settings.legacy_detection_settings),
           disabled(dispatch_dev->settings.disabled),
           enabled(dispatch_dev->settings.enabled),
           instance(instance->instance),
@@ -311,30 +318,6 @@ class BaseDevice : public Logger {
                                              record_obj);
     }
 
-    // Allow additional state parameter for CreateRayTracingPipelinesNV
-    virtual bool PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache,
-                                                            uint32_t createInfoCount,
-                                                            const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
-                                                            const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                            const ErrorObject& error_obj, PipelineStates& pipeline_states) const {
-        return PreCallValidateCreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator,
-                                                          pPipelines, error_obj);
-    }
-    virtual void PreCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                          const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
-                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                          const RecordObject& record_obj, PipelineStates& pipeline_states) {
-        PreCallRecordCreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
-                                                 record_obj);
-    }
-    virtual void PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
-                                                           const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
-                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                           const RecordObject& record_obj, PipelineStates& pipeline_states) {
-        PostCallRecordCreateRayTracingPipelinesNV(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines,
-                                                  record_obj);
-    }
-
     // Allow additional state parameter for CreateRayTracingPipelinesKHR
     virtual bool PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
                                                              VkPipelineCache pipelineCache, uint32_t createInfoCount,
@@ -453,6 +436,13 @@ class BaseDevice : public Logger {
                                                           const RecordObject& record_obj,
                                                           chassis::CmdBindDescriptorBuffers& chassis_state) {
         PreCallRecordCmdBindDescriptorBuffersEXT(commandBuffer, bufferCount, pBindingInfos, record_obj);
+    }
+
+    // Modify a parameter to AllocateMemory
+    virtual void PreCallRecordAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
+                                             const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory,
+                                             const RecordObject& record_obj, chassis::AllocateMemory& chassis_state) {
+        PreCallRecordAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, record_obj);
     }
 
 #include "generated/validation_object_device_methods.h"

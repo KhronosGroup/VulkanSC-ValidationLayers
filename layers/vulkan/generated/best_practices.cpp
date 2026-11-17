@@ -66,6 +66,7 @@ std::string GetSpecialUse(vvl::Extension extension_name) {
         {vvl::Extension::_VK_ARM_performance_counters_by_region, "devtools"},
         {vvl::Extension::_VK_ARM_shader_instrumentation, "devtools"},
         {vvl::Extension::_VK_EXT_primitive_restart_index, "glemulation"},
+        {vvl::Extension::_VK_VALVE_buffer_device_address_allocation_alignment, "d3demulation"},
     };
 
     auto it = special_use_extensions.find(extension_name);
@@ -1355,7 +1356,7 @@ void BestPractices::PostCallRecordCreateRayTracingPipelinesNV(VkDevice device, V
                                                               uint32_t createInfoCount,
                                                               const VkRayTracingPipelineCreateInfoNV* pCreateInfos,
                                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                              const RecordObject& record_obj, PipelineStates& pipeline_states) {
+                                                              const RecordObject& record_obj) {
     bp_state::LogResult(*this, device, record_obj);
 }
 
@@ -2050,6 +2051,12 @@ void bp_state::Instance::PostCallRecordGetPhysicalDeviceQueueFamilyDataGraphOpti
     const VkQueueFamilyDataGraphPropertiesARM* pQueueFamilyDataGraphProperties,
     const VkDataGraphOpticalFlowImageFormatInfoARM* pOpticalFlowImageFormatInfo, uint32_t* pFormatCount,
     VkDataGraphOpticalFlowImageFormatPropertiesARM* pImageFormatProperties, const RecordObject& record_obj) {
+    bp_state::LogResult(*this, physicalDevice, record_obj);
+}
+
+void bp_state::Instance::PostCallRecordGetPhysicalDeviceCooperativeMatrixProperties2EXT(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceCooperativeMatrixInfo2EXT* pCooperativeMatrixInfo,
+    uint32_t* pPropertyCount, VkCooperativeMatrixProperties2EXT* pProperties, const RecordObject& record_obj) {
     bp_state::LogResult(*this, physicalDevice, record_obj);
 }
 

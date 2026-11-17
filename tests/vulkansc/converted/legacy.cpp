@@ -156,7 +156,7 @@ TEST_F(NegativeLegacy, DISABLED_UseDeprecatedInstanceExtensions) {
 }
 
 // Not supported in Vulkan SC: legacy/deprecation messages
-TEST_F(NegativeLegacy, DISABLED_UseDeprecatedDeviceExtensions) {
+TEST_F(NegativeLegacy, DISABLED_UseDeprecatedDeviceExtensionsVersion) {
     // We need to explicitly allow promoted extensions to be enabled as this test relies on this behavior
     AllowPromotedExtensions();
 
@@ -175,14 +175,42 @@ TEST_F(NegativeLegacy, DISABLED_UseDeprecatedDeviceExtensions) {
     dev_info.queueCreateInfoCount = 1;
     dev_info.pQueueCreateInfos = &queue_info;
     dev_info.enabledLayerCount = 0;
-    dev_info.ppEnabledLayerNames = NULL;
+    dev_info.ppEnabledLayerNames = nullptr;
     dev_info.enabledExtensionCount = m_device_extension_names.size();
     dev_info.ppEnabledExtensionNames = m_device_extension_names.data();
 
     // One for VK_KHR_buffer_device_address
     // One for the dependency extension VK_KHR_device_group
     m_errorMonitor->SetDesiredWarning("WARNING-legacy-extension", 2);
-    vk::CreateDevice(this->Gpu(), &dev_info, NULL, &local_device);
+    vk::CreateDevice(this->Gpu(), &dev_info, nullptr, &local_device);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: legacy/deprecation messages
+TEST_F(NegativeLegacy, DISABLED_UseDeprecatedDeviceExtensionsPromoted) {
+    // We need to explicitly allow promoted extensions to be enabled as this test relies on this behavior
+    AllowPromotedExtensions();
+
+    AddRequiredExtensions(VK_EXT_INDEX_TYPE_UINT8_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework(&kLegacySettingCreateInfo));
+    RETURN_IF_SKIP(InitState());
+
+    VkDevice local_device;
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
+    VkDeviceQueueCreateInfo queue_info = vku::InitStructHelper();
+    queue_info.queueFamilyIndex = 0;
+    queue_info.queueCount = 1;
+    float qp = 1;
+    queue_info.pQueuePriorities = &qp;
+    dev_info.queueCreateInfoCount = 1;
+    dev_info.pQueueCreateInfos = &queue_info;
+    dev_info.enabledLayerCount = 0;
+    dev_info.ppEnabledLayerNames = nullptr;
+    dev_info.enabledExtensionCount = m_device_extension_names.size();
+    dev_info.ppEnabledExtensionNames = m_device_extension_names.data();
+
+    m_errorMonitor->SetDesiredWarning("WARNING-legacy-extension");
+    vk::CreateDevice(this->Gpu(), &dev_info, nullptr, &local_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -223,4 +251,71 @@ TEST_F(NegativeLegacy, DISABLED_LoadDeprecatedExtension) {
     if (device) {
         vk::DestroyDevice(device, nullptr);
     }
+}
+
+// Not supported in Vulkan SC: legacy/deprecation messages
+TEST_F(NegativeLegacy, DISABLED_DescriptorHeapAlways) {
+    RETURN_IF_SKIP(InitFramework(&kLegacySettingCreateInfo));
+    RETURN_IF_SKIP(InitState());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1};
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
+    ds_pool_ci.maxSets = 1;
+    ds_pool_ci.poolSizeCount = 1;
+    ds_pool_ci.pPoolSizes = &ds_type_count;
+
+    m_errorMonitor->SetDesiredWarning("WARNING-legacy-descriptor-sets");
+    vkt::DescriptorPool(*m_device, ds_pool_ci);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: legacy/deprecation messages
+TEST_F(NegativeLegacy, DISABLED_DescriptorHeapOnlySupport) {
+    const char* mode = "ONLY_SUPPORTED";
+    VkLayerSettingEXT layer_settings[2] = {
+        kLegacySetting, {OBJECT_LAYER_NAME, "legacy_detection_mode", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &mode}};
+    VkLayerSettingsCreateInfoEXT layer_setting_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 2, layer_settings};
+    RETURN_IF_SKIP(InitFramework(&layer_setting_ci));
+    RETURN_IF_SKIP(InitState());
+    if (!DeviceExtensionSupported(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME)) {
+        GTEST_SKIP() << VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME << " not supported.";
+    }
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1};
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
+    ds_pool_ci.maxSets = 1;
+    ds_pool_ci.poolSizeCount = 1;
+    ds_pool_ci.pPoolSizes = &ds_type_count;
+
+    m_errorMonitor->SetDesiredWarning("WARNING-legacy-descriptor-sets");
+    vkt::DescriptorPool(*m_device, ds_pool_ci);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: legacy/deprecation messages
+TEST_F(NegativeLegacy, DISABLED_DescriptorHeapOnlyEnabled) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+    const char* ids[] = {"WARNING-legacy-gpdp2"};
+    const char* mode = "ONLY_ENABLED";
+    VkLayerSettingEXT layer_settings[3] = {
+        kLegacySetting,
+        {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids},
+        {OBJECT_LAYER_NAME, "legacy_detection_mode", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, &mode}};
+    VkLayerSettingsCreateInfoEXT layer_setting_ci = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 3, layer_settings};
+    RETURN_IF_SKIP(InitFramework(&layer_setting_ci));
+    RETURN_IF_SKIP(InitState());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1};
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
+    ds_pool_ci.maxSets = 1;
+    ds_pool_ci.poolSizeCount = 1;
+    ds_pool_ci.pPoolSizes = &ds_type_count;
+
+    m_errorMonitor->SetDesiredWarning("WARNING-legacy-descriptor-sets");
+    vkt::DescriptorPool(*m_device, ds_pool_ci);
+    m_errorMonitor->VerifyFound();
 }

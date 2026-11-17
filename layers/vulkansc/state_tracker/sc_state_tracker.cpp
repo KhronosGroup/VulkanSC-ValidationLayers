@@ -216,7 +216,7 @@ void DeviceState::PreCallRecordDestroyPipelineCache(VkDevice device, VkPipelineC
 std::shared_ptr<vvl::Pipeline> DeviceState::CreateGraphicsPipelineState(
     const VkGraphicsPipelineCreateInfo* pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
     std::shared_ptr<const vvl::RenderPass>&& render_pass, std::shared_ptr<const vvl::PipelineLayout>&& layout,
-    spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) const {
+    std::vector<spirv::StatelessData>& stateless_data) const {
     // If any of the VkPipelineShaderStageCreateInfo entries are missing:
     //  * the entry point name (pName == NULL)
     //  * specialization info (pSpecializationInfo == NULL), if necessary
@@ -257,7 +257,7 @@ std::shared_ptr<vvl::Pipeline> DeviceState::CreateGraphicsPipelineState(
     }
 
     return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<Pipeline>(
-        *this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), stateless_data));
+        *this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), &stateless_data));
 }
 
 std::shared_ptr<vvl::Pipeline> DeviceState::CreateComputePipelineState(const VkComputePipelineCreateInfo* pCreateInfo,

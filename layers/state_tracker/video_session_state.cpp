@@ -174,6 +174,15 @@ bool VideoProfileDesc::InitProfile(VkVideoProfileInfoKHR const* profile) {
             } else {
                 profile_.encode_usage = vku::InitStructHelper();
             }
+
+            auto rgb_conversion = vku::FindStructInPNextChain<VkVideoEncodeProfileRgbConversionInfoVALVE>(profile->pNext);
+            if (rgb_conversion) {
+                profile_.encode_rgb_conversion = *rgb_conversion;
+                profile_.encode_rgb_conversion.pNext = profile_.base.pNext;
+                profile_.base.pNext = &profile_.encode_rgb_conversion;
+            } else {
+                profile_.encode_rgb_conversion = vku::InitStructHelper();
+            }
         }
     } else {
         profile_.valid = false;
@@ -248,6 +257,9 @@ void VideoProfileDesc::InitCapabilities(VkPhysicalDevice physical_device) {
 
         capabilities_.encode_ext.feedback2 = vku::InitStructHelper(capabilities_.base.pNext);
         capabilities_.base.pNext = &capabilities_.encode_ext.feedback2;
+
+        capabilities_.encode_ext.rgb_conversion = vku::InitStructHelper(capabilities_.base.pNext);
+        capabilities_.base.pNext = &capabilities_.encode_ext.rgb_conversion;
     }
 
     VkResult result = DispatchGetPhysicalDeviceVideoCapabilitiesKHR(physical_device, &profile_.base, &capabilities_.base);
@@ -1236,7 +1248,7 @@ std::string string_VideoProfileDesc(const vvl::VideoProfileDesc& profile) {
                << (internal_profile.decode_av1.filmGrainSupport ? " with film grain support" : " without film grain support");
             break;
         case VK_VIDEO_CODEC_OPERATION_ENCODE_AV1_BIT_KHR:
-            ss << string_std_video_av1_profile_idc(internal_profile.decode_av1.stdProfile);
+            ss << string_std_video_av1_profile_idc(internal_profile.encode_av1.stdProfile);
             break;
         case VK_VIDEO_CODEC_OPERATION_DECODE_VP9_BIT_KHR:
             ss << string_std_video_vp9_profile(internal_profile.decode_vp9.stdProfile);

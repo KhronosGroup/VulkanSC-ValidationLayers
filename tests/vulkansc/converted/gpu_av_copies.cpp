@@ -52,6 +52,11 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32) {
     vk::CmdCopyBufferToImage(m_command_buffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                              &buffer_image_copy_1);
 
+    VkMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier);
+
     VkBufferImageCopy buffer_image_copy_2 = buffer_image_copy_1;
     buffer_image_copy_2.imageOffset = {32, 32, 0};
     buffer_image_copy_2.imageExtent = {32, 32, 1};
@@ -62,6 +67,39 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32) {
     m_command_buffer.End();
     // VUID-vkCmdCopyBufferToImage-pRegions-07931
     m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
+    m_default_queue->SubmitAndWait(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVCopies, BufferToImageD32RemainingArrayLayers) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
+    float* ptr = static_cast<float*>(copy_src_buffer.Memory().Map());
+    for (size_t i = 0; i < 64 * 64; ++i) {
+        ptr[i] = 0.1f;
+    }
+    ptr[4094] = 42.0f;
+
+    vkt::Image copy_dst_image(*m_device, 64, 64, VK_FORMAT_D32_SFLOAT,
+                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    VkBufferImageCopy buffer_image_copy = {};
+    buffer_image_copy.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, VK_REMAINING_ARRAY_LAYERS};
+    buffer_image_copy.imageExtent = {64, 64, 1};
+
+    m_command_buffer.Begin();
+    vk::CmdCopyBufferToImage(m_command_buffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &buffer_image_copy);
+    m_command_buffer.End();
+    // VUID-vkCmdCopyBufferToImage-pRegions-07931
     m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
@@ -159,6 +197,11 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32Vk13) {
 
     vk::CmdCopyBufferToImage2(m_command_buffer, &buffer_image_copy);
 
+    VkMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, barrier);
+
     region_1.imageOffset = {32, 32, 0};
     region_1.imageExtent = {32, 32, 1};
 
@@ -181,13 +224,13 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32U8) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                kHostVisibleMemProps);
+    vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
 
     auto ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.CreateInfo().size));
     for (size_t i = 0; i < 64 * 64; ++i) {
-        auto ptr_float = reinterpret_cast<float*>(ptr + 5 * i);
+        auto ptr_float = reinterpret_cast<float*>(ptr + sizeof(float) * i);
         if (i == 64 * 64 - 1) {
             *ptr_float = 42.0f;
         } else {
@@ -214,7 +257,7 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32U8) {
 
     m_command_buffer.End();
     // VUID-vkCmdCopyBufferToImage-pRegions-07931
-    m_errorMonitor->SetDesiredError("has a float value at offset 20475 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16380 that is not in the range [0, 1]");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -227,13 +270,13 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32U8Vk13) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                kHostVisibleMemProps);
+    vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, kHostVisibleMemProps);
 
     auto ptr = static_cast<uint8_t*>(copy_src_buffer.Memory().Map());
     std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.CreateInfo().size));
     for (size_t i = 0; i < 64 * 64; ++i) {
-        auto ptr_float = reinterpret_cast<float*>(ptr + 5 * i);
+        auto ptr_float = reinterpret_cast<float*>(ptr + sizeof(float) * i);
         if (i == 64 * 64 - 1) {
             *ptr_float = 42.0f;
         } else {
@@ -266,7 +309,7 @@ TEST_F(NegativeGpuAVCopies, BufferToImageD32U8Vk13) {
 
     m_command_buffer.End();
     // VUID-VkCopyBufferToImageInfo2-pRegions-07931
-    m_errorMonitor->SetDesiredError("has a float value at offset 20475 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16380 that is not in the range [0, 1]");
     m_default_queue->SubmitAndWait(m_command_buffer);
     m_errorMonitor->VerifyFound();
 }

@@ -25,7 +25,7 @@
 #include <limits>
 #include <type_traits>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <intrin.h>  // For __lzcnt()
 #else
 #include <strings.h>  // For ffs()
@@ -91,7 +91,7 @@ static inline small_vector<uint8_t, 8> GetSetBitIndices(uint32_t value) {
 }
 
 static inline int u_ffs(int val) {
-#ifdef WIN32
+#ifdef _WIN32
     unsigned long bit_pos = 0;
     if (_BitScanForward(&bit_pos, val) != 0) {
         bit_pos += 1;
@@ -116,6 +116,12 @@ constexpr T Align(T x, T p2) {
     return (x + p2 - 1) & ~(p2 - 1);
 }
 
+// Given p2 a power of two, returns the first address greater than or equal to ptr that is a multiple of p2
+template <typename T>
+T* AlignPointer(T* ptr, std::uintptr_t p2) {
+    return reinterpret_cast<T*>(Align(reinterpret_cast<std::uintptr_t>(ptr), p2));
+}
+
 // Given any positive p (not necessarily power of two),
 // returns the smallest multiple of p greater than or equal to x
 template <typename T>
@@ -123,6 +129,10 @@ constexpr T AlignToMultiple(T x, T p) {
     static_assert(std::numeric_limits<T>::is_integer, "Unsigned integer required.");
     static_assert(std::is_unsigned<T>::value, "Unsigned integer required.");
     return ((x + p - 1) / p) * p;
+}
+
+inline uint32_t GetDispatchWorkGroupCount(uint32_t shader_threads_count, uint32_t work_group_size) {
+    return shader_threads_count / work_group_size + uint32_t((shader_threads_count % work_group_size) > 0);
 }
 
 // Returns the 0-based index of the LSB. An input mask of 0 yields -1

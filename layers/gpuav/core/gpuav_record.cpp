@@ -17,13 +17,13 @@
 
 #include <vulkan/vulkan_core.h>
 #include "chassis/chassis_modification_state.h"
-#include "generated/dispatch_functions.h"
+#include "core_checks/cc_vuid_maps.h"
 #include "gpuav/core/gpuav.h"
-#include "gpuav/core/gpuav_constants.h"
 #include "gpuav/debug_printf/debug_printf.h"
 #include "gpuav/descriptor_validation/gpuav_descriptor_validation.h"
 #include "gpuav/instrumentation/descriptor_checks_classic.h"
 #include "gpuav/instrumentation/descriptor_checks_heap.h"
+#include "gpuav/instrumentation/descriptor_checks_buffer.h"
 #include "gpuav/instrumentation/gpuav_instrumentation.h"
 #include "gpuav/instrumentation/register_validation.h"
 #include "gpuav/resources/gpuav_state_trackers.h"
@@ -33,13 +33,9 @@
 #include "gpuav/validation_cmd/gpuav_dispatch.h"
 #include "gpuav/validation_cmd/gpuav_draw.h"
 #include "gpuav/validation_cmd/gpuav_ray_tracing.h"
-#include "state_tracker/device_memory_state.h"
-#include "utils/assert_utils.h"
-#include "utils/descriptor_utils.h"
 #include "utils/math_utils.h"
 
 #include <cstdint>
-#include <algorithm>
 #include <vulkan/utility/vk_safe_struct.hpp>
 
 namespace gpuav {
@@ -53,51 +49,43 @@ void Validator::PreCallRecordCreateBuffer(VkDevice device, const VkBufferCreateI
     const auto* flags2 = vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfo>(chassis_state.modified_create_info.pNext);
     const VkBufferUsageFlags2 in_usage = flags2 ? flags2->usage : chassis_state.modified_create_info.usage;
 
+    VkBufferUsageFlags2 extra_usage = 0;
+
+    if (enabled_features.descriptorHeap) {
+        extra_usage |= VK_BUFFER_USAGE_2_SHADER_DEVICE_ADDRESS_BIT;
+    }
+
     // Ray tracing acceleration structure instance buffers also need the storage buffer usage as
     // acceleration structure build validation will find and replace invalid acceleration structure
     // handles inside of a compute shader.
     if (in_usage & VK_BUFFER_USAGE_2_SHADER_BINDING_TABLE_BIT_KHR) {
-        if (flags2) {
-            const_cast<VkBufferUsageFlags2CreateInfo*>(flags2)->usage |= VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT;
-        } else {
-            chassis_state.modified_create_info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        }
+        extra_usage |= VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT;
     }
 
     // Indirect buffers will require validation shader to bind the indirect buffers as a storage buffer.
     if (gpuav_settings.IsBufferValidationEnabled() &&
         (in_usage & (VK_BUFFER_USAGE_2_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT))) {
-        if (flags2) {
-            const_cast<VkBufferUsageFlags2CreateInfo*>(flags2)->usage |= VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT;
-        } else {
-            chassis_state.modified_create_info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        }
+        extra_usage |= VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT;
     }
 
     if (gpuav_settings.validate_acceleration_structures_builds &&
         (in_usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR)) {
+        extra_usage |= VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT;
+    }
+
+    // We track any usage that was actually "injected" and apply it
+    const VkBufferUsageFlags2 injected_usage = extra_usage & ~in_usage;
+    if (injected_usage != 0) {
         if (flags2) {
-            const_cast<VkBufferUsageFlags2CreateInfo*>(flags2)->usage |= VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT;
+            const_cast<VkBufferUsageFlags2CreateInfo*>(flags2)->usage |= injected_usage;
         } else {
-            chassis_state.modified_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            chassis_state.modified_create_info.usage |= static_cast<VkBufferUsageFlags>(injected_usage);
         }
     }
 
     // Align index buffer size to 4: validation shader reads DWORDS
     if (gpuav_settings.IsBufferValidationEnabled() && (in_usage & (VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT))) {
         chassis_state.modified_create_info.size = Align<VkDeviceSize>(chassis_state.modified_create_info.size, 4);
-    }
-
-    // Might need to call vkCmdFillBuffer to set the memory
-    if (set_null_descriptors_) {
-        if ((in_usage & (VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT |
-                         VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT)) != 0) {
-            if (flags2) {
-                const_cast<VkBufferUsageFlags2CreateInfo*>(flags2)->usage |= VK_BUFFER_USAGE_2_TRANSFER_DST_BIT;
-            } else {
-                chassis_state.modified_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-            }
-        }
     }
 
     chassis_state.create_info_copy = chassis_state.modified_create_info.ptr();
@@ -110,135 +98,61 @@ void Validator::PostCallRecordCreateBuffer(VkDevice device, const VkBufferCreate
     const VkBufferUsageFlags2 in_usage = flags2 ? flags2->usage : pCreateInfo->usage;
 
     if (in_usage & VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT) {
-        descriptor_buffer.resource_handles_.emplace(*pBuffer);
+        hint_descriptor_buffer_ = true;
     }
 }
 
-void Validator::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer, const VkAllocationCallbacks* pAllocator,
-                                           const RecordObject& record_obj) {
-    descriptor_buffer.resource_handles_.erase(buffer);
-}
-
-void Validator::PreCallRecordFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator,
-                                        const RecordObject& record_obj) {
-    if (descriptor_buffer.resource_memory_handles_.find(memory) != descriptor_buffer.resource_memory_handles_.end()) {
-        descriptor_buffer.resource_memory_handles_.erase(memory);
+void Validator::PreCallRecordAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
+                                            const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory,
+                                            const RecordObject& record_obj, chassis::AllocateMemory& chassis_state) {
+    if (!enabled_features.descriptorHeap) {
+        return;
     }
-}
 
-void Validator::SetMemoryWithNullDescriptor(const vvl::Buffer& buffer_state, VkDeviceMemory memory, VkDeviceSize offset,
-                                            const Location& loc) {
-    auto device_memory_state = Get<vvl::DeviceMemory>(memory);
-    ASSERT_AND_RETURN(device_memory_state);
+    chassis_state.modified_allocate_info.initialize(pAllocateInfo);
 
-    const uint32_t null_dword = GetNullDescriptorDWord(phys_dev_props);
-
-    const VkDeviceSize bound_size = buffer_state.GetSize();
-    if (device_memory_state->mappable) {
-        uint32_t* data_ptr = (uint32_t*)device_memory_state->p_driver_data;
-
-        if (!device_memory_state->p_driver_data) {
-            DispatchMapMemory(device, memory, offset, bound_size, 0, (void**)&data_ptr);
-        }
-
-        const VkDeviceSize dword_count = bound_size / sizeof(uint32_t);
-        std::fill(data_ptr, data_ptr + dword_count, null_dword);
-
-        if (!device_memory_state->p_driver_data) {
-            // Flush regardless to not need to check if coherent (safe to flush regardless)
-            VkMappedMemoryRange memory_range = vku::InitStructHelper();
-            memory_range.memory = memory;
-            memory_range.offset = offset;
-            memory_range.size = bound_size;
-            DispatchFlushMappedMemoryRanges(device, 1, &memory_range);
-
-            DispatchUnmapMemory(device, memory);
-        }
-    } else if (internal_transfer_queue_handle_ != VK_NULL_HANDLE) {
-        vko::CommandPool& cb_pool =
-            shared_resources_cache.GetOrCreate<vko::CommandPool>(*this, internal_transfer_queue_family_index_, loc);
-        auto [cb_handle, fence_handle] = cb_pool.GetCommandBuffer();
-        assert(cb_handle != VK_NULL_HANDLE);
-
-        DispatchResetCommandBuffer(cb_handle, 0);
-        VkCommandBufferBeginInfo cb_bi = vku::InitStructHelper();
-        cb_bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        DispatchBeginCommandBuffer(cb_handle, &cb_bi);
-        DispatchCmdFillBuffer(cb_handle, buffer_state.VkHandle(), 0, VK_WHOLE_SIZE, null_dword);
-        DispatchEndCommandBuffer(cb_handle);
-
-        // Need to wait until all work is done
-        // This **should** be ok since we are only doing this when allocating descriptor memory, which should not be something done
-        // once at the start of the app (or at least not a common operation)
-        DispatchQueueWaitIdle(internal_transfer_queue_handle_);
-
-        VkSubmitInfo submit_info = vku::InitStructHelper();
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &cb_handle;
-        DispatchQueueSubmit(internal_transfer_queue_handle_, 1, &submit_info, fence_handle);
-        DispatchWaitForFences(device, 1, &fence_handle, VK_TRUE, UINT64_MAX);
-        DispatchResetFences(device, 1, &fence_handle);
+    if (auto* alloc_flags_info = const_cast<VkMemoryAllocateFlagsInfo*>(
+            vku::FindStructInPNextChain<VkMemoryAllocateFlagsInfo>(chassis_state.modified_allocate_info.pNext))) {
+        alloc_flags_info->flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     } else {
-        InternalWarning(buffer_state.VkHandle(), loc, "Unable to set memory with null descriptor");
-    }
-}
-
-void Validator::BindBufferMemory(VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset, const Location& loc) {
-    if (descriptor_buffer.resource_handles_.find(buffer) != descriptor_buffer.resource_handles_.end()) {
-        descriptor_buffer.resource_memory_handles_.emplace(memory);
+        VkMemoryAllocateFlagsInfo new_alloc_flags_info = vku::InitStructHelper();
+        new_alloc_flags_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        vku::AddToPnext(chassis_state.modified_allocate_info, new_alloc_flags_info);
     }
 
-    // This is where we will try and "memset" the Descriptor Heap/Buffer to be a "safe" value by default
-    // Only want to do the buffer state lookup when actually needed
-    if (set_null_descriptors_) {
-        if (auto buffer_state = Get<vvl::Buffer>(buffer)) {
-            if ((buffer_state->usage &
-                 (VK_BUFFER_USAGE_2_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_2_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT |
-                  VK_BUFFER_USAGE_2_DESCRIPTOR_HEAP_BIT_EXT)) != 0) {
-                SetMemoryWithNullDescriptor(*buffer_state, memory, offset, loc);
-            }
-        }
-    }
-}
-
-void Validator::PostCallRecordBindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memoryOffset,
-                                               const RecordObject& record_obj) {
-    BindBufferMemory(buffer, memory, memoryOffset, record_obj.location);
-}
-
-void Validator::PostCallRecordBindBufferMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindBufferMemoryInfo* pBindInfos,
-                                                const RecordObject& record_obj) {
-    for (uint32_t i = 0; i < bindInfoCount; i++) {
-        BindBufferMemory(pBindInfos->buffer, pBindInfos->memory, pBindInfos->memoryOffset, record_obj.location);
-    }
-}
-
-void Validator::PostCallRecordBindBufferMemory2KHR(VkDevice device, uint32_t bindInfoCount,
-                                                   const VkBindBufferMemoryInfo* pBindInfos, const RecordObject& record_obj) {
-    PostCallRecordBindBufferMemory2(device, bindInfoCount, pBindInfos, record_obj);
+    chassis_state.allocate_info_copy = chassis_state.modified_allocate_info.ptr();
 }
 
 void Validator::PreCallRecordCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
                                                          const VkDescriptorBufferBindingInfoEXT* pBindingInfos,
                                                          const RecordObject& record_obj,
                                                          chassis::CmdBindDescriptorBuffers& chassis_state) {
+    if (!gpuav_settings.IsSpirvModified()) {
+        return;  // The extra binding is only used by instrumented shaders
+    }
+
     // Resize here so if using just CoreCheck we don't waste time allocating this
     chassis_state.modified_binding_infos.resize(bufferCount + 1);
     for (uint32_t i = 0; i < bufferCount; ++i) {
         vku::safe_VkDescriptorBufferBindingInfoEXT& new_bind_info = chassis_state.modified_binding_infos[i];
         new_bind_info.initialize(&pBindingInfos[i]);
     }
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+    CommandBufferSubState& gpuav_cb_state = SubState(*cb_state);
 
     vku::safe_VkDescriptorBufferBindingInfoEXT& modified_binding_info = chassis_state.modified_binding_infos[bufferCount];
     modified_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
-    modified_binding_info.address = GetGlobalDescriptorBuffer().Address();
+    modified_binding_info.address = gpuav_cb_state.GetInternalDescriptorBuffer().Address();
 
-    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    CommandBufferSubState& gpuav_cb_state = SubState(*cb_state);
     gpuav_cb_state.resource_descriptor_buffer_index_ = bufferCount;
 
     // Set the pointer the chassis will use
     chassis_state.pBindInfos = reinterpret_cast<VkDescriptorBufferBindingInfoEXT*>(chassis_state.modified_binding_infos.data());
+}
+
+void Validator::PostCallRecordGetDescriptorEXT(VkDevice device, const VkDescriptorGetInfoEXT* pDescriptorInfo, size_t dataSize,
+                                               void* pDescriptor, const RecordObject& record_obj) {
+    hint_descriptor_buffer_ = true;
 }
 
 void Validator::PreCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
@@ -247,6 +161,7 @@ void Validator::PreCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, c
 
     CommandBufferSubState& gpuav_cb_state = SubState(*cb_state);
     RegisterDescriptorChecksClassicValidation(*this, gpuav_cb_state);
+    RegisterDescriptorChecksBufferValidation(*this, gpuav_cb_state);
     RegisterDescriptorChecksHeapValidation(*this, gpuav_cb_state);
     RegisterPostProcessingValidation(*this, gpuav_cb_state);
     RegisterBufferDeviceAddressValidation(*this, gpuav_cb_state);
@@ -344,7 +259,8 @@ void Instance::PostCallRecordGetPhysicalDeviceProperties2(VkPhysicalDevice physi
             // allocate every possible byte on the GPU and our estimate is too small.
             //
             // storageBufferDescriptorSize is almost always 64 bytes
-            const VkDeviceSize bytes_to_reserve = desc_buffer_props->storageBufferDescriptorSize * cst::total_internal_descriptors;
+            VkDeviceSize buffer_indirect_buffer_stride = desc_buffer_props->storageBufferDescriptorSize * glsl::kTotalBindings;
+            const VkDeviceSize bytes_to_reserve = buffer_indirect_buffer_stride * gpuav_settings.indices_buffer_count;
             desc_buffer_props->resourceDescriptorBufferAddressSpaceSize -= bytes_to_reserve;
             desc_buffer_props->descriptorBufferAddressSpaceSize -= bytes_to_reserve;
 
@@ -374,8 +290,6 @@ void Validator::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCa
     gpu_resources_manager_.DestroyResources();
 
     global_indices_buffer_.Destroy();
-    global_resource_descriptor_buffer_.Destroy();
-    global_resource_descriptor_heap_.Destroy();
 
     GpuShaderInstrumentor::PreCallRecordDestroyDevice(device, pAllocator, record_obj);
 
@@ -487,8 +401,7 @@ void Validator::PreCallRecordCmdDrawIndirectCount(VkCommandBuffer commandBuffer,
 
     const LastBound& last_bound = cb_state->GetLastBoundGraphics();
     const char* vuid = (record_obj.location.function == vvl::Func::vkCmdDrawIndirectCount2KHR ||
-                        record_obj.location.function == vvl::Func::vkCmdDrawIndexedIndirectCount2KHR ||
-                        record_obj.location.function == vvl::Func::vkCmdDrawMeshTasksIndirectCount2EXT)
+                        record_obj.location.function == vvl::Func::vkCmdDrawIndexedIndirectCount2KHR)
                            ? "VUID-VkDrawIndirectCount2InfoKHR-countAddressRange-13116"
                            : "VUID-vkCmdDrawIndirectCount-countBuffer-02717";
     valcmd::CountBuffer(*this, sub_state, record_obj.location, last_bound, buffer, offset, sizeof(VkDrawIndirectCommand),
@@ -579,10 +492,42 @@ void Validator::PreCallRecordCmdDrawIndexedIndirectCount2KHR(VkCommandBuffer com
     PreCallRecordCmdDrawIndirectCount2KHR(commandBuffer, pInfo, record_obj);
 }
 
+void Validator::PreCallRecordCmdDrawMeshTasksIndirect2EXT(VkCommandBuffer commandBuffer, const VkDrawIndirect2InfoKHR* pInfo,
+                                                          const RecordObject& record_obj) {
+    const auto buffer_states = GetBuffersByAddressRange(
+        VkDeviceAddressRangeKHR{pInfo->addressRange.address, pInfo->addressRange.size}, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    if (buffer_states.empty()) {
+        return;
+    }
+
+    const VkBuffer buffer = buffer_states[0]->VkHandle();
+    const VkDeviceSize offset = pInfo->addressRange.address - buffer_states[0]->deviceAddress;
+    const uint32_t stride = static_cast<uint32_t>(pInfo->addressRange.stride);
+    PreCallRecordCmdDrawMeshTasksIndirectEXT(commandBuffer, buffer, offset, pInfo->drawCount, stride, record_obj);
+}
+
 void Validator::PreCallRecordCmdDrawMeshTasksIndirectCount2EXT(VkCommandBuffer commandBuffer,
                                                                const VkDrawIndirectCount2InfoKHR* pInfo,
                                                                const RecordObject& record_obj) {
-    PreCallRecordCmdDrawIndirectCount2KHR(commandBuffer, pInfo, record_obj);
+    const auto buffer_states = GetBuffersByAddressRange(
+        VkDeviceAddressRangeKHR{pInfo->addressRange.address, pInfo->addressRange.size}, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    if (buffer_states.empty()) {
+        return;
+    }
+
+    // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11879
+    const auto count_buffer_states = GetBuffersByAddressRange(pInfo->countAddressRange, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    if (count_buffer_states.empty()) {
+        return;
+    }
+
+    const VkBuffer buffer = buffer_states[0]->VkHandle();
+    const VkDeviceSize offset = pInfo->addressRange.address - buffer_states[0]->deviceAddress;
+    const VkBuffer count_buffer = count_buffer_states[0]->VkHandle();
+    const VkDeviceSize count_buffer_offset = pInfo->countAddressRange.address - count_buffer_states[0]->deviceAddress;
+    const uint32_t stride = static_cast<uint32_t>(pInfo->addressRange.stride);
+    PreCallRecordCmdDrawMeshTasksIndirectCountEXT(commandBuffer, buffer, offset, count_buffer, count_buffer_offset,
+                                                  pInfo->maxDrawCount, stride, record_obj);
 }
 
 void Validator::PreCallRecordCmdDrawIndirectByteCount(VkCommandBuffer commandBuffer, const RecordObject& record_obj) {
@@ -711,9 +656,12 @@ void Validator::PreCallRecordCmdDrawMeshTasksIndirectCountEXT(VkCommandBuffer co
     valcmd::DrawMeshIndirect(*this, sub_state, record_obj.location, last_bound, buffer, offset, stride, countBuffer,
                              countBufferOffset, maxDrawCount);
 
+    const char* count_vuid = record_obj.location.function == vvl::Func::vkCmdDrawMeshTasksIndirectCount2EXT
+                                 ? "VUID-VkDrawIndirectCount2InfoKHR-countAddressRange-13116"
+                                 : "VUID-vkCmdDrawMeshTasksIndirectCountEXT-countBuffer-02717";
     valcmd::CountBuffer(*this, sub_state, record_obj.location, last_bound, buffer, offset,
                         sizeof(VkDrawMeshTasksIndirectCommandEXT), vvl::Struct::VkDrawMeshTasksIndirectCommandEXT, stride,
-                        countBuffer, countBufferOffset, "VUID-vkCmdDrawMeshTasksIndirectCountEXT-countBuffer-02717");
+                        countBuffer, countBufferOffset, count_vuid);
     PreCallActionCommand(*this, sub_state, last_bound, record_obj.location);
 }
 
@@ -787,22 +735,61 @@ void Validator::PostCallRecordCmdBuildAccelerationStructuresKHR(
     const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos, const RecordObject& record_obj) {
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
 
+    for (const auto& lb : cb_state->lastBound) {
+        if (lb.GetDescriptorMode() == vvl::DescriptorModeBuffer) {
+            return;
+        }
+    }
+
     auto& cb_sub_state = SubState(*cb_state);
-    UpdateAccelerationStructureGpuState(*this, cb_sub_state, record_obj.location, infoCount, pInfos);
+    std::vector<AccelerationStructureGpuStateUpdate> as_gpu_state_updates(infoCount);
+    for (uint32_t info_i = 0; info_i < infoCount; ++info_i) {
+        as_gpu_state_updates[info_i].dst = pInfos[info_i].dstAccelerationStructure;
+        as_gpu_state_updates[info_i].mode = pInfos[info_i].mode;
+    }
+    UpdateAccelerationStructureGpuState(*this, cb_sub_state, record_obj.location, as_gpu_state_updates);
+    for (auto& f : cb_sub_state.on_post_call_record_cmd_build_as_functions) {
+        f(*this, cb_sub_state);
+    }
+    cb_sub_state.on_post_call_record_cmd_build_as_functions.clear();
 }
 
-void Validator::PreCallRecordCmdTraceRaysNV(VkCommandBuffer commandBuffer, VkBuffer raygenShaderBindingTableBuffer,
-                                            VkDeviceSize raygenShaderBindingOffset, VkBuffer missShaderBindingTableBuffer,
-                                            VkDeviceSize missShaderBindingOffset, VkDeviceSize missShaderBindingStride,
-                                            VkBuffer hitShaderBindingTableBuffer, VkDeviceSize hitShaderBindingOffset,
-                                            VkDeviceSize hitShaderBindingStride, VkBuffer callableShaderBindingTableBuffer,
-                                            VkDeviceSize callableShaderBindingOffset, VkDeviceSize callableShaderBindingStride,
-                                            uint32_t width, uint32_t height, uint32_t depth, const RecordObject& record_obj) {
+void Validator::PostCallRecordCmdBuildAccelerationStructuresIndirectKHR(VkCommandBuffer commandBuffer, uint32_t infoCount,
+                                                                        const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
+                                                                        const VkDeviceAddress* pIndirectDeviceAddresses,
+                                                                        const uint32_t* pIndirectStrides,
+                                                                        const uint32_t* const* ppMaxPrimitiveCounts,
+                                                                        const RecordObject& record_obj) {
     auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
 
-    auto& sub_state = SubState(*cb_state);
-    const LastBound& last_bound = cb_state->GetLastBoundRayTracing();
-    PreCallActionCommand(*this, sub_state, last_bound, record_obj.location);
+    auto& cb_sub_state = SubState(*cb_state);
+    std::vector<AccelerationStructureGpuStateUpdate> as_gpu_state_updates(infoCount);
+    for (uint32_t info_i = 0; info_i < infoCount; ++info_i) {
+        as_gpu_state_updates[info_i].dst = pInfos[info_i].dstAccelerationStructure;
+        as_gpu_state_updates[info_i].mode = pInfos[info_i].mode;
+    }
+    UpdateAccelerationStructureGpuState(*this, cb_sub_state, record_obj.location, as_gpu_state_updates);
+}
+
+void Validator::PostCallRecordCmdCopyAccelerationStructureKHR(VkCommandBuffer commandBuffer,
+                                                              const VkCopyAccelerationStructureInfoKHR* pInfo,
+                                                              const RecordObject& record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+
+    AccelerationStructureGpuStateUpdate as_gpu_state_update;
+    as_gpu_state_update.dst = pInfo->dst;
+    as_gpu_state_update.src = pInfo->src;
+    UpdateAccelerationStructureGpuState(*this, SubState(*cb_state), record_obj.location, {&as_gpu_state_update, 1});
+}
+
+void Validator::PostCallRecordCmdCopyMemoryToAccelerationStructureKHR(VkCommandBuffer commandBuffer,
+                                                                      const VkCopyMemoryToAccelerationStructureInfoKHR* pInfo,
+                                                                      const RecordObject& record_obj) {
+    auto cb_state = GetWrite<vvl::CommandBuffer>(commandBuffer);
+
+    AccelerationStructureGpuStateUpdate as_gpu_state_update;
+    as_gpu_state_update.dst = pInfo->dst;
+    UpdateAccelerationStructureGpuState(*this, SubState(*cb_state), record_obj.location, {&as_gpu_state_update, 1});
 }
 
 void Validator::PreCallRecordCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
@@ -913,6 +900,10 @@ void Validator::PreCallRecordCmdCopyMemoryToImageIndirectKHR(
 void Validator::PreCallRecordCmdCopyMemoryToImageKHR(VkCommandBuffer commandBuffer,
                                                      const VkCopyDeviceMemoryImageInfoKHR* pCopyMemoryInfo,
                                                      const RecordObject& record_obj) {
+    if (!gpuav_settings.validate_buffer_copies) {
+        return;
+    }
+
     for (uint32_t i = 0; i < pCopyMemoryInfo->regionCount; ++i) {
         // TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/11879
         const auto buffer_states =
@@ -958,13 +949,14 @@ bool Validator::PreCallValidateCmdPushDataEXT(VkCommandBuffer commandBuffer, con
 
 // Validates the buffer is allowed to be protected
 bool Validator::ValidateProtectedBuffer(const vvl::CommandBuffer& cb_state, const vvl::Buffer& buffer_state,
-                                        const Location& buffer_loc, const char* vuid, const char* more_message) const {
+                                        const Location& buffer_loc, const char* more_message) const {
     bool skip = false;
 
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == true) && (buffer_state.unprotected == false)) {
         const LogObjectList objlist(cb_state.Handle(), buffer_state.Handle());
-        skip |= LogError(vuid, objlist, buffer_loc, "(%s) is a protected buffer, but command buffer (%s) is unprotected.%s",
+        skip |= LogError(vvl::GetProtectedVUID(buffer_loc), objlist, buffer_loc,
+                         "(%s) is a protected buffer, but command buffer (%s) is unprotected.%s",
                          FormatHandle(buffer_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
     }
     return skip;
@@ -972,13 +964,14 @@ bool Validator::ValidateProtectedBuffer(const vvl::CommandBuffer& cb_state, cons
 
 // Validates the buffer is allowed to be unprotected
 bool Validator::ValidateUnprotectedBuffer(const vvl::CommandBuffer& cb_state, const vvl::Buffer& buffer_state,
-                                          const Location& buffer_loc, const char* vuid, const char* more_message) const {
+                                          const Location& buffer_loc, const char* more_message) const {
     bool skip = false;
 
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == false) && (buffer_state.unprotected == true)) {
         const LogObjectList objlist(cb_state.Handle(), buffer_state.Handle());
-        skip |= LogError(vuid, objlist, buffer_loc, "(%s) is an unprotected buffer, but command buffer (%s) is protected.%s",
+        skip |= LogError(vvl::GetUnprotectedVUID(buffer_loc), objlist, buffer_loc,
+                         "(%s) is an unprotected buffer, but command buffer (%s) is protected.%s",
                          FormatHandle(buffer_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
     }
     return skip;
@@ -986,28 +979,30 @@ bool Validator::ValidateUnprotectedBuffer(const vvl::CommandBuffer& cb_state, co
 
 // Validates the image is allowed to be protected
 bool Validator::ValidateProtectedImage(const vvl::CommandBuffer& cb_state, const vvl::Image& image_state, const Location& loc,
-                                       const char* vuid, const char* more_message) const {
+                                       const char* more_message) const {
     bool skip = false;
 
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == true) && (image_state.unprotected == false)) {
         const LogObjectList objlist(cb_state.Handle(), image_state.Handle());
-        skip |= LogError(vuid, objlist, loc, "(%s) is a protected image, but command buffer (%s) is unprotected.%s",
-                         FormatHandle(image_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
+        skip |= LogError(vvl::GetProtectedVUID(loc), objlist, loc,
+                         "(%s) is a protected image, but command buffer (%s) is unprotected.%s", FormatHandle(image_state).c_str(),
+                         FormatHandle(cb_state).c_str(), more_message);
     }
     return skip;
 }
 
 // Validates the image is allowed to be unprotected
 bool Validator::ValidateUnprotectedImage(const vvl::CommandBuffer& cb_state, const vvl::Image& image_state, const Location& loc,
-                                         const char* vuid, const char* more_message) const {
+                                         const char* more_message) const {
     bool skip = false;
 
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == false) && (image_state.unprotected == true)) {
         const LogObjectList objlist(cb_state.Handle(), image_state.Handle());
-        skip |= LogError(vuid, objlist, loc, "(%s) is an unprotected image, but command buffer (%s) is protected.%s",
-                         FormatHandle(image_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
+        skip |= LogError(vvl::GetUnprotectedVUID(loc), objlist, loc,
+                         "(%s) is an unprotected image, but command buffer (%s) is protected.%s", FormatHandle(image_state).c_str(),
+                         FormatHandle(cb_state).c_str(), more_message);
     }
     return skip;
 }
@@ -1023,7 +1018,7 @@ bool Validator::ValidateProtectedTensor(const vvl::CommandBuffer& cb_state, cons
     // if driver supports protectedNoFault the operation is valid, just has undefined values
     if ((!phys_dev_props_core11.protectedNoFault) && (cb_state.unprotected == true)) {
         const LogObjectList objlist(cb_state.Handle(), tensor_state.Handle());
-        skip |= LogError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-09800", objlist, tensor_loc,
+        skip |= LogError("VUID-vkCmdDispatchDataGraphARM-commandBuffer-02707", objlist, tensor_loc,
                          "(%s) is a protected tensor, but command buffer (%s) is unprotected.%s",
                          FormatHandle(tensor_state).c_str(), FormatHandle(cb_state).c_str(), more_message);
     }

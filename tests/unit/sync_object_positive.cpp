@@ -11,6 +11,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <chrono>
 #include <thread>
 #include "layer_validation_tests.h"
 #include "external_memory_sync.h"
@@ -144,6 +145,44 @@ TEST_F(PositiveSyncObject, BarrierQueueFamily2) {
     excl_test(other_family, submit_family, submit_family);
 }
 
+TEST_F(PositiveSyncObject, BarrierQueueFamilyExclusiveWithMemExt) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/13405");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    AddOptionalExtensions(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+    const bool foreign = IsExtensionsEnabled(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+
+    const uint32_t submit_family = m_device->graphics_queue_node_index_;
+    BarrierQueueFamilyTestHelper::Context test_context(this, {submit_family});
+    Barrier2QueueFamilyTestHelper::Context test_context2(this, {submit_family});
+
+    BarrierQueueFamilyTestHelper excl_test(&test_context);
+    excl_test.Init(nullptr);  // no queue families means *exclusive* sharing mode.
+    Barrier2QueueFamilyTestHelper excl_test2(&test_context2);
+    excl_test2.Init();  // *exclusive* sharing mode.
+
+    // No ownership transfer
+    excl_test(VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED);
+    excl_test(submit_family, submit_family);
+    excl_test2(VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED);
+    excl_test2(submit_family, submit_family);
+
+    // Ownership transfer to and from an external queue family
+    excl_test(submit_family, VK_QUEUE_FAMILY_EXTERNAL);
+    excl_test(VK_QUEUE_FAMILY_EXTERNAL, submit_family);
+    excl_test2(submit_family, VK_QUEUE_FAMILY_EXTERNAL);
+    excl_test2(VK_QUEUE_FAMILY_EXTERNAL, submit_family);
+    if (foreign) {
+        excl_test(submit_family, VK_QUEUE_FAMILY_FOREIGN_EXT);
+        excl_test(VK_QUEUE_FAMILY_FOREIGN_EXT, submit_family);
+        excl_test2(submit_family, VK_QUEUE_FAMILY_FOREIGN_EXT);
+        excl_test2(VK_QUEUE_FAMILY_FOREIGN_EXT, submit_family);
+    }
+}
+
 TEST_F(PositiveSyncObject, LayoutFromPresentWithoutAccessMemoryRead) {
     // Transition an image away from PRESENT_SRC_KHR without ACCESS_MEMORY_READ
     // in srcAccessMask.
@@ -172,14 +211,12 @@ TEST_F(PositiveSyncObject, LayoutFromPresentWithoutAccessMemoryRead) {
     barrier.subresourceRange = range;
     vkt::CommandBuffer cmdbuf(*m_device, m_command_pool);
     cmdbuf.Begin();
-    vk::CmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier);
+    cmdbuf.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.srcAccessMask = 0;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    vk::CmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
-                           nullptr, 1, &barrier);
+    cmdbuf.Barrier(barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 }
 
 TEST_F(PositiveSyncObject, QueueSubmitSemaphoresAndLayoutTracking) {
@@ -349,8 +386,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -389,8 +425,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -429,8 +464,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -491,8 +525,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -533,8 +566,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithTimelineSemaphoreAnd
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -567,8 +599,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueWithSemaphoreAndOneFence) {
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -600,8 +631,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueNullQueueSubmitWithFence) {
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -634,8 +664,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueOneFence) {
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -667,8 +696,7 @@ TEST_F(PositiveSyncObject, TwoSubmitInfosWithSemaphoreOneQueueSubmitsOneFence) {
     viewport.y = 0;
 
     cb0.Begin();
-    vk::CmdPipelineBarrier(cb0, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr,
-                           0, nullptr);
+    cb0.ExecutionBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     vk::CmdSetViewport(cb0, 0, 1, &viewport);
     cb0.End();
 
@@ -734,10 +762,10 @@ TEST_F(PositiveSyncObject, LongSemaphoreChain) {
     RETURN_IF_SKIP(Init());
     std::vector<VkSemaphore> semaphores;
 
-    const int chainLength = 32768;
+    const int chain_length = 1024;
     VkPipelineStageFlags flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
-    for (int i = 0; i < chainLength; i++) {
+    for (int i = 0; i < chain_length; i++) {
         VkSemaphoreCreateInfo sci = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0};
         VkSemaphore semaphore;
         vk::CreateSemaphore(device(), &sci, nullptr, &semaphore);
@@ -757,12 +785,13 @@ TEST_F(PositiveSyncObject, LongSemaphoreChain) {
     }
 
     vkt::Fence fence(*m_device);
-    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, nullptr, 1, &semaphores.back(), &flags, 0, nullptr, 0, nullptr};
+    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, nullptr, 1, &semaphores.back(), &flags};
     vk::QueueSubmit(m_default_queue->handle(), 1, &si, fence);
+    fence.Wait(kWaitTimeout);
 
-    vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout);
-
-    for (auto semaphore : semaphores) vk::DestroySemaphore(device(), semaphore, nullptr);
+    for (auto semaphore : semaphores) {
+        vk::DestroySemaphore(device(), semaphore, nullptr);
+    }
 }
 
 TEST_F(PositiveSyncObject, ExternalSemaphore) {
@@ -1538,9 +1567,8 @@ TEST_F(PositiveSyncObject, SubpassBarrier) {
 
     m_command_buffer.Begin();
     m_command_buffer.BeginRenderPass(rp.Handle(), fb, 32, 32);
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
-                           &barrier);
+    m_command_buffer.Barrier(barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_DEPENDENCY_BY_REGION_BIT);
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
 }
@@ -1589,9 +1617,6 @@ TEST_F(PositiveSyncObject, SubpassBarrierWithExpandableStages) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-
     VkSubpassDependency subpass_dependency{};
     subpass_dependency.srcSubpass = 0;
     subpass_dependency.dstSubpass = 0;
@@ -1600,12 +1625,9 @@ TEST_F(PositiveSyncObject, SubpassBarrierWithExpandableStages) {
     subpass_dependency.srcAccessMask = VK_ACCESS_INDEX_READ_BIT;
     subpass_dependency.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
 
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-    rpci.dependencyCount = 1;
-    rpci.pDependencies = &subpass_dependency;
-    const vkt::RenderPass rp(*m_device, rpci);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddSubpassDependency(subpass_dependency);
+    rp.CreateRenderPass();
     const vkt::Framebuffer fb(*m_device, rp, 0, nullptr, m_width, m_height);
 
     m_renderPassBeginInfo.renderPass = rp;
@@ -1621,8 +1643,7 @@ TEST_F(PositiveSyncObject, SubpassBarrierWithExpandableStages) {
     // The issue was that implementation expands *subpass* compound stages but did not expand *barrier* compound stages.
     // Specify expandable stage (VERTEX_INPUT_BIT is INDEX_INPUT_BIT + VERTEX_ATTRIBUTE_INPUT_BIT) to ensure it's correctly
     // matched against subpass stages.
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 1, &barrier,
-                           0, nullptr, 0, nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, barrier);
 
     m_command_buffer.EndRenderPass();
     m_command_buffer.End();
@@ -1706,21 +1727,12 @@ TEST_F(PositiveSyncObject, BarrierASCopy) {
 
 TEST_F(PositiveSyncObject, BarrierAccessSyncMicroMap) {
     TEST_DESCRIPTION("Test VK_PIPELINE_STAGE_2_MICROMAP_BUILD_BIT_EXT can be used with VK_ACCESS_2_SHADER_READ_BIT.");
-
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME);
-    VkPhysicalDeviceOpacityMicromapFeaturesEXT ext_features = vku::InitStructHelper();
-    VkPhysicalDeviceSynchronization2Features sync_features = vku::InitStructHelper(&ext_features);
-    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&sync_features);
-    RETURN_IF_SKIP(InitFramework());
-    vk::GetPhysicalDeviceFeatures2(Gpu(), &features2);
-    if (!ext_features.micromap) {
-        GTEST_SKIP() << "micromap feature not supported";
-    }
-    ext_features.micromap = VK_TRUE;
-    sync_features.synchronization2 = VK_TRUE;
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::micromapEXT);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
 
     VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
     mem_barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
@@ -1770,8 +1782,8 @@ TEST_F(PositiveSyncObject, DynamicRenderingLocalReadImageBarrier) {
     imageMemoryBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
 
     secondary.Begin(&beginInfo);
-    vk::CmdPipelineBarrier(secondary, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0u, nullptr, 0u, nullptr, 1u, &imageMemoryBarrier);
+    secondary.Barrier(imageMemoryBarrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                      VK_DEPENDENCY_BY_REGION_BIT);
     secondary.End();
 }
 
@@ -2350,9 +2362,8 @@ TEST_F(PositiveSyncObject, BarrierWithoutOwnershipTransferUseAllStages) {
     barrier.size = 256;
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR, 0, nullptr, 1, &barrier, 0,
-                           nullptr);
+    m_command_buffer.Barrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, barrier,
+                             VK_DEPENDENCY_QUEUE_FAMILY_OWNERSHIP_TRANSFER_USE_ALL_STAGES_BIT_KHR);
     m_command_buffer.End();
 }
 
@@ -2583,8 +2594,7 @@ TEST_F(PositiveSyncObject, Transition3dImageSlice) {
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1, 1};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_command_buffer.End();
 }
 
@@ -2618,30 +2628,25 @@ TEST_F(PositiveSyncObject, Transition3dImageSlices) {
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 4};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     image_memory_barrier.subresourceRange.baseArrayLayer = 1u;
     image_memory_barrier.subresourceRange.layerCount = 1u;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_memory_barrier.subresourceRange.baseArrayLayer = 2u;
     image_memory_barrier.subresourceRange.layerCount = 1u;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_command_buffer.End();
 
-    m_default_queue->Submit(m_command_buffer);
-    m_default_queue->Wait();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }
 
 TEST_F(PositiveSyncObject, Transition3dImageWithMipLevels) {
@@ -2671,8 +2676,7 @@ TEST_F(PositiveSyncObject, Transition3dImageWithMipLevels) {
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, 0, VK_REMAINING_ARRAY_LAYERS};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_command_buffer.End();
 }
 
@@ -2706,8 +2710,7 @@ TEST_F(PositiveSyncObject, Transition3dImageWithMipLevelsRemainingArrayLayers) {
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 2, 0, VK_REMAINING_ARRAY_LAYERS};
 
     m_command_buffer.Begin();
-    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u,
-                           nullptr, 1u, &image_memory_barrier);
+    m_command_buffer.Barrier(image_memory_barrier, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
     m_command_buffer.End();
 }
 
@@ -2901,6 +2904,32 @@ TEST_F(PositiveSyncObject, Maintenance9ImageBarriers) {
     m_command_buffer.End();
 }
 
+TEST_F(PositiveSyncObject, BarrierStencilAspectUsesStencilUsage) {
+    TEST_DESCRIPTION("A stencil-only barrier is checked against VkImageStencilUsageCreateInfo::stencilUsage");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::separateDepthStencilLayouts);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
+    VkImageStencilUsageCreateInfo stencil_usage = vku::InitStructHelper();
+    stencil_usage.stencilUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    image_ci.pNext = &stencil_usage;
+    vkt::Image image(*m_device, image_ci);
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.Barrier(barrier);
+    m_command_buffer.End();
+}
+
 TEST_F(PositiveSyncObject, BufferOwnershipTransferWholeSize) {
     TEST_DESCRIPTION("Use VK_WHOLE_SIZE for release and an explicit size for acquire");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -3000,4 +3029,49 @@ TEST_F(PositiveSyncObject, BufferOwnershipTransferTimelineReordering) {
     m_default_queue->Submit2(acquire_cb, vkt::TimelineWait(timeline, 1));
     transfer_queue->Submit2(release_cb, vkt::TimelineSignal(timeline, 1));
     m_device->Wait();
+}
+
+TEST_F(PositiveSyncObject, RenderPassBarrier) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::rayQuery);
+    RETURN_IF_SKIP(Init());
+
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    rp.AddColorAttachment(0, VK_IMAGE_LAYOUT_GENERAL);
+
+    VkMemoryBarrier2 subpass_barrier = vku::InitStructHelper();
+    subpass_barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    subpass_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    subpass_barrier.srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    subpass_barrier.dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+
+    VkSubpassDependency2 dependency = vku::InitStructHelper(&subpass_barrier);
+    dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+    rp.AddSubpassDependency(dependency);
+    rp.CreateRenderPass();
+
+    vkt::Image image(*m_device, 32, 32, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Framebuffer fb(*m_device, rp, 1, &image_view.handle());
+
+    VkImageMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    barrier.dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.image = image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp, fb, 32, 32);
+    m_command_buffer.Barrier(barrier, VK_DEPENDENCY_BY_REGION_BIT);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

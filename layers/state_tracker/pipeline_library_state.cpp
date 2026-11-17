@@ -31,8 +31,9 @@ bool PipelineLibraryState::IsIndependentSets() const {
 
 VertexInputState::VertexInputState(const vvl::Pipeline& p, const vku::safe_VkGraphicsPipelineCreateInfo& create_info)
     : PipelineLibraryState(p) {
-    for (uint32_t i = 0; i < create_info.stageCount; i++) {
-        if (create_info.pStages && create_info.pStages[i].stage == VK_SHADER_STAGE_MESH_BIT_EXT) {
+    const uint32_t stage_count = create_info.pStages ? create_info.stageCount : 0;
+    for (uint32_t i = 0; i < stage_count; i++) {
+        if (create_info.pStages[i].stage == VK_SHADER_STAGE_MESH_BIT_EXT) {
             return;  // if mesh shaders are used, all vertex input state is ignored
         }
     }
@@ -68,7 +69,7 @@ VertexInputState::VertexInputState(const vvl::Pipeline& p, const vku::safe_VkGra
 
 PreRasterState::PreRasterState(const vvl::Pipeline& p, const vvl::DeviceState& state_data,
                                const vku::safe_VkGraphicsPipelineCreateInfo& create_info, std::shared_ptr<const vvl::RenderPass> rp,
-                               spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages])
+                               std::vector<spirv::StatelessData>* stateless_data)
     : PipelineLibraryState(p),
       pipeline_layout(state_data.Get<vvl::PipelineLayout>(create_info.layout)),
       viewport_state(create_info.pViewportState),
@@ -78,7 +79,8 @@ PreRasterState::PreRasterState(const vvl::Pipeline& p, const vvl::DeviceState& s
       subpass(create_info.subpass) {
     VkShaderStageFlags all_stages = 0;
 
-    for (uint32_t i = 0; i < create_info.stageCount; ++i) {
+    const uint32_t stage_count = create_info.pStages ? create_info.stageCount : 0;
+    for (uint32_t i = 0; i < stage_count; i++) {
         const auto& stage_ci = create_info.pStages[i];
         const VkShaderStageFlagBits stage = stage_ci.stage;
         if ((stage & ValidShaderStages()) == 0) {
@@ -95,7 +97,7 @@ PreRasterState::PreRasterState(const vvl::Pipeline& p, const vvl::DeviceState& s
             // Using VkShaderModuleCreateInfo to inline with VK_KHR_maintenance5
             if (const auto shader_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(stage_ci.pNext)) {
                 spirv::StatelessData* stateless_data_stage =
-                    (stateless_data && i < kCommonMaxGraphicsShaderStages) ? &stateless_data[i] : nullptr;
+                    (stateless_data && i < stateless_data->size()) ? &(*stateless_data)[i] : nullptr;
                 auto spirv_module = vvl::CreateSpirvModuleState(shader_ci->codeSize, shader_ci->pCode, state_data.global_settings,
                                                                 stateless_data_stage);
                 module_state = std::make_shared<vvl::ShaderModule>(VK_NULL_HANDLE, spirv_module);
@@ -201,8 +203,9 @@ std::unique_ptr<const vku::safe_VkPipelineShaderStageCreateInfo> ToShaderStageCI
 template <typename CreateInfo>
 void SetFragmentShaderInfoPrivate(const vvl::Pipeline& pipeline_state, FragmentShaderState& fs_state,
                                   const vvl::DeviceState& state_data, const CreateInfo& create_info,
-                                  spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) {
-    for (uint32_t i = 0; i < create_info.stageCount; ++i) {
+                                  std::vector<spirv::StatelessData>* stateless_data) {
+    const uint32_t stage_count = create_info.pStages ? create_info.stageCount : 0;
+    for (uint32_t i = 0; i < stage_count; i++) {
         if (create_info.pStages[i].stage != VK_SHADER_STAGE_FRAGMENT_BIT) {
             continue;
         }
@@ -215,7 +218,7 @@ void SetFragmentShaderInfoPrivate(const vvl::Pipeline& pipeline_state, FragmentS
             // Using VkShaderModuleCreateInfo to inline with VK_KHR_maintenance5
             if (const auto shader_ci = vku::FindStructInPNextChain<VkShaderModuleCreateInfo>(create_info.pStages[i].pNext)) {
                 spirv::StatelessData* stateless_data_stage =
-                    (stateless_data && i < kCommonMaxGraphicsShaderStages) ? &stateless_data[i] : nullptr;
+                    (stateless_data && i < stateless_data->size()) ? &(*stateless_data)[i] : nullptr;
                 auto spirv_module = vvl::CreateSpirvModuleState(shader_ci->codeSize, shader_ci->pCode, state_data.global_settings,
                                                                 stateless_data_stage);
                 module_state = std::make_shared<vvl::ShaderModule>(VK_NULL_HANDLE, spirv_module);
@@ -249,7 +252,7 @@ void SetFragmentShaderInfoPrivate(const vvl::Pipeline& pipeline_state, FragmentS
 // static
 void FragmentShaderState::SetFragmentShaderInfo(const vvl::Pipeline& pipeline_state, FragmentShaderState& fs_state,
                                                 const vvl::DeviceState& state_data, const VkGraphicsPipelineCreateInfo& create_info,
-                                                spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) {
+                                                std::vector<spirv::StatelessData>* stateless_data) {
     SetFragmentShaderInfoPrivate(pipeline_state, fs_state, state_data, create_info, stateless_data);
 }
 
@@ -257,7 +260,7 @@ void FragmentShaderState::SetFragmentShaderInfo(const vvl::Pipeline& pipeline_st
 void FragmentShaderState::SetFragmentShaderInfo(const vvl::Pipeline& pipeline_state, FragmentShaderState& fs_state,
                                                 const vvl::DeviceState& state_data,
                                                 const vku::safe_VkGraphicsPipelineCreateInfo& create_info,
-                                                spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) {
+                                                std::vector<spirv::StatelessData>* stateless_data) {
     SetFragmentShaderInfoPrivate(pipeline_state, fs_state, state_data, create_info, stateless_data);
 }
 

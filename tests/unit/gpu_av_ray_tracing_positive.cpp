@@ -11,11 +11,13 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <algorithm>
 #include <cmath>
 #include "layer_validation_tests.h"
 #include "ray_tracing_objects.h"
 #include "descriptor_helper.h"
 #include "gpu_av_helper.h"
+#include "descriptor_heap_object.h"
 
 class PositiveGpuAVRayTracing : public GpuAVRayTracingTest {};
 
@@ -30,7 +32,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRays) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -70,12 +72,15 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRays) {
         #version 460
         #extension GL_EXT_ray_tracing : require
 
+        layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
+
         layout(location = 0) rayPayloadInEXT vec3 hit;
         hitAttributeEXT vec2 baryCoord;
 
         void main() {
             const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
             hit = barycentricCoords;
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(1000,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
         }
     )glsl";
     pipeline.AddGlslClosestHitShader(closest_hit);
@@ -116,7 +121,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDescriptorBuffer) {
     AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
     AddRequiredFeature(vkt::Feature::descriptorBuffer);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -230,7 +235,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultipleStages) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -317,7 +322,7 @@ TEST_F(PositiveGpuAVRayTracing, DynamicTminTmax) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -428,7 +433,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDynamicRayFlags) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -536,7 +541,7 @@ TEST_F(PositiveGpuAVRayTracing, DynamicRayFlagsSkipTriangle) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     AddRequiredFeature(vkt::Feature::rayTraversalPrimitiveCulling);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -649,7 +654,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
     AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
     AddRequiredFeature(vkt::Feature::shaderSampledImageArrayNonUniformIndexing);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -858,7 +863,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDeferredBuild) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -946,7 +951,7 @@ TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -957,9 +962,7 @@ TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes) {
     vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
 
     m_command_buffer.Begin();
-    for (int i = 0; i < 3; ++i) {
-        cube_blas.BuildCmdBuffer(m_command_buffer);
-    }
+    cube_blas.BuildCmdBuffer(m_command_buffer);
     m_command_buffer.End();
 
     m_default_queue->Submit(m_command_buffer);
@@ -1013,7 +1016,7 @@ TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes) {
     std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
 
     const char* slang_shader = R"slang(
-        [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
+        [[vk::binding(0, 0)]] RaytracingAccelerationStructure tlas;
         [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
 
         struct RayPayload {
@@ -1088,6 +1091,356 @@ TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes) {
     ASSERT_EQ(debug_buffer_ptr[2], 1);
 }
 
+TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubesTLASArray) {
+    TEST_DESCRIPTION("Setup a RT pipeline, a TLAS pointing to 2 cubes, and traces rays into it. Use a runtime TLAS array.");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    std::vector<vkt::as::GeometryKHR> cube_instances(1);
+    cube_instances[0].SetType(vkt::as::GeometryKHR::Type::Instance);
+
+    VkAccelerationStructureInstanceKHR cube_instance_1{};
+    cube_instance_1.transform.matrix[0][0] = 1.0f;
+    cube_instance_1.transform.matrix[1][1] = 1.0f;
+    cube_instance_1.transform.matrix[2][2] = 1.0f;
+    cube_instance_1.transform.matrix[0][3] = 50.0f;
+    cube_instance_1.transform.matrix[1][3] = 0.0f;
+    cube_instance_1.transform.matrix[2][3] = 0.0f;
+    cube_instance_1.mask = 0xff;
+    cube_instance_1.instanceCustomIndex = 0;
+    // Cube instance 1 will be associated to closest hit shader 1
+    cube_instance_1.instanceShaderBindingTableRecordOffset = 0;
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_1);
+
+    VkAccelerationStructureInstanceKHR cube_instance_2{};
+    cube_instance_2.transform.matrix[0][0] = 1.0f;
+    cube_instance_2.transform.matrix[1][1] = 1.0f;
+    cube_instance_2.transform.matrix[2][2] = 1.0f;
+    cube_instance_2.transform.matrix[0][3] = 0.0f;
+    cube_instance_2.transform.matrix[1][3] = 0.0f;
+    cube_instance_2.transform.matrix[2][3] = 50.0f;
+    cube_instance_2.mask = 0xff;
+    cube_instance_2.instanceCustomIndex = 0;
+    // Cube instance 2 will be associated to closest hit shader 1
+    cube_instance_2.instanceShaderBindingTableRecordOffset = 0;
+
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_2);
+
+    std::vector<vkt::as::BuildGeometryInfoKHR> tlas_build_info;
+    {
+        vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::CreateTLAS(*m_device, std::move(cube_instances));
+        tlas_build_info.emplace_back(std::move(tlas));
+        m_command_buffer.Begin();
+        vkt::as::BuildAccelerationStructuresKHR(m_command_buffer, tlas_build_info);
+        m_command_buffer.End();
+
+        m_default_queue->Submit(m_command_buffer);
+        m_device->Wait();
+    }
+    // Buffer used to count invocations for the 3 shaders
+    vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                             kHostVisibleMemProps);
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
+    std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
+
+    const char* slang_shader = R"slang(
+        [[vk::binding(0, 0)]] RaytracingAccelerationStructure tlas[];
+        [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
+
+        struct RayPayload {
+            uint4 payload;
+            float3 hit;
+        };
+
+        [[vk::shader_record]]
+        cbuffer ShaderRecord
+        {
+            uint tlas_i;
+        }
+
+        [shader("raygeneration")]
+        void rayGenShader()
+        {
+            InterlockedAdd(debug_buffer[0], 1);
+            RayPayload ray_payload = {};
+            RayDesc ray;
+            ray.TMin = 0.01;
+            ray.TMax = 1000.0;
+
+            // Will hit cube 1
+            ray.Origin = float3(0,0,0);
+            ray.Direction = float3(1,0,0);
+            TraceRay(tlas[tlas_i], RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, ray_payload);
+        }
+
+        [shader("miss")]
+        void missShader(inout RayPayload payload)
+        {
+            InterlockedAdd(debug_buffer[1], 1);
+            payload.hit = float3(0.1, 0.2, 0.3);
+        }
+
+        [shader("closesthit")]
+        void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+        {
+            InterlockedAdd(debug_buffer[2], 1);
+            const float3 barycentric_coords = float3(1.0f - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x,
+                attr.barycentrics.y);
+            payload.hit = barycentric_coords;
+        }
+    )slang";
+
+    std::vector<VkAccelerationStructureKHR> tlas_handles(6, tlas_build_info[0].GetDstAS()->handle());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddSlangRayGenShader(slang_shader, "rayGenShader");
+    pipeline.AddSlangMissShader(slang_shader, "missShader");
+    pipeline.AddSlangClosestHitShader(slang_shader, "closestHitShader");
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, size32(tlas_handles));
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+
+    pipeline.SetShaderRecordSize(sizeof(uint32_t));
+
+    pipeline.Build();
+
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, size32(tlas_handles), tlas_handles.data());
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    uint32_t tlas_i = 1;
+    pipeline.UpdateRayGenShaderRecord(0, &tlas_i, sizeof(tlas_i));
+
+    m_command_buffer.Begin();
+
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+
+    vkt::rt::TraceRaysSbt sbt_ray_gen_1 = pipeline.GetTraceRaysSbt(0);
+    vk::CmdTraceRaysKHR(m_command_buffer, &sbt_ray_gen_1.ray_gen_sbt, &sbt_ray_gen_1.miss_sbt, &sbt_ray_gen_1.hit_sbt,
+                        &sbt_ray_gen_1.callable_sbt, 1, 1, 1);
+
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    // Make sure expected ray tracing setup worked, indicating the TLAS was correctly built
+    ASSERT_EQ(debug_buffer_ptr[0], 1);
+    ASSERT_EQ(debug_buffer_ptr[1], 0);
+    ASSERT_EQ(debug_buffer_ptr[2], 1);
+}
+
+TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubesTLASArrayCallableShader) {
+    TEST_DESCRIPTION(
+        "Setup a RT pipeline, a TLAS pointing to 2 cubes, and traces rays into it. Use a runtime TLAS array and a callable "
+        "shader.");
+
+    RETURN_IF_SKIP(CheckSlangSupport());
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    std::vector<vkt::as::GeometryKHR> cube_instances(1);
+    cube_instances[0].SetType(vkt::as::GeometryKHR::Type::Instance);
+
+    VkAccelerationStructureInstanceKHR cube_instance_1{};
+    cube_instance_1.transform.matrix[0][0] = 1.0f;
+    cube_instance_1.transform.matrix[1][1] = 1.0f;
+    cube_instance_1.transform.matrix[2][2] = 1.0f;
+    cube_instance_1.transform.matrix[0][3] = 50.0f;
+    cube_instance_1.transform.matrix[1][3] = 0.0f;
+    cube_instance_1.transform.matrix[2][3] = 0.0f;
+    cube_instance_1.mask = 0xff;
+    cube_instance_1.instanceCustomIndex = 0;
+    // Cube instance 1 will be associated to closest hit shader 1
+    cube_instance_1.instanceShaderBindingTableRecordOffset = 0;
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_1);
+
+    VkAccelerationStructureInstanceKHR cube_instance_2{};
+    cube_instance_2.transform.matrix[0][0] = 1.0f;
+    cube_instance_2.transform.matrix[1][1] = 1.0f;
+    cube_instance_2.transform.matrix[2][2] = 1.0f;
+    cube_instance_2.transform.matrix[0][3] = 0.0f;
+    cube_instance_2.transform.matrix[1][3] = 0.0f;
+    cube_instance_2.transform.matrix[2][3] = 50.0f;
+    cube_instance_2.mask = 0xff;
+    cube_instance_2.instanceCustomIndex = 0;
+    // Cube instance 2 will be associated to closest hit shader 1
+    cube_instance_2.instanceShaderBindingTableRecordOffset = 0;
+
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_2);
+
+    std::vector<vkt::as::BuildGeometryInfoKHR> tlas_build_info;
+    {
+        vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::CreateTLAS(*m_device, std::move(cube_instances));
+        tlas_build_info.emplace_back(std::move(tlas));
+        m_command_buffer.Begin();
+        vkt::as::BuildAccelerationStructuresKHR(m_command_buffer, tlas_build_info);
+        m_command_buffer.End();
+
+        m_default_queue->Submit(m_command_buffer);
+        m_device->Wait();
+    }
+    // Buffer used to count invocations for the 3 shaders
+    vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                             kHostVisibleMemProps);
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
+    std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
+
+    const char* slang_shader = R"slang(
+        [[vk::binding(0, 0)]] RaytracingAccelerationStructure tlas[];
+        [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
+
+        struct RayPayload {
+            uint4 payload;
+            float3 hit;
+        };
+
+        [[vk::shader_record]]
+        cbuffer ShaderRecord
+        {
+            uint tlas_i;
+            uint callable_i;
+        }
+
+        [shader("raygeneration")]
+        void rayGenShader()
+        {
+            InterlockedAdd(debug_buffer[0], 1);
+            RayPayload ray_payload = {};
+            RayDesc ray;
+            ray.TMin = 0.01;
+            ray.TMax = 1000.0;
+
+            // Will hit cube 1
+            ray.Origin = float3(0,0,0);
+            ray.Direction = float3(1,0,0);
+            TraceRay(tlas[tlas_i], RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, ray_payload);
+
+            CallShader(0, ray_payload);
+        }
+
+        [shader("miss")]
+        void missShader(inout RayPayload payload)
+        {
+            InterlockedAdd(debug_buffer[1], 1);
+            payload.hit = float3(0.1, 0.2, 0.3);
+        }
+
+        [shader("closesthit")]
+        void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+        {
+            InterlockedAdd(debug_buffer[2], 1);
+            const float3 barycentric_coords = float3(1.0f - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x,
+                attr.barycentrics.y);
+            payload.hit = barycentric_coords;
+        }
+
+        [shader("callable")]
+        void myCallable(in out RayPayload payload)
+        {
+            payload.hit = float3(0);
+        }
+    )slang";
+
+    std::vector<VkAccelerationStructureKHR> tlas_handles(6, tlas_build_info[0].GetDstAS()->handle());
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddSlangRayGenShader(slang_shader, "rayGenShader");
+    pipeline.AddSlangMissShader(slang_shader, "missShader");
+    pipeline.AddSlangClosestHitShader(slang_shader, "closestHitShader");
+    pipeline.AddSlangCallableShader(slang_shader, "myCallable");
+
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0, size32(tlas_handles));
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+    pipeline.CreateDescriptorSet();
+
+    pipeline.SetShaderRecordSize(sizeof(uint32_t));
+
+    pipeline.Build();
+
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, size32(tlas_handles), tlas_handles.data());
+    pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, debug_buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+
+    std::array<uint32_t, 2> shader_record = {{1, 0}};
+    pipeline.UpdateRayGenShaderRecord(0, shader_record.data(), shader_record.size() * sizeof(shader_record[0]));
+
+    m_command_buffer.Begin();
+
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+
+    vkt::rt::TraceRaysSbt sbt_ray_gen_1 = pipeline.GetTraceRaysSbt(0);
+    vk::CmdTraceRaysKHR(m_command_buffer, &sbt_ray_gen_1.ray_gen_sbt, &sbt_ray_gen_1.miss_sbt, &sbt_ray_gen_1.hit_sbt,
+                        &sbt_ray_gen_1.callable_sbt, 1, 1, 1);
+
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    // Make sure expected ray tracing setup worked, indicating the TLAS was correctly built
+    ASSERT_EQ(debug_buffer_ptr[0], 1);
+    ASSERT_EQ(debug_buffer_ptr[1], 0);
+    ASSERT_EQ(debug_buffer_ptr[2], 1);
+}
+
 TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes2) {
     TEST_DESCRIPTION(
         "Setup a RT pipeline, a TLAS pointing to 2 cubes, and traces rays into it. Have 2 identical BLAS backed by the same "
@@ -1106,7 +1459,7 @@ TEST_F(PositiveGpuAVRayTracing, TraceRaysInCubes2) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1329,7 +1682,7 @@ TEST_F(PositiveGpuAVRayTracing, OutOfBoundsIndex) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1389,7 +1742,7 @@ TEST_F(PositiveGpuAVRayTracing, OutOfBoundsIndex2) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1444,7 +1797,7 @@ TEST_F(PositiveGpuAVRayTracing, IndexBufferUpdate) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1533,7 +1886,7 @@ TEST_F(PositiveGpuAVRayTracing, VertexBufferUpdateStridedVertices) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1631,7 +1984,7 @@ TEST_F(PositiveGpuAVRayTracing, AabbStatus) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::rayQuery);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1705,7 +2058,7 @@ TEST_F(PositiveGpuAVRayTracing, EmptyTlas) {
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::rayQuery);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1744,7 +2097,7 @@ TEST_F(PositiveGpuAVRayTracing, TlasBuildUsingZeroAsBlasAddress) {
     AddRequiredFeature(vkt::Feature::shaderInt64);
 
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
@@ -1819,4 +2172,692 @@ TEST_F(PositiveGpuAVRayTracing, TlasBuildUsingZeroAsBlasAddress) {
         m_device->Wait();
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(PositiveGpuAVRayTracing, BlasAddressRecycledFromDestroyedTlas) {
+    TEST_DESCRIPTION(
+        "A TLAS is created, then its buffer is destroyed, making the TLAS invalid. A BLAS is then created on a buffer recycling "
+        "the memory of the destroyed one, ending up with the same address as the stale TLAS. Referencing that address in a TLAS "
+        "build is valid: GPU-AV must look past the stale TLAS entry in its list of valid acceleration structures, and find the "
+        "valid BLAS listed right after it.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::DeviceMemory common_as_memory;
+
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    const VkDeviceSize as_size = blas.GetSizeInfo().accelerationStructureSize;
+
+    const VkBufferCreateInfo as_buffer_ci = vkt::Buffer::CreateInfo(
+        as_size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+
+    vkt::as::AccelerationStructureKHR tlas(m_device);
+    VkDeviceAddress stale_tlas_addr = 0;
+    {
+        vkt::Buffer tlas_buffer(*m_device, as_buffer_ci, vkt::no_mem);
+
+        VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        const VkMemoryAllocateInfo alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(
+            *m_device, tlas_buffer.MemoryRequirements(), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
+        common_as_memory.Init(*m_device, alloc_info);
+        tlas_buffer.BindMemory(common_as_memory, 0);
+
+        tlas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
+        tlas.SetSize(as_size);
+        tlas.SetDeviceBuffer(std::move(tlas_buffer));
+        tlas.Create();
+
+        // Getting the address is what makes GPU-AV list this TLAS
+        stale_tlas_addr = tlas.GetAccelerationStructureDeviceAddress();
+
+        // Destroy TLAS buffer
+        tlas.GetBuffer().Destroy();
+    }
+
+    vkt::Buffer blas_buffer(*m_device, as_buffer_ci, vkt::no_mem);
+    blas_buffer.BindMemory(common_as_memory, 0);
+    blas.GetDstAS()->SetSize(as_size);
+    blas.GetDstAS()->SetDeviceBuffer(std::move(blas_buffer));
+
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    if (blas.GetDstAS()->GetAccelerationStructureDeviceAddress() != stale_tlas_addr) {
+        GTEST_SKIP() << "Driver did not give the BLAS the address of the destroyed TLAS, cannot exercise this scenario";
+    }
+
+    // Build a TLAS referencing the BLAS: no false positive must be reported, the BLAS is valid
+    std::vector<vkt::as::GeometryKHR> cube_instances(1);
+    cube_instances[0].SetType(vkt::as::GeometryKHR::Type::Instance);
+
+    VkAccelerationStructureInstanceKHR cube_instance{};
+    cube_instance.transform.matrix[0][0] = 1.0f;
+    cube_instance.transform.matrix[1][1] = 1.0f;
+    cube_instance.transform.matrix[2][2] = 1.0f;
+    cube_instance.mask = 0xff;
+    cube_instance.instanceCustomIndex = 0;
+    cube_instance.instanceShaderBindingTableRecordOffset = 0;
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, blas.GetDstAS()->handle(), cube_instance);
+
+    std::vector<vkt::as::BuildGeometryInfoKHR> tlas_build_info;
+    tlas_build_info.emplace_back(vkt::as::blueprint::CreateTLAS(*m_device, std::move(cube_instances)));
+
+    m_command_buffer.Begin();
+    vkt::as::BuildAccelerationStructuresKHR(m_command_buffer, tlas_build_info);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, BlasReference1DescriptorHeap) {
+    RETURN_IF_SKIP(CheckSlangSupport());
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    vkt::DescriptorHeapEXT::AddDescriptorHeapRequirements(*this);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+    vkt::as::BuildGeometryInfoKHR cube_blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+
+    m_command_buffer.Begin();
+    cube_blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    std::vector<vkt::as::GeometryKHR> cube_instances(1);
+    cube_instances[0].SetType(vkt::as::GeometryKHR::Type::Instance);
+
+    VkAccelerationStructureInstanceKHR cube_instance_1{};
+    cube_instance_1.transform.matrix[0][0] = 1.0f;
+    cube_instance_1.transform.matrix[1][1] = 1.0f;
+    cube_instance_1.transform.matrix[2][2] = 1.0f;
+    cube_instance_1.transform.matrix[0][3] = 50.0f;
+    cube_instance_1.transform.matrix[1][3] = 0.0f;
+    cube_instance_1.transform.matrix[2][3] = 0.0f;
+    cube_instance_1.mask = 0xff;
+    cube_instance_1.instanceCustomIndex = 0;
+    // Cube instance 1 will be associated to closest hit shader 1
+    cube_instance_1.instanceShaderBindingTableRecordOffset = 0;
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_1);
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_1);
+
+    VkAccelerationStructureInstanceKHR cube_instance_2{};
+    cube_instance_2.transform.matrix[0][0] = 1.0f;
+    cube_instance_2.transform.matrix[1][1] = 1.0f;
+    cube_instance_2.transform.matrix[2][2] = 1.0f;
+    cube_instance_2.transform.matrix[0][3] = 0.0f;
+    cube_instance_2.transform.matrix[1][3] = 0.0f;
+    cube_instance_2.transform.matrix[2][3] = 50.0f;
+    cube_instance_2.mask = 0xff;
+    cube_instance_2.instanceCustomIndex = 0;
+    // Cube instance 2 will be associated to closest hit shader 1
+    cube_instance_2.instanceShaderBindingTableRecordOffset = 0;
+
+    cube_instances[0].AddInstanceDeviceAccelStructRef(*m_device, cube_blas.GetDstAS()->handle(), cube_instance_2);
+
+    std::vector<vkt::as::BuildGeometryInfoKHR> tlas_build_info;
+    {
+        vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::CreateTLAS(*m_device, std::move(cube_instances));
+        tlas_build_info.emplace_back(std::move(tlas));
+        m_command_buffer.Begin();
+        vkt::as::BuildAccelerationStructuresKHR(m_command_buffer, tlas_build_info);
+        m_command_buffer.End();
+
+        m_default_queue->Submit(m_command_buffer);
+        m_device->Wait();
+    }
+    // Buffer used to count invocations for the 3 shaders
+    vkt::Buffer debug_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                             vkt::device_address);
+    auto debug_buffer_ptr = static_cast<uint32_t*>(debug_buffer.Memory().Map());
+    std::memset(debug_buffer_ptr, 0, (size_t)debug_buffer.CreateInfo().size);
+
+    vkt::DescriptorHeapEXT desc_heap(*this);
+    desc_heap.CreateResourceHeap(1024, true);
+    const VkDeviceSize as_heap_offset = desc_heap.WriteAccelerationStructureDescriptor(*tlas_build_info[0].GetDstAS());
+    const VkDeviceSize debug_buffer_heap_offset = desc_heap.WriteBufferDescriptor(debug_buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+
+    std::array<VkDescriptorSetAndBindingMappingEXT, 2> mappings = {};
+    mappings[0] = vku::InitStructHelper();
+    mappings[0] = MakeSetAndBindingMappingEXT(0, 0);
+    mappings[0].source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT;
+    mappings[0].sourceData.shaderRecordIndex = {};
+    mappings[0].sourceData.shaderRecordIndex.heapOffset = (uint32_t)as_heap_offset;
+    mappings[0].sourceData.shaderRecordIndex.shaderRecordOffset = 0;
+    mappings[0].sourceData.shaderRecordIndex.heapIndexStride = 0;
+    mappings[0].sourceData.shaderRecordIndex.heapArrayStride = 0;
+
+    mappings[1] = vku::InitStructHelper();
+    mappings[1] = MakeSetAndBindingMappingEXT(0, 1);
+    mappings[1].source = VK_DESCRIPTOR_MAPPING_SOURCE_HEAP_WITH_SHADER_RECORD_INDEX_EXT;
+    mappings[1].sourceData.shaderRecordIndex = {};
+    mappings[1].sourceData.shaderRecordIndex.heapOffset = (uint32_t)debug_buffer_heap_offset;
+    mappings[1].sourceData.shaderRecordIndex.shaderRecordOffset = 0;
+    mappings[1].sourceData.shaderRecordIndex.heapIndexStride = 0;
+    mappings[1].sourceData.shaderRecordIndex.heapArrayStride = 0;
+
+    VkShaderDescriptorSetAndBindingMappingInfoEXT mapping_info = vku::InitStructHelper();
+    mapping_info.mappingCount = size32(mappings);
+    mapping_info.pMappings = mappings.data();
+
+    const char* slang_shader = R"slang(
+        [[vk::binding(0, 0)]] uniform RaytracingAccelerationStructure tlas;
+        [[vk::binding(1, 0)]] RWStructuredBuffer<uint32_t> debug_buffer;
+
+        struct RayPayload {
+            uint4 payload;
+            float3 hit;
+        };
+
+        [shader("raygeneration")]
+        void rayGenShader()
+        {
+            InterlockedAdd(debug_buffer[0], 1);
+            RayPayload ray_payload = {};
+            RayDesc ray;
+            ray.TMin = 0.01;
+            ray.TMax = 1000.0;
+
+            // Will hit cube 1
+            ray.Origin = float3(0,0,0);
+            ray.Direction = float3(1,0,0);
+            TraceRay(tlas, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, ray_payload);
+        }
+
+        [shader("miss")]
+        void missShader(inout RayPayload payload)
+        {
+            InterlockedAdd(debug_buffer[1], 1);
+            payload.hit = float3(0.1, 0.2, 0.3);
+        }
+
+        [shader("closesthit")]
+        void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+        {
+            InterlockedAdd(debug_buffer[2], 1);
+            const float3 barycentric_coords = float3(1.0f - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x,
+                attr.barycentrics.y);
+            payload.hit = barycentric_coords;
+        }
+    )slang";
+
+    vkt::rt::Pipeline pipeline(*this, m_device);
+    pipeline.AddCreateInfoFlags2(VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT);
+    pipeline.SetShaderRecordSize(3 * sizeof(uint32_t));
+    pipeline.AddSlangRayGenShader(slang_shader, "rayGenShader", nullptr, &mapping_info);
+    pipeline.AddSlangMissShader(slang_shader, "missShader", nullptr, &mapping_info);
+    pipeline.AddSlangClosestHitShader(slang_shader, "closestHitShader", nullptr, &mapping_info);
+
+    pipeline.Build();
+
+    uint32_t vec[3] = {0, 2, 4};
+    pipeline.UpdateRayGenShaderRecord(0, vec, 3 * sizeof(uint32_t));
+
+    m_command_buffer.Begin();
+
+    desc_heap.BindResourceHeap(m_command_buffer);
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
+
+    vkt::rt::TraceRaysSbt sbt_ray_gen_1 = pipeline.GetTraceRaysSbt(0);
+    vk::CmdTraceRaysKHR(m_command_buffer, &sbt_ray_gen_1.ray_gen_sbt, &sbt_ray_gen_1.miss_sbt, &sbt_ray_gen_1.hit_sbt,
+                        &sbt_ray_gen_1.callable_sbt, 1, 1, 1);
+
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    // Make sure expected ray tracing setup worked, indicating the TLAS was correctly built
+    ASSERT_EQ(debug_buffer_ptr[0], 1);
+    ASSERT_EQ(debug_buffer_ptr[1], 0);
+    ASSERT_EQ(debug_buffer_ptr[2], 1);
+}
+
+TEST_F(PositiveGpuAVRayTracing, BuildStateSnapshotFollowsExecutionOrder) {
+    TEST_DESCRIPTION(
+        "Build a BLAS twice with a different geometry count, submitting the smaller build last, then update it. The update must "
+        "be validated against the last *executed* build, not against the last *recorded* one.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    // Two geometries, 12 triangles each
+    vkt::as::BuildGeometryInfoKHR blas_big = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(
+        *m_device, vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+    {
+        std::vector<vkt::as::GeometryKHR> geometries;
+        geometries.emplace_back(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+        geometries.emplace_back(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+        blas_big.SetGeometries(std::move(geometries));
+        blas_big.SetBuildRanges(blas_big.GetBuildRangeInfosFromGeometries());
+    }
+    blas_big.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    // Size the destination acceleration structure for the biggest of the two builds, then stop touching its size
+    blas_big.UpdateDstAccelStructSize();
+    blas_big.SetUpdateDstAccelStructSizeBeforeBuild(false);
+
+    // One geometry, 1 triangle, built into the same acceleration structure
+    vkt::as::BuildGeometryInfoKHR blas_small = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(
+        *m_device, vkt::as::blueprint::GeometrySimpleOnDeviceIndexedTriangleInfo(*m_device, 1));
+    blas_small.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    blas_small.SetDstAS(blas_big.GetDstAS());
+    blas_small.SetUpdateDstAccelStructSizeBeforeBuild(false);
+
+    // Record the small build first, so that recording the big one grows the GPU side build state buffers
+    vkt::CommandBuffer cb_small(*m_device, m_command_pool);
+    cb_small.Begin();
+    blas_small.BuildCmdBuffer(cb_small);
+    cb_small.End();
+
+    vkt::CommandBuffer cb_big(*m_device, m_command_pool);
+    cb_big.Begin();
+    blas_big.BuildCmdBuffer(cb_big);
+    cb_big.End();
+
+    // Execute in the opposite order: the last executed build is the small one
+    m_default_queue->SubmitAndWait(cb_big);
+    m_default_queue->SubmitAndWait(cb_small);
+
+    // Update the small build, leaving its geometry untouched. Nothing changed since the last executed build, so this is valid.
+    blas_small.SetSrcAS(blas_small.GetDstAS());
+    blas_small.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+
+    m_command_buffer.Begin();
+    blas_small.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, VertexBufferUpdateOnlySubmittedBuildsMatter) {
+    TEST_DESCRIPTION(
+        "Record 2 builds on the same BLAS. Then record an update on this BLAS, that is only valid against the first build. Only "
+        "submit first build - second build should not be taken into account");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    struct Vertex {
+        float x, y, z;
+    };
+
+    const std::array<Vertex, 9> vertices_build_1 = {{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+
+        {2.0f, 0.0f, 0.0f},
+        {NAN, 0.0f, 0.0f},  // triangle 1 inactive
+        {2.0f, 1.0f, 0.0f},
+
+        {3.0f, 0.0f, 0.0f},
+        {4.0f, 0.0f, 0.0f},
+        {3.0f, 1.0f, 0.0f},
+    }};
+
+    const std::array<Vertex, 9> vertices_build_2 = {{
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+
+        {2.0f, 0.0f, 0.0f},
+        {2.5f, 0.0f, 0.0f},  // triangle 1 active
+        {2.0f, 1.0f, 0.0f},
+
+        {3.0f, 0.0f, 0.0f},
+        {NAN, 0.0f, 0.0f},  // triangle 2 inactive
+        {3.0f, 1.0f, 0.0f},
+    }};
+
+    const std::array<Vertex, 9> vertices_update = {{
+        {0.1f, 0.2f, 0.3f},
+        {1.1f, 0.2f, 0.3f},
+        {0.1f, 1.2f, 0.3f},
+
+        {2.1f, 0.2f, 0.3f},
+        {NAN, 0.2f, 0.3f},  // triangle 1 inactive, as in build 1
+        {2.1f, 1.2f, 0.3f},
+
+        {3.1f, 0.2f, 0.3f},
+        {4.1f, 0.2f, 0.3f},  // triangle 2 active, as in build 1
+        {3.1f, 1.2f, 0.3f},
+    }};
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+    auto make_vertex_buffer = [&](const std::array<Vertex, 9>& vertices) {
+        vkt::Buffer buffer(*m_device, sizeof(vertices[0]) * vertices.size(), buffer_usage, kHostVisibleMemProps, &alloc_flags);
+        auto ptr = static_cast<Vertex*>(buffer.Memory().Map());
+        std::copy(vertices.begin(), vertices.end(), ptr);
+        buffer.Memory().Unmap();
+        return buffer;
+    };
+
+    vkt::as::GeometryKHR geom;
+    geom.SetType(vkt::as::GeometryKHR::Type::Triangle);
+    geom.SetFlags(VK_GEOMETRY_OPAQUE_BIT_KHR);
+    geom.SetPrimitiveCount(3);
+    geom.SetTrianglesDeviceVertexBuffer(make_vertex_buffer(vertices_build_1), uint32_t(vertices_build_1.size() - 1));
+    geom.SetTrianglesIndexType(VK_INDEX_TYPE_NONE_KHR);
+
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(geom));
+    blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+    blas.UpdateDstAccelStructSize();
+    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(make_vertex_buffer(vertices_build_2),
+                                                           uint32_t(vertices_build_2.size() - 1));
+    vkt::CommandBuffer cb_build_2(*m_device, m_command_pool);
+    cb_build_2.Begin();
+    blas.BuildCmdBuffer(cb_build_2);
+    cb_build_2.End();
+
+    blas.SetSrcAS(blas.GetDstAS());
+    blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
+    blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(make_vertex_buffer(vertices_update),
+                                                           uint32_t(vertices_update.size() - 1));
+
+    m_command_buffer.Begin();
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, TlasBuildReferencingClonedBlas) {
+    TEST_DESCRIPTION("A BLAS cloned from a built BLAS is considered built, and can be referenced in a TLAS build.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::as::BuildGeometryInfoKHR blas_src = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    vkt::as::BuildGeometryInfoKHR blas_dst = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas_dst.SetupBuild(true);
+
+    VkMemoryBarrier barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+
+    m_command_buffer.Begin();
+    // Source AS handle is created by the build call, so fill copy info after it
+    blas_src.BuildCmdBuffer(m_command_buffer);
+
+    VkCopyAccelerationStructureInfoKHR copy_info = vku::InitStructHelper();
+    copy_info.src = blas_src.GetDstAS()->handle();
+    copy_info.dst = blas_dst.GetDstAS()->handle();
+    copy_info.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_CLONE_KHR;
+
+    vk::CmdPipelineBarrier(m_command_buffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                           VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+    vk::CmdCopyAccelerationStructureKHR(m_command_buffer, &copy_info);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    vkt::as::BuildGeometryInfoKHR tlas =
+        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas_dst.GetDstAS());
+    m_command_buffer.Begin();
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, TlasBuildReferencingCompactedBlas) {
+    TEST_DESCRIPTION("A BLAS compacted from a built BLAS is considered built, and can be referenced in a TLAS build.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::as::BuildGeometryInfoKHR blas_src = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas_src.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+    m_command_buffer.Begin();
+    blas_src.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    // Destination is as big as the source, so it is big enough to hold the compacted source
+    vkt::as::BuildGeometryInfoKHR blas_dst = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas_dst.SetupBuild(true);
+
+    VkCopyAccelerationStructureInfoKHR copy_info = vku::InitStructHelper();
+    copy_info.src = blas_src.GetDstAS()->handle();
+    copy_info.dst = blas_dst.GetDstAS()->handle();
+    copy_info.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyAccelerationStructureKHR(m_command_buffer, &copy_info);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    vkt::as::BuildGeometryInfoKHR tlas =
+        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas_dst.GetDstAS());
+    m_command_buffer.Begin();
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, TlasBuildReferencingIndirectBuiltBlas) {
+    TEST_DESCRIPTION("A BLAS built with vkCmdBuildAccelerationStructuresIndirectKHR can be referenced in a TLAS build.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::accelerationStructureIndirectBuild);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    m_command_buffer.Begin();
+    blas.BuildCmdBufferIndirect(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+
+    vkt::as::BuildGeometryInfoKHR tlas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *blas.GetDstAS());
+    m_command_buffer.Begin();
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, SerializeAccelerationStructure) {
+    TEST_DESCRIPTION("Build an acceleration structure, serialize then deserialize it, then use it to build a TLAS");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::accelerationStructureIndirectBuild);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    m_command_buffer.Begin();
+
+    blas.BuildCmdBuffer(m_command_buffer);
+
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    vkt::QueryPool serialization_query_pool(*m_device, VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR, 1);
+
+    m_command_buffer.Begin();
+
+    vk::CmdResetQueryPool(m_command_buffer, serialization_query_pool, 0, 1);
+    vk::CmdWriteAccelerationStructuresPropertiesKHR(m_command_buffer, 1, &blas.GetDstAS()->handle(),
+                                                    VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR,
+                                                    serialization_query_pool, 0);
+
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+    uint32_t accel_struct_serialization_size = 0;
+    serialization_query_pool.Results(0, 1, sizeof(uint32_t), &accel_struct_serialization_size, 0);
+
+    vkt::Buffer serialized_accel_struct_buffer(
+        *m_device, accel_struct_serialization_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        vkt::device_address);
+
+    VkCopyAccelerationStructureToMemoryInfoKHR copy_accel_struct_to_memory_info = vku::InitStructHelper();
+    copy_accel_struct_to_memory_info.src = blas.GetDstAS()->handle();
+    copy_accel_struct_to_memory_info.dst.deviceAddress = serialized_accel_struct_buffer.Address();
+    copy_accel_struct_to_memory_info.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_SERIALIZE_KHR;
+
+    m_command_buffer.Begin();
+    vk::CmdCopyAccelerationStructureToMemoryKHR(m_command_buffer, &copy_accel_struct_to_memory_info);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    vkt::Buffer de_serialized_accel_struct_buffer(
+        *m_device, accel_struct_serialization_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        vkt::device_address);
+
+    auto deserialized_blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+    deserialized_blas.AddFlags(
+        VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR /*| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR*/);
+    deserialized_blas.GetDstAS()->SetSize(accel_struct_serialization_size);
+    deserialized_blas.GetDstAS()->Create();
+
+    VkCopyMemoryToAccelerationStructureInfoKHR copy_memory_to_accel_struct_info = vku::InitStructHelper();
+    copy_memory_to_accel_struct_info.src.deviceAddress = serialized_accel_struct_buffer.Address();
+    copy_memory_to_accel_struct_info.dst = deserialized_blas.GetDstAS()->handle();
+    copy_memory_to_accel_struct_info.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_DESERIALIZE_KHR;
+
+    m_command_buffer.Begin();
+
+    vk::CmdCopyMemoryToAccelerationStructureKHR(m_command_buffer, &copy_memory_to_accel_struct_info);
+
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
+    m_device->Wait();
+
+    vkt::as::BuildGeometryInfoKHR tlas =
+        vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceTopLevel(*m_device, *deserialized_blas.GetDstAS());
+    m_command_buffer.Begin();
+    tlas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
+}
+
+TEST_F(PositiveGpuAVRayTracing, BuildAccelerationStructureDescriptorBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features, false));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+
+    VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
+    vkt::DescriptorSetLayout ds_layout(*m_device, binding, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+    vkt::PipelineLayout pipeline_layout(*m_device, {&ds_layout});
+
+    vkt::Buffer descriptor_buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
+    VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
+    buffer_binding_info.address = descriptor_buffer.Address();
+    buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+
+    vkt::as::GeometryKHR cube(vkt::as::blueprint::GeometryCubeOnDeviceInfo(*m_device));
+    vkt::as::BuildGeometryInfoKHR blas = vkt::as::blueprint::BuildGeometryInfoOnDeviceBottomLevel(*m_device, std::move(cube));
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorBuffersEXT(m_command_buffer, 1, &buffer_binding_info);
+    const uint32_t buffer_index = 0;
+    const VkDeviceSize buffer_offset = 0;
+    vk::CmdSetDescriptorBufferOffsetsEXT(m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &buffer_index,
+                                         &buffer_offset);
+    blas.BuildCmdBuffer(m_command_buffer);
+    m_command_buffer.End();
+    m_default_queue->SubmitAndWait(m_command_buffer);
 }

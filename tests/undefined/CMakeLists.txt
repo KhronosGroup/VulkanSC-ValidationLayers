@@ -1,6 +1,6 @@
 # ~~~
-# Copyright (c) 2025 Valve Corporation
-# Copyright (c) 2025 LunarG, Inc.
+# Copyright (c) 2026 Valve Corporation
+# Copyright (c) 2026 LunarG, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,18 +21,13 @@ if (ANDROID)
 else()
     add_executable(vk_layer_validation_undefined)
 endif()
-target_sources(vk_layer_validation_undefined PRIVATE
+
+set(TEST_SOURCES
     core_undefined.cpp
 )
-
-get_target_property(TEST_SOURCES vk_layer_validation_undefined SOURCES)
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${TEST_SOURCES})
+vvl_add_test_sources(vk_layer_validation_undefined ${TEST_SOURCES})
 
 add_dependencies(vk_layer_validation_undefined vvl)
-
-target_link_libraries(vk_layer_validation_undefined PRIVATE
-    vk_test_framework
-)
 
 # Want next to other executable in build folder
 set_target_properties(vk_layer_validation_undefined
@@ -53,9 +48,10 @@ if(SLANG_INSTALL_DIR)
 endif()
 
 include(GoogleTest)
-# If cross-compiling, discovery will use an executable with the wrong architecture and stop execution here.
+# Discover the tests when running ctest (PRE_TEST), not after every link (POST_BUILD), to keep incremental builds fast.
+# If cross-compiling, discovery will use an executable with the wrong architecture and fail.
 # Set env. variable VVL_SKIP_GTEST_DISCOVERY to skip discovery.
 if(NOT VVL_SKIP_GTEST_DISCOVERY)
-    gtest_discover_tests(vk_layer_validation_undefined DISCOVERY_TIMEOUT 100)
+    gtest_discover_tests(vk_layer_validation_undefined DISCOVERY_TIMEOUT 100 DISCOVERY_MODE PRE_TEST)
 endif()
 

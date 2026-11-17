@@ -47,7 +47,7 @@ void UpdateBoundDescriptors(Validator& gpuav, CommandBufferSubState& cb_state, V
 
     DescriptorSetBindings::BindingCommand descriptor_binding_cmd{};
     descriptor_binding_cmd.bound_descriptor_sets.reserve(number_of_sets);
-    // Currently we loop through the sets multiple times to reduce complexity and seperate the various parts, can revisit if we find
+    // Currently we loop through the sets multiple times to reduce complexity and separate the various parts, can revisit if we find
     // this is actually a perf bottleneck (assume number of sets are low as people we will then to have a single large set)
     for (uint32_t i = 0; i < number_of_sets; i++) {
         const auto& ds_slot = last_bound.ds_slots[i];
@@ -68,7 +68,7 @@ void UpdateBoundDescriptorHeap(Validator& gpuav, CommandBufferSubState& cb_state
         return;
     }
     DescriptorHeapBindings::BindingCommand bound_heap_snapshot{};
-    desc_heap_bindings->on_update_bound_descriptor_heap(gpuav, cb_state, bound_heap_snapshot, is_sampler);
+    desc_heap_bindings->on_update_bound_descriptor_heap(gpuav, cb_state, bound_heap_snapshot, is_sampler, false);
     desc_heap_bindings->bound_heap_snapshots.emplace_back(std::move(bound_heap_snapshot));
 }
 
