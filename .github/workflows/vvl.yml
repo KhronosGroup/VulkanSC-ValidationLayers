@@ -131,8 +131,6 @@ jobs:
           CFLAGS: -fsanitize=thread
           CXXFLAGS: -fsanitize=thread
           LDFLAGS: -fsanitize=thread
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
       # Thread Sanitize will take about 9x longer to run than Address Sanitize.
       # The main reason we have Max Core and Min Core is to catch issues with Vulkan 1.x vs Vulkan 1.y version issues.
       # In effort to reduce the bottle neck time in testing, skipping these for Thread Sanitize.
@@ -152,9 +150,6 @@ jobs:
       - uses: actions/checkout@v7
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
       - run: python scripts/tests_vksc.py --build --config debug --cmake='-DVVL_ENABLE_UBSAN=ON'
-        env:
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - name: Test Max Profile
         run: python scripts/tests_vksc.py --test
         env:
@@ -180,8 +175,6 @@ jobs:
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
       - run: cmake -S . -B build/ -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Debug
         env:
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
           # Linker warnings as errors
           LDFLAGS: -Wl,--fatal-warnings
       - run: cmake --build build
@@ -195,10 +188,7 @@ jobs:
     strategy:
       matrix:
         arch: [ amd64 ]
-    env:
-      # Exercises the multi-config generator path (Visual Studio, Xcode, Ninja Multi-Config),
-      # where switching Debug/Release/RelWithDebInfo must work from a single configure.
-      CMAKE_GENERATOR: Ninja Multi-Config
+        config: [ debug, release ]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -210,7 +200,7 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
       - name: Build
-        run: python3 scripts/tests_vksc.py --build --config ${{ matrix.config }} --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
+        run: python3 scripts/tests_vksc.py --build --config ${{ matrix.config }}
       - name: Test Max Profile
         run: python scripts/tests_vksc.py --test
         env:
@@ -242,8 +232,6 @@ jobs:
           -D CMAKE_BUILD_TYPE=Release
         env:
           LDFLAGS: -fuse-ld=lld # MINGW linking is very slow. Use llvm linker instead.
-          CMAKE_C_COMPILER_LAUNCHER: ccache
-          CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - run: cmake --build build
       - run: cmake --install build --prefix /tmp
 

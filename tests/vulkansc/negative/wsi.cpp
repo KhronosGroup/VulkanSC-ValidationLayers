@@ -19,7 +19,11 @@ class VkSCNegativeWsi : public VkSCLayerTest {
         AddOptionalExtensions(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME);
     }
 
-    ~VkSCNegativeWsi() { vksc::DestroySurfaceKHR(instance(), surface_, nullptr); }
+    ~VkSCNegativeWsi() {
+        if (surface_ != VK_NULL_HANDLE) {
+            vksc::DestroySurfaceKHR(instance(), surface_, nullptr);
+        }
+    }
 
     VkSurfaceKHR WSISurface() {
         if (surface_ == VK_NULL_HANDLE) {

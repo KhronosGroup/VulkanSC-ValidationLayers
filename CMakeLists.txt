@@ -286,24 +286,6 @@ if(MSVC AND UPDATE_DEPS)
     file(GLOB_RECURSE DOCS "${DOCS_DIR}/*.md")
     add_custom_target(Docs SOURCES ${DOCS})
     source_group(TREE ${DOCS_DIR} PREFIX "Docs" FILES ${DOCS})
-
-    set(EXTERNAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external")
-    file(GLOB_RECURSE EXTERNAL_HEADER_FILES
-            "${GLSLANG_INSTALL_DIR}/*.h"
-            "${GLSLANG_INSTALL_DIR}/*.hpp"
-            "${VULKAN_HEADERS_INSTALL_DIR}/*.h"
-            "${VULKAN_HEADERS_INSTALL_DIR}/*.hpp"
-            "${VULKAN_UTILITY_LIBRARIES_INSTALL_DIR}/*.h"
-            "${VULKAN_UTILITY_LIBRARIES_INSTALL_DIR}/*.hpp"
-            "${SPIRV_HEADERS_INSTALL_DIR}/*.h"
-            "${SPIRV_HEADERS_INSTALL_DIR}/*.hpp"
-            "${SPIRV_TOOLS_INSTALL_DIR}/*.h"
-            "${SPIRV_TOOLS_INSTALL_DIR}/*.hpp"
-            "${GOOGLETEST_INSTALL_DIR}/*.h"
-            "${MIMALLOC_INSTALL_DIR}/*.h"
-    )
-    add_custom_target(External SOURCES ${EXTERNAL_HEADER_FILES})
-    source_group(TREE ${EXTERNAL_DIR} PREFIX "External" FILES ${EXTERNAL_HEADER_FILES})
 endif()
 
 option(BUILD_TESTS "Build the tests")
