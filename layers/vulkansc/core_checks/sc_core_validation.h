@@ -47,8 +47,8 @@ class Instance : public vvl::sc::InstanceProxy<core::Instance> {
     template <typename VkHandleType>
     bool ValidatePipelineCacheCreateInfo(VkHandleType handle, const Location& loc,
                                          const VkPipelineCacheCreateInfo& create_info) const;
-    bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const stateless::SpirvValidator& stateless_spirv_validator,
-                                   const VkPipelineCacheCreateInfo& create_info, const Location& loc) const;
+    bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
+                                   const Location& loc) const;
 
     // Functions requiring additional/modified validation for Vulkan SC
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,

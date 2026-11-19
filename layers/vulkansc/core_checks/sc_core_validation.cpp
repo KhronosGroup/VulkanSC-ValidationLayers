@@ -133,9 +133,8 @@ bool Instance::ValidatePipelineCacheCreateInfo(VkHandleType handle, const Locati
     return skip;
 }
 
-bool Instance::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice,
-                                         const stateless::SpirvValidator& stateless_spirv_validator,
-                                         const VkPipelineCacheCreateInfo& create_info, const Location& loc) const {
+bool Instance::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
+                                         const Location& loc) const {
     bool skip = false;
     bool header_valid = true;
 
@@ -155,7 +154,9 @@ bool Instance::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice,
 
     vvl::sc::PipelineCacheData data(create_info);
     auto baseHeader = data.GetBaseHeader();
-    assert(baseHeader.has_value());
+    if (!baseHeader.has_value()) {
+        return skip;
+    }
 
     if (baseHeader->headerSize != sc_header_size) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_InvalidHeaderSize, physicalDevice, loc.dot(Field::pInitialData),
@@ -179,6 +180,10 @@ bool Instance::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice,
                            "(%u bytes) header.",
                            create_info.initialDataSize, sc_header_size);
         // Return early here as we cannot validate anything else if the header is too small.
+        return skip;
+    }
+
+    if (!data.header.has_value()) {
         return skip;
     }
 
@@ -542,17 +547,13 @@ bool Instance::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, cons
         uint32_t total_device_memory_request_count = 0;
         uint32_t total_sampler_request_count = 0;
 
-        // We have to set up temporary device info for stateless SPIR-V validation
-        const vvl::StatelessDeviceData stateless_device_data(dispatch_instance_, physicalDevice, pCreateInfo);
-        stateless::SpirvValidator stateless_spirv_validator(dispatch_instance_->debug_report, stateless_device_data, false);
-
         while (object_reservation_info != nullptr) {
             const Location object_reservation_info_loc = create_info_loc.pNext(Struct::VkDeviceObjectReservationCreateInfo);
             for (uint32_t i = 0; i < object_reservation_info->pipelineCacheCreateInfoCount; ++i) {
                 const auto& create_info = object_reservation_info->pPipelineCacheCreateInfos[i];
                 const Location cache_create_info_loc = object_reservation_info_loc.dot(Field::pPipelineCacheCreateInfos, i);
                 skip |= ValidatePipelineCacheCreateInfo(physicalDevice, cache_create_info_loc, create_info);
-                skip |= ValidatePipelineCacheData(physicalDevice, stateless_spirv_validator, create_info, cache_create_info_loc);
+                skip |= ValidatePipelineCacheData(physicalDevice, create_info, cache_create_info_loc);
             }
 
             if (object_reservation_info->maxImageViewArrayLayers > device_limits.maxImageArrayLayers) {
